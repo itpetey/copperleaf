@@ -1,0 +1,8 @@
+[package]
+name = "copperleaf"
+version = "0.1.0"
+edition = "2021"
+description = "A typed, constraint-driven Rust EDA library scaffold (see ARCHITECTURE.md)"
+license = "MPL-2.0"
+
+[dependencies]
