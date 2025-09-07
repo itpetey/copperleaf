@@ -1,0 +1,11 @@
+[package]
+name = "copperleaf-analysis"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Analysis passes: ERC and stubs"
+
+[dependencies]
+copperleaf-core = { path = "../core" }
+copperleaf-ir = { path = "../ir" }
+serde = { version = "1", features = ["derive"] }

@@ -4,7 +4,6 @@ use copperleaf::{
 };
 
 fn main() {
-    // Rails
     let vbus = Net::power("VBUS", 5.0.volt());
     let gnd = Net::ground();
     let mut v3v3 = Net::power("V3V3", 3.3.volt()).ripple(50.0.millivolt());
@@ -17,14 +16,12 @@ fn main() {
         clearance: 0.2.mm(),
     });
 
-    // Blocks
     let buck = parts::Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
     let u_reg = ComponentInst::new("U1", buck);
 
     let mcu = parts::Mcu::new("STM32F405RG");
     let u_mcu = ComponentInst::new("U2", mcu);
 
-    // Design assembly (graph wiring omitted in this sketch)
     let mut d = Design::default();
     d.add_net(vbus);
     d.add_net(gnd);
@@ -32,7 +29,6 @@ fn main() {
     d.add_component(&u_reg);
     d.add_component(&u_mcu);
 
-    // Pre-layout ERC example (fake hookup for demo)
     let vdd_pin = Pin {
         name: "VDD",
         role: Role::PowerIn,
@@ -48,11 +44,8 @@ fn main() {
         println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
     }
 
-    // Add global constraints (project targets)
     d.add_constraint(Constraint::ResonanceIndex { max: 0.5 });
     d.add_constraint(Constraint::MaxJunction {
         temp: 85.0.celsius(),
     });
-
-    // Export would serialize `d` to JSON IR / KiCad in real backends.
 }

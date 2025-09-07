@@ -1,0 +1,15 @@
+[package]
+name = "copperleaf"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Unified public API re-exporting subcrates"
+
+[dependencies]
+copperleaf-core = { path = "../core" }
+copperleaf-ir = { path = "../ir" }
+copperleaf-analysis = { path = "../analysis" }
+copperleaf-edsl = { path = "../edsl" }
+copperleaf-parts = { path = "../parts" }
+copperleaf-backend-kicad = { path = "../backends/kicad" }
+

@@ -1,0 +1,10 @@
+[package]
+name = "copperleaf-core"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Core types: units, diagnostics, IDs"
+
+[dependencies]
+uom = { version = "0.36", default-features = false, features = ["f64", "si"] }
+serde = { version = "1", features = ["derive"] }

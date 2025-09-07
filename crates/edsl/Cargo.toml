@@ -1,0 +1,10 @@
+[package]
+name = "copperleaf-edsl"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "EDSL builders and macro stubs"
+
+[dependencies]
+copperleaf-ir = { path = "../ir" }
+

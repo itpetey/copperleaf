@@ -1,0 +1,111 @@
+# Copperleaf
+
+A typed, constraint‑driven Rust EDA library.
+
+Copperleaf provides a small, strongly‑typed core for describing electronics: nets, pins, components, constraints, and simple analysis. It’s organized as multiple crates but re‑exported through a single `copperleaf` facade for ergonomic use.
+
+Read the high‑level design in ARCHITECTURE.md.
+
+## Getting Started
+
+### Prerequisites
+
+- Rust (stable) with Cargo installed
+
+### Build and Docs
+
+- Build all crates: `cargo build`
+- Run tests: `cargo test`
+- Generate docs: `cargo doc --open`
+
+### Quick Start: Run an Example
+
+Run the included example that builds a tiny design, runs a simple ERC, and adds a few constraints:
+
+- `cargo run -p copperleaf --example basic`
+
+You should see an ERC message if the example connects a pin beyond its voltage rating.
+
+### CLI Usage
+
+The CLI offers quick verification, export, and JSON views using the same in‑repo example design:
+
+- Verify (ERC snippet): `cargo run -p copperleaf-cli -- verify`
+- Export a toy KiCad‑like netlist: `cargo run -p copperleaf-cli -- export`
+- Serialize the design to JSON: `cargo run -p copperleaf-cli -- json`
+
+## Your First Design (Tutorial)
+
+Below is a minimal program using the `copperleaf` facade crate to create a design, check a voltage rule, and attach constraints.
+
+Create `examples/hello.rs` (or a small binary crate) with:
+
+```rust
+use copperleaf::{
+    erc_voltage_pin_to_net, parts, ComponentInst, Constraint, Design, Limits, Net, NetClass, Pin,
+    Role, UnitExt,
+};
+
+fn main() {
+    // 1) Define power nets
+    let vbus = Net::power("VBUS", 5.0.volt());
+    let gnd = Net::ground();
+    let mut v3v3 = Net::power("V3V3", 3.3.volt()).ripple(50.0.millivolt());
+    v3v3.class = NetClass { min_width: Some(0.3.mm()), clearance: Some(0.2.mm()) };
+    v3v3
+        .constraints
+        .push(Constraint::NetClass { min_width: 0.3.mm(), clearance: 0.2.mm() });
+
+    // 2) Pick parts and instantiate them
+    let buck = parts::Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+    let u_reg = ComponentInst::new("U1", buck);
+    let mcu = parts::Mcu::new("STM32F405RG");
+    let u_mcu = ComponentInst::new("U2", mcu);
+
+    // 3) Build a design and add top‑level constraints
+    let mut d = Design::default();
+    d.add_net(vbus);
+    d.add_net(gnd);
+    d.add_net(v3v3);
+    d.add_component(&u_reg);
+    d.add_component(&u_mcu);
+    d.add_constraint(Constraint::ResonanceIndex { max: 0.5 });
+    d.add_constraint(Constraint::MaxJunction { temp: 85.0.celsius() });
+
+    // 4) Run a simple ERC: is a pin over‑voltage for V3V3?
+    let vdd_pin = Pin { name: "VDD", role: Role::PowerIn, limits: Limits { v_min: 1.7.volt(), v_max: 3.6.volt(), i_max: 0.5.amp() }, sig: None };
+    let v3v3 = &d.nets.iter().find(|n| n.name == "V3V3").unwrap();
+    if let Some(diag) = erc_voltage_pin_to_net(v3v3, &vdd_pin) {
+        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+    } else {
+        println!("ERC OK: no overvoltage detected");
+    }
+}
+```
+
+Run it with:
+
+- `cargo run -p copperleaf --example hello`
+
+### Inspect the Design as JSON
+
+Serialize the example design to JSON for debugging or downstream tooling:
+
+- `cargo run -p copperleaf-cli -- json`
+
+### Export (Toy) Netlist
+
+Emit a placeholder KiCad‑like netlist from the example design:
+
+- `cargo run -p copperleaf-cli -- export`
+
+## Tips
+
+- Lint (if installed): `cargo clippy --all-targets -- -D warnings`
+- Format: `cargo fmt --all`
+- Explore architecture and crate boundaries in ARCHITECTURE.md
+
+## Status
+
+This is early‑stage and experimental. APIs may change; features are intentionally minimal. Contributions and feedback are welcome.
+
