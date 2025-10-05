@@ -14,7 +14,7 @@
 
 ## Build, Test, and Development Commands
 - Build all: `cargo build`
-- Run CLI: `cargo run -p copperleaf-cli -- verify|export|json`
+- Run CLI: `cl verify|export|json` (installed) or `cargo run -p copperleaf-cli -- verify|export|json` (from repo)
 - Run example: `cargo run -p copperleaf --example basic`
 - Tests: `cargo test` (unit tests across crates)
 - Lint (if installed): `cargo clippy --all-targets -- -D warnings`

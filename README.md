@@ -28,11 +28,15 @@ You should see an ERC message if the example connects a pin beyond its voltage r
 
 ### CLI Usage
 
-The CLI offers quick verification, export, and JSON views using the same in‑repo example design:
+The CLI binary is now named `cl`. It offers quick verification, export, and JSON views using the same example design:
 
-- Verify (ERC snippet): `cargo run -p copperleaf-cli -- verify`
-- Export a toy KiCad‑like netlist: `cargo run -p copperleaf-cli -- export`
-- Serialize the design to JSON: `cargo run -p copperleaf-cli -- json`
+- Verify (ERC snippet): `cl verify`
+- Export a toy KiCad‑like netlist: `cl export`
+- Serialize the design to JSON: `cl json`
+
+Running from the repo without installing:
+
+- `cargo run -p copperleaf-cli -- verify`
 
 ## Your First Design (Tutorial)
 
@@ -91,13 +95,13 @@ Run it with:
 
 Serialize the example design to JSON for debugging or downstream tooling:
 
-- `cargo run -p copperleaf-cli -- json`
+- `cl json` (or `cargo run -p copperleaf-cli -- json`)
 
 ### Export (Toy) Netlist
 
 Emit a placeholder KiCad‑like netlist from the example design:
 
-- `cargo run -p copperleaf-cli -- export`
+- `cl export` (or `cargo run -p copperleaf-cli -- export`)
 
 ## Tips
 
@@ -108,4 +112,3 @@ Emit a placeholder KiCad‑like netlist from the example design:
 ## Status
 
 This is early‑stage and experimental. APIs may change; features are intentionally minimal. Contributions and feedback are welcome.
-
