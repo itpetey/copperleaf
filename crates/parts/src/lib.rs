@@ -23,7 +23,7 @@ impl Buck {
             i_max,
             pins: vec![
                 Pin {
-                    name: "VIN",
+                    name: "VIN".into(),
                     role: Role::PowerIn,
                     limits: Limits {
                         v_min: 3.0.volt(),
@@ -33,7 +33,7 @@ impl Buck {
                     sig: None,
                 },
                 Pin {
-                    name: "SW",
+                    name: "SW".into(),
                     role: Role::PowerOut,
                     limits: Limits {
                         v_min: 0.0.volt(),
@@ -43,7 +43,7 @@ impl Buck {
                     sig: None,
                 },
                 Pin {
-                    name: "GND",
+                    name: "GND".into(),
                     role: Role::Gnd,
                     limits: Limits {
                         v_min: 0.0.volt(),
@@ -91,7 +91,7 @@ impl Mcu {
             id: id.to_owned(),
             pins: vec![
                 Pin {
-                    name: "VDD",
+                    name: "VDD".into(),
                     role: Role::PowerIn,
                     limits: Limits {
                         v_min: 1.7.volt(),
@@ -101,7 +101,7 @@ impl Mcu {
                     sig: None,
                 },
                 Pin {
-                    name: "VSS",
+                    name: "VSS".into(),
                     role: Role::Gnd,
                     limits: Limits {
                         v_min: 0.0.volt(),
@@ -111,7 +111,7 @@ impl Mcu {
                     sig: None,
                 },
                 Pin {
-                    name: "USB_DP",
+                    name: "USB_DP".into(),
                     role: Role::DiffPos,
                     limits: Limits {
                         v_min: 0.0.volt(),
@@ -121,7 +121,7 @@ impl Mcu {
                     sig: Some(usb_spec),
                 },
                 Pin {
-                    name: "USB_DM",
+                    name: "USB_DM".into(),
                     role: Role::DiffNeg,
                     limits: Limits {
                         v_min: 0.0.volt(),

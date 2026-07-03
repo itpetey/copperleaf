@@ -37,7 +37,7 @@ fn main() {
 
     // 4) Run a simple ERC: is a pin over‑voltage for V3V3?
     let vdd_pin = Pin {
-        name: "VDD",
+        name: "VDD".into(),
         role: Role::PowerIn,
         limits: Limits {
             v_min: 1.7.volt(),

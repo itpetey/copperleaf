@@ -30,7 +30,7 @@ fn main() {
     d.add_component(&u_mcu);
 
     let vdd_pin = Pin {
-        name: "VDD",
+        name: "VDD".into(),
         role: Role::PowerIn,
         limits: Limits {
             v_min: 1.7.volt(),

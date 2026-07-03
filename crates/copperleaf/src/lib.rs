@@ -12,7 +12,7 @@
 //!
 //! // Define a 3.3 V net and a power input pin that tolerates up to 3.6 V.
 //! let v3v3 = Net::power("V3V3", 3.3.volt());
-//! let vdd = Pin { name: "VDD", role: Role::PowerIn,
+//! let vdd = Pin { name: "VDD".into(), role: Role::PowerIn,
 //!     limits: Limits { v_min: 1.7.volt(), v_max: 3.6.volt(), i_max: 0.5.amp() },
 //!     sig: None };
 //!
@@ -27,7 +27,7 @@
 //! use copperleaf::{Design, Constraint, NetClass, UnitExt, Net};
 //!
 //! let mut d = Design::default();
-//! let mut v3v3 = Net::power("V3V3", 3.3.volt());  µbht7
+//! let mut v3v3 = Net::power("V3V3", 3.3.volt());
 //! v3v3.class = NetClass { min_width: Some(0.3.mm()), clearance: Some(0.2.mm()) };
 //! d.add_net(v3v3);
 //! d.add_constraint(Constraint::MaxJunction { temp: 85.0.celsius() });

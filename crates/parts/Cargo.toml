@@ -1,11 +1,10 @@
 [package]
 name = "copperleaf-parts"
-version = "0.1.0"
-edition = "2021"
-license = "MPL-2.0"
+version.workspace = true
+edition.workspace = true
 description = "Parts library (initial Buck/MCU)"
+license.workspace = true
 
 [dependencies]
-copperleaf-core = { path = "../core" }
-copperleaf-ir = { path = "../ir" }
-
+copperleaf-core.workspace = true
+copperleaf-ir.workspace = true

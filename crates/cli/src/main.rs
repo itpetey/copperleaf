@@ -1,6 +1,6 @@
 use copperleaf::{
-    backend_kicad, erc_voltage_pin_to_net, parts, ComponentInst, Constraint, Design, Limits, Net,
-    NetClass, Pin, Role, UnitExt,
+    backend_kicad, erc_voltage_pin_to_net, parts, synthesize_decoupling, ComponentInst, Constraint,
+    Design, Limits, Net, NetClass, Pin, Role, UnitExt,
 };
 use std::env;
 use std::fs;
@@ -30,6 +30,10 @@ fn build_example_design() -> Design {
     d.add_net(v3v3);
     d.add_component(&u_reg);
     d.add_component(&u_mcu);
+    d.connect("U1", "VIN", "VBUS");
+    d.connect("U1", "GND", "GND");
+    d.connect("U2", "VDD", "V3V3");
+    d.connect("U2", "VSS", "GND");
 
     d.add_constraint(Constraint::ResonanceIndex { max: 0.5 });
     d.add_constraint(Constraint::MaxJunction {
@@ -41,7 +45,7 @@ fn build_example_design() -> Design {
 fn cmd_verify() {
     let d = build_example_design();
     let vdd_pin = Pin {
-        name: "VDD",
+        name: "VDD".into(),
         role: Role::PowerIn,
         limits: Limits {
             v_min: 1.7.volt(),
@@ -72,9 +76,31 @@ fn cmd_json() {
     }
 }
 
+fn cmd_decouple() {
+    let d = build_example_design();
+    let result = synthesize_decoupling(&d);
+    if result.caps.is_empty() {
+        println!("[Info] DECOUPLE: no capacitors placed");
+    } else {
+        for cap in &result.caps {
+            println!(
+                "  {}: {} F on {} (from {}.{})",
+                cap.refdes,
+                cap.value.as_base(),
+                cap.net,
+                cap.source_component,
+                cap.source_pin,
+            );
+        }
+    }
+    for diag in &result.diagnostics {
+        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+    }
+}
+
 fn usage() {
     eprintln!(
-        "Usage: copperleaf <verify|export|json|apply>\n  apply <in.json> <patch.json> <out.json>"
+        "Usage: copperleaf <verify|export|json|decouple|apply>\n  apply <in.json> <patch.json> <out.json>"
     );
 }
 
@@ -88,6 +114,7 @@ fn main() {
         "verify" => cmd_verify(),
         "export" => cmd_export(),
         "json" => cmd_json(),
+        "decouple" => cmd_decouple(),
         "apply" => cmd_apply(&args[2..]),
         _ => usage(),
     }

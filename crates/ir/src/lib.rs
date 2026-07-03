@@ -55,7 +55,7 @@ pub struct SigSpec {
 /// A logical pin on a component footprint.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pin {
-    pub name: &'static str,
+    pub name: String,
     pub role: Role,
     pub limits: Limits,
     pub sig: Option<SigSpec>,
@@ -87,6 +87,49 @@ pub struct Net {
     pub kind: NetKind,
     pub class: NetClass,
     pub constraints: Vec<Constraint>,
+}
+
+impl Limits {
+    pub fn new(v_min: Qty<Volt>, v_max: Qty<Volt>, i_max: Qty<Amp>) -> Self {
+        Self {
+            v_min,
+            v_max,
+            i_max,
+        }
+    }
+}
+
+impl SigSpec {
+    pub fn new(
+        kind: SigKind,
+        bandwidth: Option<Qty<Second>>,
+        edge_rate: Option<Qty<Second>>,
+        target_impedance: Option<Qty<Ohm>>,
+    ) -> Self {
+        Self {
+            kind,
+            bandwidth,
+            edge_rate,
+            target_impedance,
+        }
+    }
+}
+
+impl Pin {
+    pub fn new(name: impl Into<String>, role: Role, limits: Limits, sig: Option<SigSpec>) -> Self {
+        Self {
+            name: name.into(),
+            role,
+            limits,
+            sig,
+        }
+    }
+
+    pub fn duplicate(&self, name: impl Into<String>) -> Self {
+        let mut dupe = self.clone();
+        dupe.name = name.into();
+        dupe
+    }
 }
 
 impl Net {
@@ -156,6 +199,12 @@ pub enum Constraint {
 /// Trait implemented by parts to expose identity, pins, and default constraints.
 pub trait Block {
     fn id(&self) -> &str;
+    fn pin(&self, idx: usize) -> Option<&Pin> {
+        let pins = self.pins();
+        // Decrement the idx here because pins are 1-based and the array is 0-based.
+        // i.e. pin 1 = idx 0
+        pins.get(idx - 1)
+    }
     fn pins(&self) -> &[Pin];
     fn constraints(&self) -> Vec<Constraint> {
         vec![]
@@ -179,12 +228,27 @@ impl<B: Block> ComponentInst<B> {
     }
 }
 
+/// A component placed in a design, capturing its reference designator, pins,
+/// and constraints extracted from the original [`Block`] at insertion time.
+///
+/// This is the serializable shadow of a [`ComponentInst`] — the generic block
+/// type is erased so that heterogeneous parts can live in a single [`Design`].
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ComponentRecord {
+    /// Reference designator (e.g. `U1`).
+    pub refdes: String,
+    /// Pins exposed by the component, copied from the [`Block`] definition.
+    pub pins: Vec<Pin>,
+    /// Constraints attached to the component, copied from the [`Block`] definition.
+    pub constraints: Vec<Constraint>,
+}
+
 // Design container (graph elided for now)
 /// Top-level container for a design’s nets, components, constraints and diagnostics.
 #[derive(Default, Serialize, Deserialize)]
 pub struct Design {
     pub nets: Vec<Net>,
-    pub components: Vec<String>,
+    pub components: Vec<ComponentRecord>,
     pub constraints: Vec<Constraint>,
     pub diagnostics: Vec<Diagnostic>,
     #[serde(skip)]
@@ -195,9 +259,20 @@ impl Design {
     pub fn add_net(&mut self, n: Net) {
         self.nets.push(n);
     }
-    /// Add a component to the design (graph connectivity is separate).
+    /// Add a component to the design, capturing its pins and constraints.
+    ///
+    /// Graph connectivity is separate — use [`Design::connect`] to wire pins
+    /// to nets after the component has been added.
     pub fn add_component<B: Block>(&mut self, inst: &ComponentInst<B>) {
-        self.components.push(inst.refdes.clone());
+        self.components.push(ComponentRecord {
+            refdes: inst.refdes.clone(),
+            pins: inst.block.pins().to_vec(),
+            constraints: inst.block.constraints(),
+        });
+    }
+    /// Returns the component record with the given reference designator.
+    pub fn component_by_refdes(&self, refdes: &str) -> Option<&ComponentRecord> {
+        self.components.iter().find(|c| c.refdes == refdes)
     }
     /// Add a top-level constraint to the design.
     pub fn add_constraint(&mut self, c: Constraint) {
@@ -223,10 +298,6 @@ impl Design {
         self.graph.nets_of_pin(refdes, pin)
     }
 }
-
-// (ERC functionality lives in `copperleaf-analysis`)
-
-// ===== Graph modeling =====
 
 /// Graph node: either a named net or a concrete (refdes.pin) endpoint.
 #[derive(Clone, Debug)]

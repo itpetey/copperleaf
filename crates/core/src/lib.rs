@@ -13,8 +13,6 @@ use uom::si::length::meter;
 use uom::si::thermodynamic_temperature::degree_celsius;
 use uom::si::time::second;
 
-// ===== Units (backed by uom) =====
-
 /// Marker trait used to bridge concrete `uom` quantities with a simple
 /// generic wrapper [`Qty`]. Each marker defines its underlying `uom` type,
 /// a human label, and conversions to/from the base unit.
@@ -36,7 +34,7 @@ pub struct Amp;
 pub struct Ohm;
 /// Capacitance (farads)
 #[derive(Clone, Copy, Debug)]
-pub struct Farad; // placeholder, not wired
+pub struct Farad;
 /// Length (meters)
 #[derive(Clone, Copy, Debug)]
 pub struct Meter;
@@ -163,10 +161,16 @@ impl<'de, U: UnitMarker> Deserialize<'de> for Qty<U> {
 pub trait UnitExt {
     /// Construct a voltage in volts.
     fn volt(self) -> Qty<Volt>;
+    /// Construct a voltage in millivolts.
+    fn millivolt(self) -> Qty<Volt>;
     /// Construct a current in amperes.
     fn amp(self) -> Qty<Amp>;
+    /// Constructs a current in milliamperes.
+    fn milliamp(self) -> Qty<Amp>;
     /// Construct a resistance in ohms.
     fn ohm(self) -> Qty<Ohm>;
+    /// Construct a resistance in kilo-ohms.
+    fn kohm(self) -> Qty<Ohm>;
     /// Construct a capacitance in farads.
     fn farad(self) -> Qty<Farad>;
     /// Construct a length in millimeters (converted to meters internally).
@@ -185,21 +189,26 @@ pub trait UnitExt {
     fn uf(self) -> Qty<Farad>;
     /// Construct a capacitance in picofarads.
     fn pf(self) -> Qty<Farad>;
-    /// Construct a resistance in kilo-ohms.
-    fn kohm(self) -> Qty<Ohm>;
-    /// Construct a voltage in millivolts.
-    fn millivolt(self) -> Qty<Volt>;
 }
 
 impl UnitExt for f64 {
     fn volt(self) -> Qty<Volt> {
         Qty(Volt::from_base(self), PhantomData)
     }
+    fn millivolt(self) -> Qty<Volt> {
+        Qty(Volt::from_base(self * 1.0e-3), PhantomData)
+    }
     fn amp(self) -> Qty<Amp> {
         Qty(Amp::from_base(self), PhantomData)
     }
+    fn milliamp(self) -> Qty<Amp> {
+        Qty(Amp::from_base(self * 1.0e-3), PhantomData)
+    }
     fn ohm(self) -> Qty<Ohm> {
         Qty(Ohm::from_base(self), PhantomData)
+    }
+    fn kohm(self) -> Qty<Ohm> {
+        Qty(Ohm::from_base(self * 1.0e3), PhantomData)
     }
     fn farad(self) -> Qty<Farad> {
         Qty(Farad::from_base(self), PhantomData)
@@ -230,18 +239,10 @@ impl UnitExt for f64 {
     fn pf(self) -> Qty<Farad> {
         Qty(Farad::from_base(self * 1.0e-12), PhantomData)
     }
-    fn kohm(self) -> Qty<Ohm> {
-        Qty(Ohm::from_base(self * 1.0e3), PhantomData)
-    }
-    fn millivolt(self) -> Qty<Volt> {
-        Qty(Volt::from_base(self * 1.0e-3), PhantomData)
-    }
 }
 
-// ===== Diagnostics =====
-
 /// Diagnostic severity for analysis and verification messages.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Severity {
     Info,
     Warning,

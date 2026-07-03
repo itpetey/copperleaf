@@ -1,11 +1,14 @@
 [package]
 name = "copperleaf-analysis"
-version = "0.1.0"
-edition = "2021"
-license = "MPL-2.0"
+version.workspace = true
+edition.workspace = true
 description = "Analysis passes: ERC and stubs"
+license.workspace = true
 
 [dependencies]
-copperleaf-core = { path = "../core" }
-copperleaf-ir = { path = "../ir" }
-serde = { version = "1", features = ["derive"] }
+copperleaf-core.workspace = true
+copperleaf-ir.workspace = true
+serde = { workspace = true, features = ["derive", "std"] }
+
+[dev-dependencies]
+copperleaf-parts = { workspace = true }
