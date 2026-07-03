@@ -1,9 +1,37 @@
+use std::{env, fs};
+
 use copperleaf::{
-    backend_kicad, erc_voltage_pin_to_net, parts, synthesize_decoupling, ComponentInst, Constraint,
-    Design, Limits, Net, NetClass, Pin, Role, UnitExt,
+    ComponentInst, Constraint, Design, Limits, Net, NetClass, Pin, Role, UnitExt, backend_kicad,
+    erc_voltage_pin_to_net, parts, synthesize_decoupling,
 };
-use std::env;
-use std::fs;
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "op", rename_all = "lowercase")]
+enum PatchOp {
+    // { "op": "connect", "net": "VDD", "pins": ["U1.VDD", "C1.1"] }
+    Connect { net: String, pins: Vec<String> },
+}
+
+#[derive(serde::Deserialize)]
+struct Patch {
+    ops: Vec<PatchOp>,
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        usage();
+        return;
+    }
+    match args[1].as_str() {
+        "verify" => cmd_verify(),
+        "export" => cmd_export(),
+        "json" => cmd_json(),
+        "decouple" => cmd_decouple(),
+        "apply" => cmd_apply(&args[2..]),
+        _ => usage(),
+    }
+}
 
 fn build_example_design() -> Design {
     let vbus = Net::power("VBUS", 5.0.volt());
@@ -42,96 +70,6 @@ fn build_example_design() -> Design {
     d
 }
 
-fn cmd_verify() {
-    let d = build_example_design();
-    let vdd_pin = Pin {
-        name: "VDD".into(),
-        role: Role::PowerIn,
-        limits: Limits {
-            v_min: 1.7.volt(),
-            v_max: 3.6.volt(),
-            i_max: 0.5.amp(),
-        },
-        sig: None,
-    };
-    let v3v3 = &d.nets.iter().find(|n| n.name == "V3V3").unwrap();
-    if let Some(diag) = erc_voltage_pin_to_net(v3v3, &vdd_pin) {
-        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-    } else {
-        println!("[Info] ERC:OK — no overvoltage detected");
-    }
-}
-
-fn cmd_export() {
-    let d = build_example_design();
-    let txt = backend_kicad::emit_netlist_text(&d);
-    println!("{}", txt);
-}
-
-fn cmd_json() {
-    let d = build_example_design();
-    match serde_json::to_string_pretty(&d) {
-        Ok(s) => println!("{}", s),
-        Err(e) => eprintln!("Error serializing design: {}", e),
-    }
-}
-
-fn cmd_decouple() {
-    let d = build_example_design();
-    let result = synthesize_decoupling(&d);
-    if result.caps.is_empty() {
-        println!("[Info] DECOUPLE: no capacitors placed");
-    } else {
-        for cap in &result.caps {
-            println!(
-                "  {}: {} F on {} (from {}.{})",
-                cap.refdes,
-                cap.value.as_base(),
-                cap.net,
-                cap.source_component,
-                cap.source_pin,
-            );
-        }
-    }
-    for diag in &result.diagnostics {
-        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-    }
-}
-
-fn usage() {
-    eprintln!(
-        "Usage: copperleaf <verify|export|json|decouple|apply>\n  apply <in.json> <patch.json> <out.json>"
-    );
-}
-
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        usage();
-        return;
-    }
-    match args[1].as_str() {
-        "verify" => cmd_verify(),
-        "export" => cmd_export(),
-        "json" => cmd_json(),
-        "decouple" => cmd_decouple(),
-        "apply" => cmd_apply(&args[2..]),
-        _ => usage(),
-    }
-}
-
-#[derive(serde::Deserialize)]
-#[serde(tag = "op", rename_all = "lowercase")]
-enum PatchOp {
-    // { "op": "connect", "net": "VDD", "pins": ["U1.VDD", "C1.1"] }
-    Connect { net: String, pins: Vec<String> },
-}
-
-#[derive(serde::Deserialize)]
-struct Patch {
-    ops: Vec<PatchOp>,
-}
-
 fn cmd_apply(args: &[String]) {
     if args.len() != 3 {
         return usage();
@@ -159,4 +97,66 @@ fn cmd_apply(args: &[String]) {
 
     let out = serde_json::to_string_pretty(&d).expect("serialize design");
     fs::write(out_path, out).expect("write output");
+}
+
+fn cmd_decouple() {
+    let d = build_example_design();
+    let result = synthesize_decoupling(&d);
+    if result.caps.is_empty() {
+        println!("[Info] DECOUPLE: no capacitors placed");
+    } else {
+        for cap in &result.caps {
+            println!(
+                "  {}: {} F on {} (from {}.{})",
+                cap.refdes,
+                cap.value.as_base(),
+                cap.net,
+                cap.source_component,
+                cap.source_pin,
+            );
+        }
+    }
+    for diag in &result.diagnostics {
+        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+    }
+}
+
+fn cmd_export() {
+    let d = build_example_design();
+    let txt = backend_kicad::emit_netlist_text(&d);
+    println!("{}", txt);
+}
+
+fn cmd_json() {
+    let d = build_example_design();
+    match serde_json::to_string_pretty(&d) {
+        Ok(s) => println!("{}", s),
+        Err(e) => eprintln!("Error serializing design: {}", e),
+    }
+}
+
+fn cmd_verify() {
+    let d = build_example_design();
+    let vdd_pin = Pin {
+        name: "VDD".into(),
+        role: Role::PowerIn,
+        limits: Limits {
+            v_min: 1.7.volt(),
+            v_max: 3.6.volt(),
+            i_max: 0.5.amp(),
+        },
+        sig: None,
+    };
+    let v3v3 = &d.nets.iter().find(|n| n.name == "V3V3").unwrap();
+    if let Some(diag) = erc_voltage_pin_to_net(v3v3, &vdd_pin) {
+        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+    } else {
+        println!("[Info] ERC:OK — no overvoltage detected");
+    }
+}
+
+fn usage() {
+    eprintln!(
+        "Usage: copperleaf <verify|export|json|decouple|apply>\n  apply <in.json> <patch.json> <out.json>"
+    );
 }

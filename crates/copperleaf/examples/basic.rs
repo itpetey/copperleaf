@@ -1,6 +1,6 @@
 use copperleaf::{
-    erc_voltage_pin_to_net, parts, ComponentInst, Constraint, Design, Limits, Net, NetClass, Pin,
-    Role, UnitExt,
+    ComponentInst, Constraint, Design, Limits, Net, NetClass, Pin, Role, UnitExt,
+    erc_voltage_pin_to_net, parts,
 };
 
 fn main() {

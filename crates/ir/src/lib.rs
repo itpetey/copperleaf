@@ -4,10 +4,27 @@
 //! connectivity graph. It is intended to be serialized to and from JSON and
 //! consumed by analysis passes and backends.
 
+use std::collections::HashMap;
+
 use copperleaf_core::{Amp, Celsius, Diagnostic, Farad, Meter, Ohm, Qty, Second, UnitExt, Volt};
 use petgraph::graph::{Graph, NodeIndex};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+// Component trait and instance wrapper
+/// Trait implemented by parts to expose identity, pins, and default constraints.
+pub trait Block {
+    fn id(&self) -> &str;
+    fn pin(&self, idx: usize) -> Option<&Pin> {
+        let pins = self.pins();
+        // Decrement the idx here because pins are 1-based and the array is 0-based.
+        // i.e. pin 1 = idx 0
+        pins.get(idx - 1)
+    }
+    fn pins(&self) -> &[Pin];
+    fn constraints(&self) -> Vec<Constraint> {
+        vec![]
+    }
+}
 
 // Roles and signal kinds
 /// Electrical role of a pin used to infer ERC rules and routing.
@@ -80,6 +97,40 @@ pub struct NetClass {
     pub clearance: Option<Qty<Meter>>,
 }
 
+/// Physical and verification constraints associated with nets and designs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Constraint {
+    Impedance {
+        target: Qty<Ohm>,
+        tol_pct: f64,
+    },
+    LengthMatch {
+        group: String,
+        skew_ps: f64,
+    },
+    ReturnPath {
+        requires_plane: bool,
+    },
+    NetClass {
+        min_width: Qty<Meter>,
+        clearance: Qty<Meter>,
+    },
+    Creepage {
+        min: Qty<Meter>,
+        voltage: Qty<Volt>,
+    },
+    Decoupling {
+        values: Vec<Qty<Farad>>,
+        per_pin: bool,
+    },
+    ResonanceIndex {
+        max: f64,
+    },
+    MaxJunction {
+        temp: Qty<Celsius>,
+    },
+}
+
 /// A named net with kind, class, and attached constraints.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Net {
@@ -87,6 +138,60 @@ pub struct Net {
     pub kind: NetKind,
     pub class: NetClass,
     pub constraints: Vec<Constraint>,
+}
+
+/// An instantiated component with a reference designator.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ComponentInst<B: Block> {
+    pub refdes: String,
+    pub block: B,
+}
+
+/// A component placed in a design, capturing its reference designator, pins,
+/// and constraints extracted from the original [`Block`] at insertion time.
+///
+/// This is the serializable shadow of a [`ComponentInst`] — the generic block
+/// type is erased so that heterogeneous parts can live in a single [`Design`].
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ComponentRecord {
+    /// Reference designator (e.g. `U1`).
+    pub refdes: String,
+    /// Pins exposed by the component, copied from the [`Block`] definition.
+    pub pins: Vec<Pin>,
+    /// Constraints attached to the component, copied from the [`Block`] definition.
+    pub constraints: Vec<Constraint>,
+}
+
+/// Graph node: either a named net or a concrete (refdes.pin) endpoint.
+#[derive(Clone, Debug)]
+pub enum Node {
+    Net(String),
+    Pin { refdes: String, pin: String },
+}
+
+/// Graph edge kinds; currently only electrical connectivity is modeled.
+#[derive(Clone, Debug)]
+pub enum Edge {
+    Electrical,
+}
+
+/// Internal connectivity graph used by [`Design`]. Not serialized.
+#[derive(Default)]
+pub struct DesignGraph {
+    pub g: Graph<Node, Edge>,
+    index: HashMap<String, NodeIndex>,
+}
+
+// Design container (graph elided for now)
+/// Top-level container for a design’s nets, components, constraints and diagnostics.
+#[derive(Default, Serialize, Deserialize)]
+pub struct Design {
+    pub nets: Vec<Net>,
+    pub components: Vec<ComponentRecord>,
+    pub constraints: Vec<Constraint>,
+    pub diagnostics: Vec<Diagnostic>,
+    #[serde(skip)]
+    pub graph: DesignGraph,
 }
 
 impl Limits {
@@ -161,63 +266,6 @@ impl Net {
     }
 }
 
-/// Physical and verification constraints associated with nets and designs.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Constraint {
-    Impedance {
-        target: Qty<Ohm>,
-        tol_pct: f64,
-    },
-    LengthMatch {
-        group: String,
-        skew_ps: f64,
-    },
-    ReturnPath {
-        requires_plane: bool,
-    },
-    NetClass {
-        min_width: Qty<Meter>,
-        clearance: Qty<Meter>,
-    },
-    Creepage {
-        min: Qty<Meter>,
-        voltage: Qty<Volt>,
-    },
-    Decoupling {
-        values: Vec<Qty<Farad>>,
-        per_pin: bool,
-    },
-    ResonanceIndex {
-        max: f64,
-    },
-    MaxJunction {
-        temp: Qty<Celsius>,
-    },
-}
-
-// Component trait and instance wrapper
-/// Trait implemented by parts to expose identity, pins, and default constraints.
-pub trait Block {
-    fn id(&self) -> &str;
-    fn pin(&self, idx: usize) -> Option<&Pin> {
-        let pins = self.pins();
-        // Decrement the idx here because pins are 1-based and the array is 0-based.
-        // i.e. pin 1 = idx 0
-        pins.get(idx - 1)
-    }
-    fn pins(&self) -> &[Pin];
-    fn constraints(&self) -> Vec<Constraint> {
-        vec![]
-    }
-}
-
-/// An instantiated component with a reference designator.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ComponentInst<B: Block> {
-    pub refdes: String,
-    pub block: B,
-}
-
 impl<B: Block> ComponentInst<B> {
     /// Construct a new component instance with the provided reference and part.
     pub fn new(refdes: &str, block: B) -> Self {
@@ -226,97 +274,6 @@ impl<B: Block> ComponentInst<B> {
             block,
         }
     }
-}
-
-/// A component placed in a design, capturing its reference designator, pins,
-/// and constraints extracted from the original [`Block`] at insertion time.
-///
-/// This is the serializable shadow of a [`ComponentInst`] — the generic block
-/// type is erased so that heterogeneous parts can live in a single [`Design`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ComponentRecord {
-    /// Reference designator (e.g. `U1`).
-    pub refdes: String,
-    /// Pins exposed by the component, copied from the [`Block`] definition.
-    pub pins: Vec<Pin>,
-    /// Constraints attached to the component, copied from the [`Block`] definition.
-    pub constraints: Vec<Constraint>,
-}
-
-// Design container (graph elided for now)
-/// Top-level container for a design’s nets, components, constraints and diagnostics.
-#[derive(Default, Serialize, Deserialize)]
-pub struct Design {
-    pub nets: Vec<Net>,
-    pub components: Vec<ComponentRecord>,
-    pub constraints: Vec<Constraint>,
-    pub diagnostics: Vec<Diagnostic>,
-    #[serde(skip)]
-    pub graph: DesignGraph,
-}
-impl Design {
-    /// Add a net to the design.
-    pub fn add_net(&mut self, n: Net) {
-        self.nets.push(n);
-    }
-    /// Add a component to the design, capturing its pins and constraints.
-    ///
-    /// Graph connectivity is separate — use [`Design::connect`] to wire pins
-    /// to nets after the component has been added.
-    pub fn add_component<B: Block>(&mut self, inst: &ComponentInst<B>) {
-        self.components.push(ComponentRecord {
-            refdes: inst.refdes.clone(),
-            pins: inst.block.pins().to_vec(),
-            constraints: inst.block.constraints(),
-        });
-    }
-    /// Returns the component record with the given reference designator.
-    pub fn component_by_refdes(&self, refdes: &str) -> Option<&ComponentRecord> {
-        self.components.iter().find(|c| c.refdes == refdes)
-    }
-    /// Add a top-level constraint to the design.
-    pub fn add_constraint(&mut self, c: Constraint) {
-        self.constraints.push(c);
-    }
-
-    /// Connect a component pin to a net (creates nodes if missing).
-    pub fn connect(&mut self, refdes: &str, pin: &str, net: &str) {
-        let p_idx = self.graph.ensure_pin(refdes, pin);
-        let n_idx = self.graph.ensure_net(net);
-        if self.graph.g.find_edge(p_idx, n_idx).is_none() {
-            self.graph.g.add_edge(p_idx, n_idx, Edge::Electrical);
-        }
-    }
-
-    /// List pins currently connected to a given net.
-    pub fn pins_on_net(&self, net: &str) -> Vec<(String, String)> {
-        self.graph.pins_on_net(net)
-    }
-
-    /// List nets a given component pin is connected to.
-    pub fn nets_of_pin(&self, refdes: &str, pin: &str) -> Vec<String> {
-        self.graph.nets_of_pin(refdes, pin)
-    }
-}
-
-/// Graph node: either a named net or a concrete (refdes.pin) endpoint.
-#[derive(Clone, Debug)]
-pub enum Node {
-    Net(String),
-    Pin { refdes: String, pin: String },
-}
-
-/// Graph edge kinds; currently only electrical connectivity is modeled.
-#[derive(Clone, Debug)]
-pub enum Edge {
-    Electrical,
-}
-
-/// Internal connectivity graph used by [`Design`]. Not serialized.
-#[derive(Default)]
-pub struct DesignGraph {
-    pub g: Graph<Node, Edge>,
-    index: HashMap<String, NodeIndex>,
 }
 
 impl DesignGraph {
@@ -389,6 +346,51 @@ impl DesignGraph {
             }
         }
         out
+    }
+}
+
+impl Design {
+    /// Add a net to the design.
+    pub fn add_net(&mut self, n: Net) {
+        self.nets.push(n);
+    }
+    /// Add a component to the design, capturing its pins and constraints.
+    ///
+    /// Graph connectivity is separate — use [`Design::connect`] to wire pins
+    /// to nets after the component has been added.
+    pub fn add_component<B: Block>(&mut self, inst: &ComponentInst<B>) {
+        self.components.push(ComponentRecord {
+            refdes: inst.refdes.clone(),
+            pins: inst.block.pins().to_vec(),
+            constraints: inst.block.constraints(),
+        });
+    }
+    /// Returns the component record with the given reference designator.
+    pub fn component_by_refdes(&self, refdes: &str) -> Option<&ComponentRecord> {
+        self.components.iter().find(|c| c.refdes == refdes)
+    }
+    /// Add a top-level constraint to the design.
+    pub fn add_constraint(&mut self, c: Constraint) {
+        self.constraints.push(c);
+    }
+
+    /// Connect a component pin to a net (creates nodes if missing).
+    pub fn connect(&mut self, refdes: &str, pin: &str, net: &str) {
+        let p_idx = self.graph.ensure_pin(refdes, pin);
+        let n_idx = self.graph.ensure_net(net);
+        if self.graph.g.find_edge(p_idx, n_idx).is_none() {
+            self.graph.g.add_edge(p_idx, n_idx, Edge::Electrical);
+        }
+    }
+
+    /// List pins currently connected to a given net.
+    pub fn pins_on_net(&self, net: &str) -> Vec<(String, String)> {
+        self.graph.pins_on_net(net)
+    }
+
+    /// List nets a given component pin is connected to.
+    pub fn nets_of_pin(&self, refdes: &str, pin: &str) -> Vec<String> {
+        self.graph.nets_of_pin(refdes, pin)
     }
 }
 

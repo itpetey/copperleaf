@@ -8,6 +8,35 @@ use copperleaf_core::{Diagnostic, Farad, Qty, Severity};
 use copperleaf_ir::{Constraint, Design, Net, NetKind, Pin, Role};
 use serde::{Deserialize, Serialize};
 
+/// Trait for analysis passes to expose a stable name.
+pub trait CheckPass {
+    fn name(&self) -> &str;
+}
+
+/// A decoupling capacitor placement emitted by [`synthesize_decoupling`].
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DecouplingCap {
+    /// Suggested reference designator (e.g. `C1`).
+    pub refdes: String,
+    /// Capacitance value.
+    pub value: Qty<Farad>,
+    /// Power net the capacitor is placed on.
+    pub net: String,
+    /// Component whose decoupling constraint produced this cap.
+    pub source_component: String,
+    /// Pin whose connected net determined the placement target.
+    pub source_pin: String,
+}
+
+/// Result of running decoupling synthesis over a [`Design`].
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DecouplingResult {
+    /// Decoupling capacitors placed by the pass.
+    pub caps: Vec<DecouplingCap>,
+    /// Diagnostics emitted during synthesis.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
 /// Simple ERC: flag when a pin's maximum voltage is below a power net's nominal voltage.
 ///
 /// Returns a [`Diagnostic`] describing the violation when overvoltage is detected,
@@ -33,30 +62,6 @@ pub fn erc_voltage_pin_to_net(net: &Net, pin: &Pin) -> Option<Diagnostic> {
         }
         _ => None,
     }
-}
-
-/// A decoupling capacitor placement emitted by [`synthesize_decoupling`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DecouplingCap {
-    /// Suggested reference designator (e.g. `C1`).
-    pub refdes: String,
-    /// Capacitance value.
-    pub value: Qty<Farad>,
-    /// Power net the capacitor is placed on.
-    pub net: String,
-    /// Component whose decoupling constraint produced this cap.
-    pub source_component: String,
-    /// Pin whose connected net determined the placement target.
-    pub source_pin: String,
-}
-
-/// Result of running decoupling synthesis over a [`Design`].
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct DecouplingResult {
-    /// Decoupling capacitors placed by the pass.
-    pub caps: Vec<DecouplingCap>,
-    /// Diagnostics emitted during synthesis.
-    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Synthesize decoupling capacitors from part-level [`Constraint::Decoupling`] rules.
@@ -167,11 +172,6 @@ pub fn synthesize_decoupling(design: &Design) -> DecouplingResult {
     }
 
     DecouplingResult { caps, diagnostics }
-}
-
-/// Trait for analysis passes to expose a stable name.
-pub trait CheckPass {
-    fn name(&self) -> &str;
 }
 
 #[cfg(test)]

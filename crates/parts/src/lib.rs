@@ -14,6 +14,13 @@ pub struct Buck {
     pub i_max: Qty<Amp>,
 }
 
+/// Generic microcontroller model with USB pins and power rails.
+#[derive(Clone, Debug)]
+pub struct Mcu {
+    id: String,
+    pins: Vec<Pin>,
+}
+
 impl Buck {
     /// Create a new buck regulator with output voltage and current limit.
     pub fn new(id: &str, v_out: Qty<Volt>, i_max: Qty<Amp>) -> Self {
@@ -56,6 +63,7 @@ impl Buck {
         }
     }
 }
+
 impl Block for Buck {
     fn id(&self) -> &str {
         &self.id
@@ -69,13 +77,6 @@ impl Block for Buck {
             per_pin: true,
         }]
     }
-}
-
-/// Generic microcontroller model with USB pins and power rails.
-#[derive(Clone, Debug)]
-pub struct Mcu {
-    id: String,
-    pins: Vec<Pin>,
 }
 
 impl Mcu {
@@ -134,6 +135,7 @@ impl Mcu {
         }
     }
 }
+
 impl Block for Mcu {
     fn id(&self) -> &str {
         &self.id
