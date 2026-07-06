@@ -8,8 +8,8 @@ use std::marker::PhantomData;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use uom::{
-    si::electric_potential::volt, si::electrical_resistance::ohm, si::f64 as uq, si::length::meter,
-    si::thermodynamic_temperature::degree_celsius, si::time::second,
+    si::electric_potential::volt, si::electrical_resistance::ohm, si::f64 as uq, si::inductance::henry,
+    si::length::meter, si::thermodynamic_temperature::degree_celsius, si::time::second,
 };
 
 /// Extension methods on numeric types to construct typed quantities.
@@ -44,6 +44,8 @@ pub trait UnitExt {
     fn uf(self) -> Qty<Farad>;
     /// Construct a capacitance in picofarads.
     fn pf(self) -> Qty<Farad>;
+    /// Construct an inductance in henries.
+    fn henry(self) -> Qty<Henry>;
 }
 
 /// Marker trait used to bridge concrete `uom` quantities with a simple
@@ -71,6 +73,10 @@ pub struct Ohm;
 /// Capacitance (farads)
 #[derive(Clone, Copy, Debug)]
 pub struct Farad;
+
+/// Inductance (henries)
+#[derive(Clone, Copy, Debug)]
+pub struct Henry;
 
 /// Length (meters)
 #[derive(Clone, Copy, Debug)]
@@ -171,6 +177,17 @@ impl UnitMarker for Farad {
     }
     fn from_base(v: f64) -> Self::Q {
         uq::Capacitance::new::<uom::si::capacitance::farad>(v)
+    }
+}
+
+impl UnitMarker for Henry {
+    type Q = uq::Inductance;
+    const LABEL: &'static str = "H";
+    fn to_base(q: &Self::Q) -> f64 {
+        q.value
+    }
+    fn from_base(v: f64) -> Self::Q {
+        uq::Inductance::new::<henry>(v)
     }
 }
 
@@ -296,6 +313,9 @@ impl UnitExt for f64 {
     }
     fn pf(self) -> Qty<Farad> {
         Qty(Farad::from_base(self * 1.0e-12), PhantomData)
+    }
+    fn henry(self) -> Qty<Henry> {
+        Qty(Henry::from_base(self), PhantomData)
     }
 }
 

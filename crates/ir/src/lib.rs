@@ -259,6 +259,46 @@ impl SigSpec {
             target_impedance,
         }
     }
+
+    /// Generic SPI signal with the given bandwidth in MHz and 50 Ω target impedance.
+    pub fn spi(bw_mhz: f64) -> Self {
+        Self {
+            kind: SigKind::Generic,
+            bandwidth: Some(bw_mhz.mhz()),
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
+
+    /// SPI clock signal with the given bandwidth in MHz and 50 Ω target impedance.
+    pub fn spi_clk(bw_mhz: f64) -> Self {
+        Self {
+            kind: SigKind::Clock,
+            bandwidth: Some(bw_mhz.mhz()),
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
+
+    /// Generic control signal with no bandwidth or impedance target.
+    pub fn control() -> Self {
+        Self {
+            kind: SigKind::Generic,
+            bandwidth: None,
+            edge_rate: None,
+            target_impedance: None,
+        }
+    }
+
+    /// Analog low-noise 50 Ω signal (e.g., RF).
+    pub fn rf_50ohm() -> Self {
+        Self {
+            kind: SigKind::AnalogLowNoise,
+            bandwidth: None,
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
 }
 
 impl Pin {
@@ -539,5 +579,41 @@ mod tests {
         let after = restored.graph.counts();
 
         assert_eq!(before, after);
+    }
+
+    #[test]
+    fn spi_preset_is_generic_with_bandwidth_and_impedance() {
+        let spec = SigSpec::spi(50.0);
+        assert!(matches!(spec.kind, SigKind::Generic));
+        assert!((spec.bandwidth.unwrap().as_mhz() - 50.0).abs() < 1e-9);
+        assert!(approx_eq(spec.target_impedance.unwrap().as_base(), 50.0));
+    }
+
+    #[test]
+    fn spi_clk_preset_is_clock() {
+        let spec = SigSpec::spi_clk(50.0);
+        assert!(matches!(spec.kind, SigKind::Clock));
+        assert!((spec.bandwidth.unwrap().as_mhz() - 50.0).abs() < 1e-9);
+        assert!(approx_eq(spec.target_impedance.unwrap().as_base(), 50.0));
+    }
+
+    #[test]
+    fn control_preset_is_generic_with_no_bandwidth_or_impedance() {
+        let spec = SigSpec::control();
+        assert!(matches!(spec.kind, SigKind::Generic));
+        assert!(spec.bandwidth.is_none());
+        assert!(spec.target_impedance.is_none());
+    }
+
+    #[test]
+    fn rf_50ohm_preset_is_analog_low_noise() {
+        let spec = SigSpec::rf_50ohm();
+        assert!(matches!(spec.kind, SigKind::AnalogLowNoise));
+        assert!(spec.bandwidth.is_none());
+        assert!(approx_eq(spec.target_impedance.unwrap().as_base(), 50.0));
+    }
+
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-12
     }
 }

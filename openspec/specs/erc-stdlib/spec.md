@@ -1,5 +1,8 @@
-## ADDED Requirements
+# erc-stdlib Specification
 
+## Purpose
+TBD - created by archiving change analysis-stdlib. Update Purpose after archive.
+## Requirements
 ### Requirement: run_erc runs all built-in ERC rules
 The `copperleaf-analysis` crate SHALL provide `pub fn run_erc(design: &Design) -> Vec<Diagnostic>` that executes all built-in ERC rules and returns a flat list of diagnostics.
 
@@ -29,4 +32,17 @@ The `copperleaf-analysis` crate SHALL provide `pub fn erc_floating_inputs(design
 - **WHEN** a component has a DigitalIO pin with no signal spec and no net connection
 - **THEN** a diagnostic is returned with code `ERC:FLOATING_INPUT` and severity `Warning`
 
+### Requirement: ERC rule for floating power inputs
+The `copperleaf-analysis` crate SHALL provide `pub fn erc_floating_power_inputs(design: &Design) -> Vec<Diagnostic>` that flags `PowerIn` pins that are not connected to any net.
+
+#### Scenario: Unconnected power input
+- **WHEN** a component has a `PowerIn` pin with no net connection
+- **THEN** a diagnostic is returned with code `ERC:FLOATING_POWER_INPUT` and severity `Warning`
+
+### Requirement: ERC rule for multi-net power pins
+The `copperleaf-analysis` crate SHALL provide `pub fn erc_multi_net_power(design: &Design) -> Vec<Diagnostic>` that flags `PowerIn` pins connected to more than one net.
+
+#### Scenario: Power input on two nets
+- **WHEN** a `PowerIn` pin is connected to both "VBUS" and "VCC"
+- **THEN** a diagnostic is returned with code `ERC:MULTI_NET_POWER` and severity `Warning`
 

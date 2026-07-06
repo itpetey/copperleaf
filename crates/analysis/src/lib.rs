@@ -129,34 +129,7 @@ pub fn report(design: &Design) -> String {
     // ERC results
     out.push_str("ERC Results\n");
     out.push_str("-----------\n");
-    let mut erc_diags: Vec<Diagnostic> = Vec::new();
-    for c in &design.components {
-        for pin in &c.pins {
-            let nets = design.nets_of_pin(&c.refdes, &pin.name);
-
-            // Overvoltage: power-input pin connected to a power net with v_nom > v_max
-            if matches!(pin.role, Role::PowerIn) {
-                for net_name in &nets {
-                    if let Some(net) = design.nets.iter().find(|n| n.name == *net_name) {
-                        if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
-                            erc_diags.push(diag);
-                        }
-                    }
-                }
-            }
-
-            // Floating/NC check: input-ish pins with no net connection
-            if matches!(pin.role, Role::PowerIn | Role::AnalogIn | Role::DigitalIO) && nets.is_empty() {
-                erc_diags.push(Diagnostic {
-                    code: "ERC:FLOATING_PIN".into(),
-                    severity: Severity::Warning,
-                    message: format!("Pin {}.{} is unconnected", c.refdes, pin.name),
-                    entities: vec![format!("{}.{}", c.refdes, pin.name)],
-                    hint: Some("Connect the pin to a net or mark it as no-connect".into()),
-                });
-            }
-        }
-    }
+    let erc_diags = run_erc(design);
     if erc_diags.is_empty() {
         out.push_str("  [Info] ERC:OK — no issues detected\n");
     } else {
@@ -225,6 +198,143 @@ pub fn erc_voltage_pin_to_net(net: &Net, pin: &Pin) -> Option<Diagnostic> {
         }
         _ => None,
     }
+}
+
+/// ERC rule: flag pins named "NC" or starting with "NC_" that are connected to a net.
+pub fn erc_nc_pin_connected(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if pin.name == "NC" || pin.name.starts_with("NC_") {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if !nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:NC_CONNECTED".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "NC pin {}.{} is connected to net(s) {}",
+                            component.refdes,
+                            pin.name,
+                            nets.join(", ")
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Leave no-connect pins unconnected".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
+pub fn erc_floating_inputs(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::DigitalIO | Role::AnalogIn) && pin.sig.is_none() {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:FLOATING_INPUT".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "Input pin {}.{} is floating",
+                            component.refdes,
+                            pin.name
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Connect the pin or assign a signal specification".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag any pin connected to a power net with v_nom > v_max.
+///
+/// This moves the component × pin × net orchestration loop out of consumer code.
+pub fn erc_overvoltage(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            for net_name in design.nets_of_pin(&component.refdes, &pin.name) {
+                if let Some(net) = design.nets.iter().find(|n| n.name == net_name) {
+                    if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
+                        diags.push(diag);
+                    }
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag PowerIn pins with no net connection.
+pub fn erc_floating_power_inputs(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::PowerIn) {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:FLOATING_POWER_INPUT".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "Power input pin {}.{} is unconnected",
+                            component.refdes,
+                            pin.name
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Connect the pin to a power net".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag PowerIn pins connected to more than one net.
+pub fn erc_multi_net_power(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::PowerIn) {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.len() > 1 {
+                    diags.push(Diagnostic {
+                        code: "ERC:MULTI_NET_POWER".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "Power input pin {}.{} connects to {} nets: {}",
+                            component.refdes,
+                            pin.name,
+                            nets.len(),
+                            nets.join(", ")
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Check for shorted power nets".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// Run all built-in ERC rules and return a flat list of diagnostics.
+pub fn run_erc(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    diags.extend(erc_nc_pin_connected(design));
+    diags.extend(erc_floating_inputs(design));
+    diags.extend(erc_floating_power_inputs(design));
+    diags.extend(erc_overvoltage(design));
+    diags.extend(erc_multi_net_power(design));
+    diags
 }
 
 /// Synthesize decoupling capacitors from part-level [`Constraint::Decoupling`] rules.
@@ -341,7 +451,7 @@ pub fn synthesize_decoupling(design: &Design) -> DecouplingResult {
 mod tests {
     use super::*;
     use copperleaf_core::UnitExt;
-    use copperleaf_ir::{ComponentInst, ComponentRecord, Limits, Net, Pin, Role};
+    use copperleaf_ir::{ComponentInst, ComponentRecord, Limits, Net, Pin, Role, SigSpec};
     use copperleaf_parts::Buck;
 
     fn approx_eq(a: f64, b: f64) -> bool {
@@ -549,5 +659,310 @@ mod tests {
         assert!(r.contains("U1"));
         assert!(r.contains("VBUS"));
         assert!(r.contains("C1"));
+    }
+
+    #[test]
+    fn nc_pin_connected_flags_connected_nc_pin() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "NC".into(),
+                role: Role::DigitalIO,
+                limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "NC", "V3V3");
+
+        let diags = erc_nc_pin_connected(&d);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "ERC:NC_CONNECTED");
+        assert_eq!(diags[0].severity, Severity::Error);
+        assert!(diags[0].message.contains("U1"));
+        assert!(diags[0].message.contains("NC"));
+    }
+
+    #[test]
+    fn nc_pin_connected_ignores_floating_nc_pin() {
+        let mut d = Design::default();
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin {
+                    name: "NC".into(),
+                    role: Role::DigitalIO,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+                Pin {
+                    name: "NC_1".into(),
+                    role: Role::DigitalIO,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+            ],
+            constraints: vec![],
+        });
+
+        let diags = erc_nc_pin_connected(&d);
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn floating_input_flags_unconnected_digital_io_without_sigspec() {
+        let mut d = Design::default();
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "GPIO".into(),
+                role: Role::DigitalIO,
+                limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+
+        let diags = erc_floating_inputs(&d);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "ERC:FLOATING_INPUT");
+        assert_eq!(diags[0].severity, Severity::Warning);
+    }
+
+    #[test]
+    fn floating_input_ignores_connected_pins_and_pins_with_sigspec() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.6.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin {
+                    name: "GPIO1".into(),
+                    role: Role::DigitalIO,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+                Pin {
+                    name: "GPIO2".into(),
+                    role: Role::DigitalIO,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: Some(SigSpec::control()),
+                },
+            ],
+            constraints: vec![],
+        });
+        d.connect("U1", "GPIO1", "V3V3");
+
+        let diags = erc_floating_inputs(&d);
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn overvoltage_detects_via_run_erc() {
+        let mut d = Design::default();
+        d.add_net(Net::power("VBUS", 5.0.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VDD".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "VDD", "VBUS");
+
+        let diags = run_erc(&d);
+        assert!(diags.iter().any(|d| d.code == "ERC:OVERVOLT"));
+    }
+
+    #[test]
+    fn run_erc_returns_empty_for_clean_design() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VDD".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "VDD", "V3V3");
+
+        let diags = run_erc(&d);
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn run_erc_concatenates_multiple_rules() {
+        let mut d = Design::default();
+        d.add_net(Net::power("VBUS", 5.0.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin {
+                    name: "VDD".into(),
+                    role: Role::PowerIn,
+                    limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+                Pin {
+                    name: "NC".into(),
+                    role: Role::DigitalIO,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+            ],
+            constraints: vec![],
+        });
+        d.connect("U1", "VDD", "VBUS");
+        d.connect("U1", "NC", "VBUS");
+
+        let diags = run_erc(&d);
+        assert!(diags.iter().any(|d| d.code == "ERC:OVERVOLT"));
+        assert!(diags.iter().any(|d| d.code == "ERC:NC_CONNECTED"));
+    }
+
+    #[test]
+    fn overvoltage_scans_all_pin_roles() {
+        let mut d = Design::default();
+        d.add_net(Net::power("VBUS", 5.0.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "GPIO".into(),
+                role: Role::DigitalIO,
+                limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "GPIO", "VBUS");
+
+        let diags = erc_overvoltage(&d);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "ERC:OVERVOLT");
+    }
+
+    #[test]
+    fn floating_power_input_flags_unconnected_power_in() {
+        let mut d = Design::default();
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VDD".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+
+        let diags = erc_floating_power_inputs(&d);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "ERC:FLOATING_POWER_INPUT");
+        assert_eq!(diags[0].severity, Severity::Warning);
+    }
+
+    #[test]
+    fn floating_power_input_ignores_connected_power_in() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VDD".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "VDD", "V3V3");
+
+        let diags = erc_floating_power_inputs(&d);
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn multi_net_power_flags_power_in_on_multiple_nets() {
+        let mut d = Design::default();
+        d.add_net(Net::power("VBUS", 5.0.volt()));
+        d.add_net(Net::power("VCC", 5.0.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VIN".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+        d.connect("U1", "VIN", "VBUS");
+        d.connect("U1", "VIN", "VCC");
+
+        let diags = erc_multi_net_power(&d);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "ERC:MULTI_NET_POWER");
+        assert_eq!(diags[0].severity, Severity::Warning);
+        assert!(diags[0].message.contains("VBUS"));
+        assert!(diags[0].message.contains("VCC"));
+    }
+
+    #[test]
+    fn run_erc_includes_floating_power_and_multi_net_rules() {
+        let mut d = Design::default();
+        d.add_net(Net::power("VBUS", 5.0.volt()));
+        d.add_net(Net::power("VCC", 5.0.volt()));
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin {
+                    name: "VIN".into(),
+                    role: Role::PowerIn,
+                    limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
+                    sig: None,
+                },
+                Pin {
+                    name: "EN".into(),
+                    role: Role::PowerIn,
+                    limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+                    sig: None,
+                },
+            ],
+            constraints: vec![],
+        });
+        d.connect("U1", "VIN", "VBUS");
+        d.connect("U1", "VIN", "VCC");
+        // EN deliberately left unconnected
+
+        let diags = run_erc(&d);
+        assert!(diags.iter().any(|d| d.code == "ERC:MULTI_NET_POWER"));
+        assert!(diags.iter().any(|d| d.code == "ERC:FLOATING_POWER_INPUT"));
+    }
+
+    #[test]
+    fn report_uses_run_erc_for_erc_section() {
+        let mut d = Design::default();
+        d.components.push(ComponentRecord {
+            refdes: "U1".into(),
+            pins: vec![Pin {
+                name: "VDD".into(),
+                role: Role::PowerIn,
+                limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
+                sig: None,
+            }],
+            constraints: vec![],
+        });
+
+        let r = report(&d);
+        assert!(r.contains("ERC:FLOATING_POWER_INPUT"));
     }
 }

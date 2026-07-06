@@ -17,12 +17,13 @@ The `copperleaf-parts` crate SHALL provide `Capacitor`, `Resistor`, `Crystal`, a
 - **THEN** the resulting block has 2 pins with `AnalogIn` role
 
 ### Requirement: Passive convenience constructors
-`Capacitor` SHALL provide `::decoupling(refdes, value)` with PowerIn/Gnd pin roles. `Resistor` SHALL provide `::pullup(refdes, value)` and `::pulldown(refdes, value)` with appropriate pin roles.
+`Capacitor` SHALL provide `::decoupling(refdes, value)` with PowerIn/Gnd pin roles. `Resistor` SHALL provide `::pullup(refdes, value, net)` and `::pulldown(refdes, value, net)` with appropriate pin roles and the supplied net stored on the part.
 
 #### Scenario: Decoupling capacitor pin roles
 - **WHEN** `Capacitor::decoupling("C1", 100.0.nf())` is called
 - **THEN** pin "1" has role `PowerIn` and pin "2" has role `Gnd`
 
-#### Scenario: Pullup resistor pin roles
-- **WHEN** `Resistor::pullup("R1", 10.0.kohm())` is called
+#### Scenario: Pullup resistor pin roles and stored net
+- **WHEN** `Resistor::pullup("R1", 10.0.kohm(), "VCC")` is called
 - **THEN** both pins have role `DigitalIO`
+- **AND** the resistor's `net` field equals `"VCC"`
