@@ -18,6 +18,7 @@ edition = "2024"
 license = "MPL-2.0"
 
 [workspace.dependencies]
+clap = { version = "4.6", default-features = false }
 copperleaf = { path = "crates/copperleaf", default-features = false }
 copperleaf-analysis = { path = "crates/analysis", default-features = false }
 copperleaf-backend-kicad = {
