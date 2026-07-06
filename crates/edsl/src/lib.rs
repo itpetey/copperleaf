@@ -3,8 +3,47 @@
 //! This crate provides lightweight macros to construct designs succinctly in
 //! examples and tests. Macros are deliberately limited and subject to change.
 
-pub use copperleaf_ir::*;
 use copperleaf_core::{Amp, Ohm, Qty, Second, UnitExt, Volt};
+
+pub use copperleaf_ir::*;
+#[cfg(feature = "parts")]
+pub use design_ext::DesignExt;
+
+#[cfg(feature = "parts")]
+pub mod design_ext {
+    //! Extension methods on [`Design`] for adding passive components in one call.
+
+    use copperleaf_core::{Farad, Ohm, Qty};
+    use copperleaf_ir::{ComponentInst, Design};
+    use copperleaf_parts::{Capacitor, Resistor};
+
+    /// Extension trait adding passive convenience methods to [`Design`].
+    pub trait DesignExt {
+        /// Add a capacitor with the given value and wire both pins.
+        fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str);
+
+        /// Add a resistor with the given value and wire both pins.
+        fn add_res(&mut self, refdes: &str, value: Qty<Ohm>, net_a: &str, net_b: &str);
+    }
+
+    impl DesignExt for Design {
+        fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str) {
+            let c = Capacitor::new(value);
+            let inst = ComponentInst::new(refdes, c);
+            self.add_component(inst);
+            self.wire(&format!("{}.{}", refdes, "1"), net_pos);
+            self.wire(&format!("{}.{}", refdes, "2"), net_neg);
+        }
+
+        fn add_res(&mut self, refdes: &str, value: Qty<Ohm>, net_a: &str, net_b: &str) {
+            let r = Resistor::new(value);
+            let inst = ComponentInst::new(refdes, r);
+            self.add_component(inst);
+            self.wire(&format!("{}.{}", refdes, "1"), net_a);
+            self.wire(&format!("{}.{}", refdes, "2"), net_b);
+        }
+    }
+}
 
 // Macro stubs retained for API exploration
 /// Create a [`copperleaf_ir::Design`] with a convenient builder-like block.
@@ -47,68 +86,6 @@ macro_rules! export {
     ($($tt:tt)*) => {
         compile_error!("export! macro is a stub in edsl")
     };
-}
-
-// Pin helper functions used by `part!` and available for direct use.
-
-/// Ground pin helper.
-pub fn gnd() -> Pin {
-    Pin::new(
-        "GND",
-        Role::Gnd,
-        Limits::new(0.0.volt(), 0.0.volt(), 100.0.amp()),
-        None,
-    )
-}
-
-/// Generic digital I/O pin helper.
-pub fn dio() -> Pin {
-    Pin::new(
-        "DIO",
-        Role::DigitalIO,
-        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
-        None,
-    )
-}
-
-/// Power input pin helper with the given voltage/current limits.
-pub fn power_in(v_min: Qty<Volt>, v_max: Qty<Volt>, i_max: Qty<Amp>) -> Pin {
-    Pin::new("PWR", Role::PowerIn, Limits::new(v_min, v_max, i_max), None)
-}
-
-/// SPI data pin helper with bandwidth (as period) and target impedance.
-pub fn dio_spi(bw: Qty<Second>, z: Qty<Ohm>) -> Pin {
-    Pin::new(
-        "SPI",
-        Role::DigitalIO,
-        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
-        Some(SigSpec {
-            kind: SigKind::Generic,
-            bandwidth: Some(bw),
-            edge_rate: None,
-            target_impedance: Some(z),
-        }),
-    )
-}
-
-/// SPI clock pin helper with bandwidth (as period) and target impedance.
-pub fn dio_clk(bw: Qty<Second>, z: Qty<Ohm>) -> Pin {
-    Pin::new(
-        "CLK",
-        Role::DigitalIO,
-        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
-        Some(SigSpec {
-            kind: SigKind::Clock,
-            bandwidth: Some(bw),
-            edge_rate: None,
-            target_impedance: Some(z),
-        }),
-    )
-}
-
-/// Analog input pin helper with the given limits.
-pub fn analog_in(limits: Limits) -> Pin {
-    Pin::new("AIN", Role::AnalogIn, limits, None)
 }
 
 /// Declarative macro for defining parts from a pin table.
@@ -175,44 +152,65 @@ macro_rules! part {
     };
 }
 
-#[cfg(feature = "parts")]
-pub mod design_ext {
-    //! Extension methods on [`Design`] for adding passive components in one call.
-
-    use copperleaf_parts::{Capacitor, Resistor};
-    use copperleaf_ir::{ComponentInst, Design};
-    use copperleaf_core::{Farad, Ohm, Qty};
-
-    /// Extension trait adding passive convenience methods to [`Design`].
-    pub trait DesignExt {
-        /// Add a capacitor with the given value and wire both pins.
-        fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str);
-
-        /// Add a resistor with the given value and wire both pins.
-        fn add_res(&mut self, refdes: &str, value: Qty<Ohm>, net_a: &str, net_b: &str);
-    }
-
-    impl DesignExt for Design {
-        fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str) {
-            let c = Capacitor::new(value);
-            let inst = ComponentInst::new(refdes, c);
-            self.add_component(inst);
-            self.wire(&format!("{}.{}", refdes, "1"), net_pos);
-            self.wire(&format!("{}.{}", refdes, "2"), net_neg);
-        }
-
-        fn add_res(&mut self, refdes: &str, value: Qty<Ohm>, net_a: &str, net_b: &str) {
-            let r = Resistor::new(value);
-            let inst = ComponentInst::new(refdes, r);
-            self.add_component(inst);
-            self.wire(&format!("{}.{}", refdes, "1"), net_a);
-            self.wire(&format!("{}.{}", refdes, "2"), net_b);
-        }
-    }
+/// Analog input pin helper with the given limits.
+pub fn analog_in(limits: Limits) -> Pin {
+    Pin::new("AIN", Role::AnalogIn, limits, None)
 }
 
-#[cfg(feature = "parts")]
-pub use design_ext::DesignExt;
+/// Generic digital I/O pin helper.
+pub fn dio() -> Pin {
+    Pin::new(
+        "DIO",
+        Role::DigitalIO,
+        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+        None,
+    )
+}
+
+/// SPI clock pin helper with bandwidth (as period) and target impedance.
+pub fn dio_clk(bw: Qty<Second>, z: Qty<Ohm>) -> Pin {
+    Pin::new(
+        "CLK",
+        Role::DigitalIO,
+        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+        Some(SigSpec {
+            kind: SigKind::Clock,
+            bandwidth: Some(bw),
+            edge_rate: None,
+            target_impedance: Some(z),
+        }),
+    )
+}
+
+/// SPI data pin helper with bandwidth (as period) and target impedance.
+pub fn dio_spi(bw: Qty<Second>, z: Qty<Ohm>) -> Pin {
+    Pin::new(
+        "SPI",
+        Role::DigitalIO,
+        Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
+        Some(SigSpec {
+            kind: SigKind::Generic,
+            bandwidth: Some(bw),
+            edge_rate: None,
+            target_impedance: Some(z),
+        }),
+    )
+}
+
+/// Ground pin helper.
+pub fn gnd() -> Pin {
+    Pin::new(
+        "GND",
+        Role::Gnd,
+        Limits::new(0.0.volt(), 0.0.volt(), 100.0.amp()),
+        None,
+    )
+}
+
+/// Power input pin helper with the given voltage/current limits.
+pub fn power_in(v_min: Qty<Volt>, v_max: Qty<Volt>, i_max: Qty<Amp>) -> Pin {
+    Pin::new("PWR", Role::PowerIn, Limits::new(v_min, v_max, i_max), None)
+}
 
 #[cfg(test)]
 mod tests {
@@ -306,7 +304,11 @@ mod tests {
 
         let chip = MultiGnd::new("U1");
         assert_eq!(chip.pins().len(), 3);
-        assert!(chip.pins().iter().all(|p| p.name == "GND" && matches!(p.role, Role::Gnd)));
+        assert!(
+            chip.pins()
+                .iter()
+                .all(|p| p.name == "GND" && matches!(p.role, Role::Gnd))
+        );
     }
 
     #[test]
@@ -324,8 +326,14 @@ mod tests {
 
         let chip = ConstrainedChip::new("U1");
         assert_eq!(chip.constraints().len(), 2);
-        assert!(matches!(chip.constraints()[0], Constraint::Decoupling { .. }));
-        assert!(matches!(chip.constraints()[1], Constraint::MaxJunction { .. }));
+        assert!(matches!(
+            chip.constraints()[0],
+            Constraint::Decoupling { .. }
+        ));
+        assert!(matches!(
+            chip.constraints()[1],
+            Constraint::MaxJunction { .. }
+        ));
     }
 
     #[test]
@@ -355,6 +363,9 @@ mod tests {
 
         assert!(d.component_by_refdes("R1").is_some());
         assert!(d.pins_on_net("VDD").contains(&("R1".into(), "1".into())));
-        assert!(d.pins_on_net("SDIO_CS").contains(&("R1".into(), "2".into())));
+        assert!(
+            d.pins_on_net("SDIO_CS")
+                .contains(&("R1".into(), "2".into()))
+        );
     }
 }

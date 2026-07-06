@@ -19,6 +19,36 @@ pub struct Mcu {
     pins: Vec<Pin>,
 }
 
+/// Standard two-pin capacitor.
+#[derive(Clone, Debug)]
+pub struct Capacitor {
+    pins: Vec<Pin>,
+    pub value: Qty<Farad>,
+}
+
+/// Standard two-pin resistor.
+#[derive(Clone, Debug)]
+pub struct Resistor {
+    pins: Vec<Pin>,
+    pub value: Qty<Ohm>,
+    /// Net the resistor terminates on (e.g., `VCC` for a pull-up, `GND` for a pull-down).
+    pub net: String,
+}
+
+/// Standard two-pin crystal.
+#[derive(Clone, Debug)]
+pub struct Crystal {
+    pins: Vec<Pin>,
+    pub frequency: Qty<Second>,
+}
+
+/// Standard two-pin inductor.
+#[derive(Clone, Debug)]
+pub struct Inductor {
+    pins: Vec<Pin>,
+    pub value: Qty<Henry>,
+}
+
 impl Buck {
     /// Create a new buck regulator with output voltage and current limit.
     pub fn new(v_out: Qty<Volt>, i_max: Qty<Amp>) -> Self {
@@ -70,12 +100,6 @@ impl Block for Buck {
             values: vec![100.0.nf(), 1.0.uf()],
             per_pin: true,
         }]
-    }
-}
-
-impl Default for Mcu {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -153,11 +177,10 @@ impl Block for Mcu {
     }
 }
 
-/// Standard two-pin capacitor.
-#[derive(Clone, Debug)]
-pub struct Capacitor {
-    pins: Vec<Pin>,
-    pub value: Qty<Farad>,
+impl Default for Mcu {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Capacitor {
@@ -224,15 +247,6 @@ impl Block for Capacitor {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
-}
-
-/// Standard two-pin resistor.
-#[derive(Clone, Debug)]
-pub struct Resistor {
-    pins: Vec<Pin>,
-    pub value: Qty<Ohm>,
-    /// Net the resistor terminates on (e.g., `VCC` for a pull-up, `GND` for a pull-down).
-    pub net: String,
 }
 
 impl Resistor {
@@ -308,13 +322,6 @@ impl Block for Resistor {
     }
 }
 
-/// Standard two-pin crystal.
-#[derive(Clone, Debug)]
-pub struct Crystal {
-    pins: Vec<Pin>,
-    pub frequency: Qty<Second>,
-}
-
 impl Crystal {
     /// Create a two-pin crystal with both pins as AnalogIn inputs.
     pub fn new(frequency: Qty<Second>) -> Self {
@@ -350,13 +357,6 @@ impl Block for Crystal {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
-}
-
-/// Standard two-pin inductor.
-#[derive(Clone, Debug)]
-pub struct Inductor {
-    pins: Vec<Pin>,
-    pub value: Qty<Henry>,
 }
 
 impl Inductor {
@@ -437,8 +437,18 @@ mod tests {
         let pulldown = Resistor::pulldown(10.0.kohm(), "GND");
         assert_eq!(pullup.pins().len(), 2);
         assert_eq!(pulldown.pins().len(), 2);
-        assert!(pullup.pins().iter().all(|p| matches!(p.role, Role::DigitalIO)));
-        assert!(pulldown.pins().iter().all(|p| matches!(p.role, Role::DigitalIO)));
+        assert!(
+            pullup
+                .pins()
+                .iter()
+                .all(|p| matches!(p.role, Role::DigitalIO))
+        );
+        assert!(
+            pulldown
+                .pins()
+                .iter()
+                .all(|p| matches!(p.role, Role::DigitalIO))
+        );
     }
 
     #[test]

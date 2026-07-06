@@ -37,6 +37,154 @@ pub struct DecouplingResult {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+/// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
+pub fn erc_floating_inputs(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::DigitalIO | Role::AnalogIn) && pin.sig.is_none() {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:FLOATING_INPUT".into(),
+                        severity: Severity::Warning,
+                        message: format!("Input pin {}.{} is floating", component.refdes, pin.name),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Connect the pin or assign a signal specification".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag PowerIn pins with no net connection.
+pub fn erc_floating_power_inputs(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::PowerIn) {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:FLOATING_POWER_INPUT".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "Power input pin {}.{} is unconnected",
+                            component.refdes, pin.name
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Connect the pin to a power net".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag PowerIn pins connected to more than one net.
+pub fn erc_multi_net_power(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if matches!(pin.role, Role::PowerIn) {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if nets.len() > 1 {
+                    diags.push(Diagnostic {
+                        code: "ERC:MULTI_NET_POWER".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "Power input pin {}.{} connects to {} nets: {}",
+                            component.refdes,
+                            pin.name,
+                            nets.len(),
+                            nets.join(", ")
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Check for shorted power nets".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag pins named "NC" or starting with "NC_" that are connected to a net.
+pub fn erc_nc_pin_connected(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            if pin.name == "NC" || pin.name.starts_with("NC_") {
+                let nets = design.nets_of_pin(&component.refdes, &pin.name);
+                if !nets.is_empty() {
+                    diags.push(Diagnostic {
+                        code: "ERC:NC_CONNECTED".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "NC pin {}.{} is connected to net(s) {}",
+                            component.refdes,
+                            pin.name,
+                            nets.join(", ")
+                        ),
+                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
+                        hint: Some("Leave no-connect pins unconnected".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// ERC rule: flag any pin connected to a power net with v_nom > v_max.
+///
+/// This moves the component × pin × net orchestration loop out of consumer code.
+pub fn erc_overvoltage(design: &Design) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for component in &design.components {
+        for pin in &component.pins {
+            for net_name in design.nets_of_pin(&component.refdes, &pin.name) {
+                if let Some(net) = design.nets.iter().find(|n| n.name == net_name)
+                    && let Some(diag) = erc_voltage_pin_to_net(net, pin)
+                {
+                    diags.push(diag);
+                }
+            }
+        }
+    }
+    diags
+}
+
+/// Simple ERC: flag when a pin's maximum voltage is below a power net's nominal voltage.
+///
+/// Returns a [`Diagnostic`] describing the violation when overvoltage is detected,
+/// otherwise `None`.
+pub fn erc_voltage_pin_to_net(net: &Net, pin: &Pin) -> Option<Diagnostic> {
+    match net.kind {
+        NetKind::Power { v_nom, .. } => {
+            if v_nom.as_base() > pin.limits.v_max.as_base() + 1e-9 {
+                return Some(Diagnostic {
+                    code: "ERC:OVERVOLT".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "Pin {} max {:.2}V, connected to {:.2}V net",
+                        pin.name,
+                        pin.limits.v_max.as_base(),
+                        v_nom.as_base()
+                    ),
+                    entities: vec![pin.name.clone(), net.name.clone()],
+                    hint: Some("Use a level shifter or different pin".into()),
+                });
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
 /// Returns a human-readable multi-line report summarizing the design.
 ///
 /// The report includes graph stats, component list grouped by reference
@@ -66,7 +214,11 @@ pub fn report(design: &Design) -> String {
     out.push_str("----------\n");
     let mut groups: BTreeMap<String, Vec<&ComponentRecord>> = BTreeMap::new();
     for c in &design.components {
-        let prefix: String = c.refdes.chars().take_while(|ch| ch.is_alphabetic()).collect();
+        let prefix: String = c
+            .refdes
+            .chars()
+            .take_while(|ch| ch.is_alphabetic())
+            .collect();
         let prefix = if prefix.is_empty() {
             "?".into()
         } else {
@@ -171,159 +323,6 @@ pub fn report(design: &Design) -> String {
     }
 
     out
-}
-
-/// Simple ERC: flag when a pin's maximum voltage is below a power net's nominal voltage.
-///
-/// Returns a [`Diagnostic`] describing the violation when overvoltage is detected,
-/// otherwise `None`.
-pub fn erc_voltage_pin_to_net(net: &Net, pin: &Pin) -> Option<Diagnostic> {
-    match net.kind {
-        NetKind::Power { v_nom, .. } => {
-            if v_nom.as_base() > pin.limits.v_max.as_base() + 1e-9 {
-                return Some(Diagnostic {
-                    code: "ERC:OVERVOLT".into(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "Pin {} max {:.2}V, connected to {:.2}V net",
-                        pin.name,
-                        pin.limits.v_max.as_base(),
-                        v_nom.as_base()
-                    ),
-                    entities: vec![pin.name.clone(), net.name.clone()],
-                    hint: Some("Use a level shifter or different pin".into()),
-                });
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
-/// ERC rule: flag pins named "NC" or starting with "NC_" that are connected to a net.
-pub fn erc_nc_pin_connected(design: &Design) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for component in &design.components {
-        for pin in &component.pins {
-            if pin.name == "NC" || pin.name.starts_with("NC_") {
-                let nets = design.nets_of_pin(&component.refdes, &pin.name);
-                if !nets.is_empty() {
-                    diags.push(Diagnostic {
-                        code: "ERC:NC_CONNECTED".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "NC pin {}.{} is connected to net(s) {}",
-                            component.refdes,
-                            pin.name,
-                            nets.join(", ")
-                        ),
-                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
-                        hint: Some("Leave no-connect pins unconnected".into()),
-                    });
-                }
-            }
-        }
-    }
-    diags
-}
-
-/// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
-pub fn erc_floating_inputs(design: &Design) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for component in &design.components {
-        for pin in &component.pins {
-            if matches!(pin.role, Role::DigitalIO | Role::AnalogIn) && pin.sig.is_none() {
-                let nets = design.nets_of_pin(&component.refdes, &pin.name);
-                if nets.is_empty() {
-                    diags.push(Diagnostic {
-                        code: "ERC:FLOATING_INPUT".into(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Input pin {}.{} is floating",
-                            component.refdes,
-                            pin.name
-                        ),
-                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
-                        hint: Some("Connect the pin or assign a signal specification".into()),
-                    });
-                }
-            }
-        }
-    }
-    diags
-}
-
-/// ERC rule: flag any pin connected to a power net with v_nom > v_max.
-///
-/// This moves the component × pin × net orchestration loop out of consumer code.
-pub fn erc_overvoltage(design: &Design) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for component in &design.components {
-        for pin in &component.pins {
-            for net_name in design.nets_of_pin(&component.refdes, &pin.name) {
-                if let Some(net) = design.nets.iter().find(|n| n.name == net_name)
-                    && let Some(diag) = erc_voltage_pin_to_net(net, pin)
-                {
-                    diags.push(diag);
-                }
-            }
-        }
-    }
-    diags
-}
-
-/// ERC rule: flag PowerIn pins with no net connection.
-pub fn erc_floating_power_inputs(design: &Design) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for component in &design.components {
-        for pin in &component.pins {
-            if matches!(pin.role, Role::PowerIn) {
-                let nets = design.nets_of_pin(&component.refdes, &pin.name);
-                if nets.is_empty() {
-                    diags.push(Diagnostic {
-                        code: "ERC:FLOATING_POWER_INPUT".into(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Power input pin {}.{} is unconnected",
-                            component.refdes,
-                            pin.name
-                        ),
-                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
-                        hint: Some("Connect the pin to a power net".into()),
-                    });
-                }
-            }
-        }
-    }
-    diags
-}
-
-/// ERC rule: flag PowerIn pins connected to more than one net.
-pub fn erc_multi_net_power(design: &Design) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for component in &design.components {
-        for pin in &component.pins {
-            if matches!(pin.role, Role::PowerIn) {
-                let nets = design.nets_of_pin(&component.refdes, &pin.name);
-                if nets.len() > 1 {
-                    diags.push(Diagnostic {
-                        code: "ERC:MULTI_NET_POWER".into(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Power input pin {}.{} connects to {} nets: {}",
-                            component.refdes,
-                            pin.name,
-                            nets.len(),
-                            nets.join(", ")
-                        ),
-                        entities: vec![format!("{}.{}", component.refdes, pin.name)],
-                        hint: Some("Check for shorted power nets".into()),
-                    });
-                }
-            }
-        }
-    }
-    diags
 }
 
 /// Run all built-in ERC rules and return a flat list of diagnostics.

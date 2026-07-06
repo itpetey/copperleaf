@@ -8,8 +8,9 @@ use std::marker::PhantomData;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use uom::{
-    si::electric_potential::volt, si::electrical_resistance::ohm, si::f64 as uq, si::inductance::henry,
-    si::length::meter, si::thermodynamic_temperature::degree_celsius, si::time::second,
+    si::electric_potential::volt, si::electrical_resistance::ohm, si::f64 as uq,
+    si::inductance::henry, si::length::meter, si::thermodynamic_temperature::degree_celsius,
+    si::time::second,
 };
 
 /// Extension methods on numeric types to construct typed quantities.

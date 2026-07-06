@@ -213,27 +213,6 @@ struct DesignRaw {
     connections: Vec<Connection>,
 }
 
-impl<'de> Deserialize<'de> for Design {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = DesignRaw::deserialize(deserializer)?;
-        let mut design = Design {
-            nets: raw.nets,
-            components: raw.components,
-            constraints: raw.constraints,
-            diagnostics: raw.diagnostics,
-            connections: raw.connections,
-            graph: DesignGraph::default(),
-        };
-        // Take ownership so connect() can rebuild the graph and re-populate
-        // the connections vec, naturally deduplicating any duplicate records.
-        let conns = std::mem::take(&mut design.connections);
-        for conn in &conns {
-            design.connect(&conn.refdes, &conn.pin, &conn.net);
-        }
-        Ok(design)
-    }
-}
-
 impl Limits {
     pub fn new(v_min: Qty<Volt>, v_max: Qty<Volt>, i_max: Qty<Amp>) -> Self {
         Self {
@@ -478,9 +457,11 @@ impl Design {
             pin: pin.to_string(),
             net: net.to_string(),
         };
-        if !self.connections.iter().any(|c| {
-            c.refdes == conn.refdes && c.pin == conn.pin && c.net == conn.net
-        }) {
+        if !self
+            .connections
+            .iter()
+            .any(|c| c.refdes == conn.refdes && c.pin == conn.pin && c.net == conn.net)
+        {
             self.connections.push(conn);
         }
         let p_idx = self.graph.ensure_pin(refdes, pin);
@@ -498,6 +479,27 @@ impl Design {
     /// List nets a given component pin is connected to.
     pub fn nets_of_pin(&self, refdes: &str, pin: &str) -> Vec<String> {
         self.graph.nets_of_pin(refdes, pin)
+    }
+}
+
+impl<'de> Deserialize<'de> for Design {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = DesignRaw::deserialize(deserializer)?;
+        let mut design = Design {
+            nets: raw.nets,
+            components: raw.components,
+            constraints: raw.constraints,
+            diagnostics: raw.diagnostics,
+            connections: raw.connections,
+            graph: DesignGraph::default(),
+        };
+        // Take ownership so connect() can rebuild the graph and re-populate
+        // the connections vec, naturally deduplicating any duplicate records.
+        let conns = std::mem::take(&mut design.connections);
+        for conn in &conns {
+            design.connect(&conn.refdes, &conn.pin, &conn.net);
+        }
+        Ok(design)
     }
 }
 
@@ -528,7 +530,10 @@ mod tests {
         d.connect_net("SDIO_CLK", &["U1.SDIO_CLK", "U2.GPIO2"]);
         let mut pins = d.pins_on_net("SDIO_CLK");
         pins.sort();
-        let mut expected = vec![("U1".into(), "SDIO_CLK".into()), ("U2".into(), "GPIO2".into())];
+        let mut expected = vec![
+            ("U1".into(), "SDIO_CLK".into()),
+            ("U2".into(), "GPIO2".into()),
+        ];
         expected.sort();
         assert_eq!(pins, expected);
     }
@@ -604,7 +609,10 @@ mod tests {
         let mut expected_pins = vec![("U1".into(), "VDD".into()), ("U2".into(), "VDD".into())];
         expected_pins.sort();
         assert_eq!(restored_pins, expected_pins);
-        assert_eq!(restored.nets_of_pin("U1", "VDD"), vec![String::from("V3V3")]);
+        assert_eq!(
+            restored.nets_of_pin("U1", "VDD"),
+            vec![String::from("V3V3")]
+        );
         assert_eq!(restored.nets_of_pin("U1", "GND"), vec![String::from("GND")]);
     }
 

@@ -35,28 +35,6 @@ fn main() {
     }
 }
 
-fn load_design(path: Option<&str>) -> Design {
-    match path {
-        Some(p) => {
-            let data = match fs::read_to_string(p) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("Error reading design file '{}': {}", p, e);
-                    std::process::exit(1);
-                }
-            };
-            match serde_json::from_str(&data) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("Error parsing design file '{}': {}", p, e);
-                    std::process::exit(1);
-                }
-            }
-        }
-        None => build_example_design(),
-    }
-}
-
 fn build_example_design() -> Design {
     let vbus = Net::power("VBUS", 5.0.volt());
     let gnd = Net::ground();
@@ -92,16 +70,6 @@ fn build_example_design() -> Design {
         temp: 85.0.celsius(),
     });
     d
-}
-
-fn read_or_exit(path: &str) -> String {
-    match fs::read_to_string(path) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("Error reading file '{}': {}", path, e);
-            std::process::exit(1);
-        }
-    }
 }
 
 fn cmd_apply(args: &[String]) {
@@ -229,6 +197,38 @@ fn cmd_verify(args: &[String]) {
     }
     if !issues {
         println!("[Info] ERC:OK — no overvoltage detected");
+    }
+}
+
+fn load_design(path: Option<&str>) -> Design {
+    match path {
+        Some(p) => {
+            let data = match fs::read_to_string(p) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Error reading design file '{}': {}", p, e);
+                    std::process::exit(1);
+                }
+            };
+            match serde_json::from_str(&data) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Error parsing design file '{}': {}", p, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        None => build_example_design(),
+    }
+}
+
+fn read_or_exit(path: &str) -> String {
+    match fs::read_to_string(path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Error reading file '{}': {}", path, e);
+            std::process::exit(1);
+        }
     }
 }
 
