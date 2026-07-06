@@ -23,6 +23,9 @@ pub trait Block {
     fn constraints(&self) -> Vec<Constraint> {
         vec![]
     }
+    fn kicad_symbol(&self) -> Option<&str> {
+        None
+    }
 }
 
 // Roles and signal kinds
@@ -75,6 +78,24 @@ pub struct Pin {
     pub role: Role,
     pub limits: Limits,
     pub sig: Option<SigSpec>,
+    pub pos: Option<(f64, f64)>,
+    pub rotation: Option<f64>,
+    /// Pin stub length in mm, typically populated from a KiCad symbol library.
+    pub length: Option<f64>,
+}
+
+impl Default for Pin {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            role: Role::PowerIn,
+            limits: Limits::new(0.0.volt(), 0.0.volt(), 0.0.amp()),
+            sig: None,
+            pos: None,
+            rotation: None,
+            length: None,
+        }
+    }
 }
 
 /// Different classes of nets supported by the IR.
@@ -159,6 +180,8 @@ pub struct ComponentRecord {
     pub pins: Vec<Pin>,
     /// Constraints attached to the component, copied from the [`Block`] definition.
     pub constraints: Vec<Constraint>,
+    /// Optional KiCad library symbol reference (e.g. `RP2040:RP2354a`).
+    pub kicad_symbol: Option<String>,
 }
 
 /// A serializable connection record linking a component pin to a net.
@@ -286,6 +309,9 @@ impl Pin {
             role,
             limits,
             sig,
+            pos: None,
+            rotation: None,
+            length: None,
         }
     }
 
@@ -422,6 +448,7 @@ impl Design {
             refdes: inst.refdes,
             pins: inst.block.pins().to_vec(),
             constraints: inst.block.constraints(),
+            kicad_symbol: inst.block.kicad_symbol().map(|s| s.to_owned()),
         });
     }
     /// Returns the component record with the given reference designator.
@@ -667,5 +694,63 @@ mod tests {
 
     fn approx_eq(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-12
+    }
+
+    #[derive(Clone, Debug)]
+    struct PlainBlock {
+        pins: Vec<Pin>,
+    }
+
+    impl Block for PlainBlock {
+        fn pins(&self) -> &[Pin] {
+            &self.pins
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct SymbolBlock {
+        pins: Vec<Pin>,
+    }
+
+    impl Block for SymbolBlock {
+        fn pins(&self) -> &[Pin] {
+            &self.pins
+        }
+        fn kicad_symbol(&self) -> Option<&str> {
+            Some("RP2040:RP2354a")
+        }
+    }
+
+    #[test]
+    fn component_without_kicad_symbol_gets_none() {
+        let mut d = Design::default();
+        let block = PlainBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        assert_eq!(d.components[0].kicad_symbol, None);
+    }
+
+    #[test]
+    fn component_with_kicad_symbol_override_gets_some() {
+        let mut d = Design::default();
+        let block = SymbolBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        assert_eq!(
+            d.components[0].kicad_symbol,
+            Some("RP2040:RP2354a".to_string())
+        );
     }
 }

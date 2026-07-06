@@ -14,7 +14,11 @@
 //! let v3v3 = Net::power("V3V3", 3.3.volt());
 //! let vdd = Pin { name: "VDD".into(), role: Role::PowerIn,
 //!     limits: Limits { v_min: 1.7.volt(), v_max: 3.6.volt(), i_max: 0.5.amp() },
-//!     sig: None };
+//!     sig: None,
+//!     pos: None,
+//!     rotation: None,
+//!     length: None,
+//! };
 //!
 //! // ERC: No error because 3.3 V <= 3.6 V max.
 //! assert!(erc_voltage_pin_to_net(&v3v3, &vdd).is_none());

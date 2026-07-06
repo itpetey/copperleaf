@@ -1,6 +1,6 @@
 //! Minimal deterministic S-expression builder for KiCad 6+ file formats.
 
-use std::fmt;
+use std::{error, fmt};
 
 /// A single S-expression node.
 #[derive(Clone, Debug, PartialEq)]
@@ -96,6 +96,151 @@ fn escape_str(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// Error returned when an S-expression cannot be parsed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ParseError {
+    /// Input ended while a string or list was still open.
+    UnexpectedEof,
+    /// A closing `)` had no matching opening `(`.
+    UnmatchedParen { pos: usize },
+    /// An invalid escape sequence was encountered inside a quoted string.
+    BadEscape { pos: usize },
+    /// An unexpected character was found at the given byte position.
+    UnexpectedChar { ch: char, pos: usize },
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnexpectedEof => write!(f, "unexpected end of input"),
+            Self::UnmatchedParen { pos } => write!(f, "unmatched ')' at position {}", pos),
+            Self::BadEscape { pos } => write!(f, "bad escape sequence at position {}", pos),
+            Self::UnexpectedChar { ch, pos } => {
+                write!(f, "unexpected character {:?} at position {}", ch, pos)
+            }
+        }
+    }
+}
+
+impl error::Error for ParseError {}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Token {
+    LParen,
+    RParen,
+    Atom(String),
+    String(String),
+}
+
+/// Tokenize a KiCad S-expression string.
+///
+/// Handles atoms, quoted strings with `\\` and `\"` escapes, parentheses,
+/// whitespace, and `#`-prefixed line comments.
+fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
+    let mut tokens = Vec::new();
+    let mut chars = input.char_indices().peekable();
+
+    while let Some((_start, ch)) = chars.next() {
+        match ch {
+            '(' => tokens.push(Token::LParen),
+            ')' => tokens.push(Token::RParen),
+            '"' => {
+                let mut s = String::new();
+                loop {
+                    match chars.next() {
+                        Some((_, '\\')) => match chars.next() {
+                            Some((_, '\\')) => s.push('\\'),
+                            Some((_, '"')) => s.push('"'),
+                            Some((pos, _)) => return Err(ParseError::BadEscape { pos }),
+                            None => return Err(ParseError::UnexpectedEof),
+                        },
+                        Some((_, '"')) => break,
+                        Some((_, c)) => s.push(c),
+                        None => return Err(ParseError::UnexpectedEof),
+                    }
+                }
+                tokens.push(Token::String(s));
+            }
+            '#' => {
+                // Line comment: consume until newline.
+                for (_, c) in &mut chars {
+                    if c == '\n' {
+                        break;
+                    }
+                }
+            }
+            c if c.is_whitespace() => {}
+            _ => {
+                let mut s = String::new();
+                s.push(ch);
+                while let Some(&(_, c)) = chars.peek() {
+                    if c.is_whitespace() || c == '(' || c == ')' || c == '"' || c == '#' {
+                        break;
+                    }
+                    s.push(c);
+                    chars.next();
+                }
+                tokens.push(Token::Atom(s));
+            }
+        }
+    }
+
+    Ok(tokens)
+}
+
+/// Parse a KiCad S-expression string into an [`Sexpr`] tree.
+pub fn parse(input: &str) -> Result<Sexpr, ParseError> {
+    let tokens = tokenize(input)?;
+    let mut parser = Parser {
+        tokens: &tokens,
+        pos: 0,
+    };
+    let expr = parser.parse_expr()?;
+    if parser.pos < tokens.len() {
+        return Err(ParseError::UnmatchedParen { pos: parser.pos });
+    }
+    Ok(expr)
+}
+
+struct Parser<'a> {
+    tokens: &'a [Token],
+    pos: usize,
+}
+
+impl<'a> Parser<'a> {
+    fn parse_expr(&mut self) -> Result<Sexpr, ParseError> {
+        match self.tokens.get(self.pos) {
+            Some(Token::LParen) => self.parse_list(),
+            Some(Token::Atom(s)) => {
+                self.pos += 1;
+                Ok(Sexpr::Atom(s.clone()))
+            }
+            Some(Token::String(s)) => {
+                self.pos += 1;
+                Ok(Sexpr::str(s.clone()))
+            }
+            Some(Token::RParen) => Err(ParseError::UnmatchedParen { pos: self.pos }),
+            None => Err(ParseError::UnexpectedEof),
+        }
+    }
+
+    fn parse_list(&mut self) -> Result<Sexpr, ParseError> {
+        // Consume '('
+        self.pos += 1;
+        let mut children = Vec::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::RParen) => {
+                    self.pos += 1;
+                    return Ok(Sexpr::List(children));
+                }
+                Some(_) => children.push(self.parse_expr()?),
+                None => return Err(ParseError::UnexpectedEof),
+            }
+        }
+    }
+}
+
 /// Convenience: `(key "val")`.
 pub fn kv(key: impl AsRef<str>, val: impl AsRef<str>) -> Sexpr {
     Sexpr::list([Sexpr::atom(key.as_ref().to_string()), Sexpr::str(val)])
@@ -174,5 +319,77 @@ mod tests {
         let a = deterministic_uuid("sch:U1");
         let b = deterministic_uuid("sch:U2");
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn parse_simple_list() {
+        let s = parse("(foo bar)").unwrap();
+        assert_eq!(s, Sexpr::list([Sexpr::atom("foo"), Sexpr::atom("bar")]));
+    }
+
+    #[test]
+    fn parse_nested_list() {
+        let s = parse("(foo (bar baz))").unwrap();
+        assert_eq!(
+            s,
+            Sexpr::list([
+                Sexpr::atom("foo"),
+                Sexpr::list([Sexpr::atom("bar"), Sexpr::atom("baz")])
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_quoted_string() {
+        let s = parse("(name \"VDD\")").unwrap();
+        assert_eq!(s, Sexpr::list([Sexpr::atom("name"), Sexpr::str("VDD")]));
+    }
+
+    #[test]
+    fn parse_escaped_quote() {
+        let s = parse("(name \"\\\"foo\\\"\")").unwrap();
+        assert_eq!(s, Sexpr::list([Sexpr::atom("name"), Sexpr::str("\"foo\"")]));
+    }
+
+    #[test]
+    fn parse_ignores_comments() {
+        let s = parse("# leading comment\n(foo bar) # trailing comment").unwrap();
+        assert_eq!(s, Sexpr::list([Sexpr::atom("foo"), Sexpr::atom("bar")]));
+    }
+
+    #[test]
+    fn parse_whitespace_tolerance() {
+        let s = parse("  (  foo   bar  )  ").unwrap();
+        assert_eq!(s, Sexpr::list([Sexpr::atom("foo"), Sexpr::atom("bar")]));
+    }
+
+    #[test]
+    fn parse_error_unmatched_paren() {
+        assert!(matches!(parse("(foo bar"), Err(ParseError::UnexpectedEof)));
+    }
+
+    #[test]
+    fn parse_error_extra_paren() {
+        assert!(matches!(
+            parse("foo)"),
+            Err(ParseError::UnmatchedParen { .. })
+        ));
+    }
+
+    #[test]
+    fn parse_error_bad_escape() {
+        assert!(matches!(
+            parse("(name \"\\q\")"),
+            Err(ParseError::BadEscape { .. })
+        ));
+    }
+
+    #[test]
+    fn parse_round_trip_kicad_fragment() {
+        let input = r#"(symbol "RP2354a" (pin power_in line (at -15.24 5.08 0) (length 2.54) (name "VDD") (number "1")))"#;
+        let s = parse(input).unwrap();
+        let output = s.to_string();
+        let reparsed = parse(&output).unwrap();
+        assert_eq!(s, reparsed);
     }
 }

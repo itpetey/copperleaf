@@ -486,6 +486,9 @@ mod tests {
                 i_max: 0.1.amp(),
             },
             sig: None,
+            pos: None,
+            rotation: None,
+            length: None,
         };
         assert!(erc_voltage_pin_to_net(&net, &pin).is_some());
     }
@@ -540,8 +543,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U2", "VDD", "V3V3");
 
@@ -562,18 +569,25 @@ mod tests {
                     role: Role::PowerIn,
                     limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "EN".into(),
                     role: Role::PowerIn,
                     limits: Limits::new(0.0.volt(), 24.0.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
             constraints: vec![Constraint::Decoupling {
                 values: vec![10.0.uf()],
                 per_pin: false,
             }],
+            kicad_symbol: None,
         });
         d.connect("U3", "VIN", "VBUS");
         d.connect("U3", "EN", "VBUS");
@@ -598,11 +612,15 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![Constraint::Decoupling {
                 values: vec![100.0.nf()],
                 per_pin: true,
             }],
+            kicad_symbol: None,
         });
         d.connect("U4", "VIN", "VBUS");
         d.connect("U4", "VIN", "VCC");
@@ -675,8 +693,12 @@ mod tests {
                 role: Role::DigitalIO,
                 limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "NC", "V3V3");
 
@@ -699,15 +721,22 @@ mod tests {
                     role: Role::DigitalIO,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "NC_1".into(),
                     role: Role::DigitalIO,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
             constraints: vec![],
+            kicad_symbol: None,
         });
 
         let diags = erc_nc_pin_connected(&d);
@@ -724,8 +753,12 @@ mod tests {
                 role: Role::DigitalIO,
                 limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
 
         let diags = erc_floating_inputs(&d);
@@ -746,15 +779,22 @@ mod tests {
                     role: Role::DigitalIO,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "GPIO2".into(),
                     role: Role::DigitalIO,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: Some(SigSpec::control()),
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "GPIO1", "V3V3");
 
@@ -773,8 +813,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VDD", "VBUS");
 
@@ -793,8 +837,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VDD", "V3V3");
 
@@ -814,15 +862,22 @@ mod tests {
                     role: Role::PowerIn,
                     limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "NC".into(),
                     role: Role::DigitalIO,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VDD", "VBUS");
         d.connect("U1", "NC", "VBUS");
@@ -843,8 +898,12 @@ mod tests {
                 role: Role::DigitalIO,
                 limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "GPIO", "VBUS");
 
@@ -863,8 +922,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
 
         let diags = erc_floating_power_inputs(&d);
@@ -884,8 +947,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VDD", "V3V3");
 
@@ -905,8 +972,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VIN", "VBUS");
         d.connect("U1", "VIN", "VCC");
@@ -932,15 +1003,22 @@ mod tests {
                     role: Role::PowerIn,
                     limits: Limits::new(3.0.volt(), 24.0.volt(), 3.0.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "EN".into(),
                     role: Role::PowerIn,
                     limits: Limits::new(0.0.volt(), 3.6.volt(), 0.1.amp()),
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
             constraints: vec![],
+            kicad_symbol: None,
         });
         d.connect("U1", "VIN", "VBUS");
         d.connect("U1", "VIN", "VCC");
@@ -961,8 +1039,12 @@ mod tests {
                 role: Role::PowerIn,
                 limits: Limits::new(1.7.volt(), 3.6.volt(), 0.1.amp()),
                 sig: None,
+                pos: None,
+                rotation: None,
+                length: None,
             }],
             constraints: vec![],
+            kicad_symbol: None,
         });
 
         let r = report(&d);

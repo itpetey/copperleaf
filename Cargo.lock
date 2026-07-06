@@ -103,10 +103,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "copperleaf-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "copperleaf-edsl"
 version = "0.1.0"
 dependencies = [
  "copperleaf-core",
+ "copperleaf-derive",
  "copperleaf-ir",
  "copperleaf-parts",
 ]

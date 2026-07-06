@@ -45,6 +45,9 @@ fn main() {
             i_max: 0.5.amp(),
         },
         sig: None,
+        pos: None,
+        rotation: None,
+        length: None,
     };
     let v3v3 = &d.nets.iter().find(|n| n.name == "V3V3").unwrap();
     if let Some(diag) = erc_voltage_pin_to_net(v3v3, &vdd_pin) {

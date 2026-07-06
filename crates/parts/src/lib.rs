@@ -65,6 +65,9 @@ impl Buck {
                         i_max: 3.0.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "SW".into(),
@@ -75,6 +78,9 @@ impl Buck {
                         i_max: 3.0.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "GND".into(),
@@ -85,6 +91,9 @@ impl Buck {
                         i_max: 100.0.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -123,6 +132,9 @@ impl Mcu {
                         i_max: 0.5.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "VSS".into(),
@@ -133,6 +145,9 @@ impl Mcu {
                         i_max: 100.0.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "USB_DP".into(),
@@ -143,6 +158,9 @@ impl Mcu {
                         i_max: 0.05.amp(),
                     },
                     sig: Some(usb_spec),
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "USB_DM".into(),
@@ -153,6 +171,9 @@ impl Mcu {
                         i_max: 0.05.amp(),
                     },
                     sig: Some(usb_spec),
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -198,6 +219,9 @@ impl Capacitor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -208,6 +232,9 @@ impl Capacitor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -227,6 +254,9 @@ impl Capacitor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -237,6 +267,9 @@ impl Capacitor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -265,6 +298,9 @@ impl Resistor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -275,6 +311,9 @@ impl Resistor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -295,6 +334,9 @@ impl Resistor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -305,6 +347,9 @@ impl Resistor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -337,6 +382,9 @@ impl Crystal {
                         i_max: 0.01.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -347,6 +395,9 @@ impl Crystal {
                         i_max: 0.01.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }
@@ -374,6 +425,9 @@ impl Inductor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
                 Pin {
                     name: "2".into(),
@@ -384,6 +438,9 @@ impl Inductor {
                         i_max: 0.1.amp(),
                     },
                     sig: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
                 },
             ],
         }

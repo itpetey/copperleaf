@@ -7,7 +7,8 @@
   - `crates/ir`: IR (pins, nets, constraints, design) + serde.
   - `crates/analysis`: ERC and analysis passes.
   - `crates/backends/kicad`: KiCad netlist, schematic, and PCB emitters.
-  - `crates/edsl`: builder/macros (stubs for now).
+  - `crates/derive`: proc-macro crate providing `#[derive(Component)]`.
+  - `crates/edsl`: builder/macros and derive re-exports.
   - `crates/parts`: standard parts (e.g., Buck, MCU).
   - `crates/copperleaf`: public facade; re-exports subcrates.
   - `crates/cli`: `copperleaf` CLI (`verify`, `export`, `json`).

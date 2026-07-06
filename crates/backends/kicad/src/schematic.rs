@@ -52,7 +52,7 @@ fn lib_symbols_node(design: &Design) -> Sexpr {
     let symbols: Vec<Sexpr> = design
         .components
         .iter()
-        .map(|comp| lib_symbol_for_component(comp))
+        .map(lib_symbol_for_component)
         .collect();
 
     Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
@@ -60,9 +60,11 @@ fn lib_symbols_node(design: &Design) -> Sexpr {
 
 /// Build a single `<symbol>` S-expression for one component.
 fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
+    let fallback = format!("copperleaf:{}", comp.refdes);
+    let symbol_name = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
     let mut body = vec![
         Sexpr::atom("symbol"),
-        Sexpr::str(format!("copperleaf:{}", comp.refdes)),
+        Sexpr::str(symbol_name),
         Sexpr::list([
             Sexpr::atom("pin_names"),
             Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
@@ -84,11 +86,7 @@ fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
                     Sexpr::atom("-5.08"),
                     Sexpr::atom("-5.08"),
                 ]),
-                Sexpr::list([
-                    Sexpr::atom("end"),
-                    Sexpr::atom("5.08"),
-                    Sexpr::atom("5.08"),
-                ]),
+                Sexpr::list([Sexpr::atom("end"), Sexpr::atom("5.08"), Sexpr::atom("5.08")]),
                 Sexpr::list([
                     Sexpr::atom("stroke"),
                     Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
@@ -113,8 +111,12 @@ fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
 /// A pin definition inside a lib_symbol — placed on the right edge of the
 /// symbol body, pointing left.
 fn lib_pin_node(pin: &copperleaf_ir::Pin, index: usize, total_pins: usize) -> Sexpr {
-    let y = pin_y_offset(index, total_pins);
     let pin_type = role_to_pin_type(pin.role);
+
+    let (x, y, rotation) = match pin.pos {
+        Some((px, py)) => (px, py, pin.rotation.unwrap_or(180.0)),
+        None => (7.62, pin_y_offset(index, total_pins), 180.0),
+    };
 
     Sexpr::list([
         Sexpr::atom("pin"),
@@ -122,11 +124,14 @@ fn lib_pin_node(pin: &copperleaf_ir::Pin, index: usize, total_pins: usize) -> Se
         Sexpr::atom("line"),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom("7.62"),
+            Sexpr::atom(format_float(x, 2)),
             Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom("180"),
+            Sexpr::atom(format_float(rotation, 0)),
         ]),
-        Sexpr::list([Sexpr::atom("length"), Sexpr::atom("2.54")]),
+        Sexpr::list([
+            Sexpr::atom("length"),
+            Sexpr::atom(format_float(pin.length.unwrap_or(2.54), 2)),
+        ]),
         Sexpr::list([
             Sexpr::atom("name"),
             Sexpr::str(&pin.name),
@@ -212,12 +217,11 @@ fn lib_property_node(key: &str, value: &str, hide: bool) -> Sexpr {
 
 fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
     let (x, y) = symbol_position(idx);
+    let fallback = format!("copperleaf:{}", comp.refdes);
+    let lib_id = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
     Sexpr::list([
         Sexpr::atom("symbol"),
-        Sexpr::list([
-            Sexpr::atom("lib_id"),
-            Sexpr::str(format!("copperleaf:{}", comp.refdes)),
-        ]),
+        Sexpr::list([Sexpr::atom("lib_id"), Sexpr::str(lib_id)]),
         Sexpr::list([
             Sexpr::atom("at"),
             Sexpr::atom(format_float(x, 2)),
@@ -275,19 +279,41 @@ fn property_node(key: &str, value: &str, x: f64, y: f64) -> Sexpr {
     ])
 }
 
-/// Emit a `<wire>` S‑expression from the component's pin tip to the label
-/// position.  Returns `None` when the pin cannot be found (no wire to draw).
-fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr> {
+/// Compute the schematic coordinates for a pin tip and the label placed just
+/// past it. Returns `None` when the component or pin cannot be found.
+fn pin_tip_and_label(
+    design: &Design,
+    conn: &copperleaf_ir::Connection,
+) -> Option<((f64, f64), (f64, f64))> {
     let comp_idx = component_index_by_refdes(design, &conn.refdes);
     let comp = design.components.get(comp_idx)?;
     let pin_idx = pin_index_by_name(&comp.pins, &conn.pin)?;
+    let pin = &comp.pins[pin_idx];
     let (sym_x, sym_y) = symbol_position(comp_idx);
-    let y_off = pin_y_offset(pin_idx, comp.pins.len());
 
-    let pin_tip_x = sym_x + 7.62;
-    let pin_tip_y = sym_y + y_off;
-    let label_x = pin_tip_x + 2.54;
-    let label_y = pin_tip_y;
+    let (tip_x, tip_y) = match pin.pos {
+        Some((px, py)) => {
+            let rot = pin.rotation.unwrap_or(180.0);
+            let rad = rot.to_radians();
+            let length = pin.length.unwrap_or(2.54);
+            (
+                sym_x + px + length * rad.cos(),
+                sym_y + py + length * rad.sin(),
+            )
+        }
+        None => {
+            let y_off = pin_y_offset(pin_idx, comp.pins.len());
+            (sym_x + 7.62, sym_y + y_off)
+        }
+    };
+
+    Some(((tip_x, tip_y), (tip_x + 2.54, tip_y)))
+}
+
+/// Emit a `<wire>` S‑expression from the component's pin tip to the label
+/// position.  Returns `None` when the pin cannot be found (no wire to draw).
+fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr> {
+    let ((pin_tip_x, pin_tip_y), (label_x, label_y)) = pin_tip_and_label(design, conn)?;
 
     Some(Sexpr::list([
         Sexpr::atom("wire"),
@@ -319,21 +345,10 @@ fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr>
 }
 
 fn label_node(design: &Design, conn: &copperleaf_ir::Connection) -> Sexpr {
-    let comp_idx = component_index_by_refdes(design, &conn.refdes);
-    let comp = design.components.get(comp_idx);
-    let (sym_x, sym_y) = symbol_position(comp_idx);
-
-    // Determine the vertical offset for this specific pin; fall back to 0.0
-    // when the component or pin is not found so we still emit a label.
-    let y_off = comp
-        .and_then(|c| {
-            let i = pin_index_by_name(&c.pins, &conn.pin)?;
-            Some(pin_y_offset(i, c.pins.len()))
-        })
-        .unwrap_or(0.0);
-
-    let label_x = sym_x + 7.62 + 2.54; // pin_tip_x + 2.54
-    let label_y = sym_y + y_off;
+    let (_, (label_x, label_y)) = pin_tip_and_label(design, conn).unwrap_or_else(|| {
+        let (sym_x, sym_y) = symbol_position(component_index_by_refdes(design, &conn.refdes));
+        ((0.0, 0.0), (sym_x + 7.62 + 2.54, sym_y))
+    });
 
     Sexpr::list([
         Sexpr::atom("label"),
@@ -596,5 +611,138 @@ mod tests {
         assert!(out.contains("(at 35.56 22.86 0)"));
         assert!(out.contains("(at 35.56 25.4 0)"));
         assert!(out.contains("(at 35.56 27.94 0)"));
+    }
+
+    #[derive(Clone, Debug)]
+    struct SymbolBlock {
+        pins: Vec<Pin>,
+        symbol: Option<&'static str>,
+    }
+
+    impl copperleaf_ir::Block for SymbolBlock {
+        fn pins(&self) -> &[Pin] {
+            &self.pins
+        }
+        fn kicad_symbol(&self) -> Option<&str> {
+            self.symbol
+        }
+    }
+
+    #[test]
+    fn component_with_kicad_symbol_uses_real_lib_id() {
+        let mut pin = Pin::new(
+            "VDD",
+            Role::PowerIn,
+            Limits::new(1.7_f64.volt(), 3.6_f64.volt(), 0.5_f64.amp()),
+            None,
+        );
+        pin.pos = Some((-15.24, 5.08));
+        pin.rotation = Some(0.0);
+
+        let u1 = ComponentInst::new(
+            "U1",
+            SymbolBlock {
+                pins: vec![pin],
+                symbol: Some("RP2040:RP2354a"),
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VDD", "V3V3");
+
+        let out = emit_schematic(&d);
+        assert!(out.contains("(lib_id \"RP2040:RP2354a\")"));
+        assert!(out.contains("(symbol \"RP2040:RP2354a\""));
+        assert!(out.contains("(at -15.24 5.08 0)"));
+    }
+
+    #[test]
+    fn resolved_symbol_produces_wire_at_real_pin_position() {
+        use std::io::Write;
+
+        let lib = r#"(kicad_symbol_lib
+  (symbol "RP2354a"
+    (pin power_in line (at -15.24 5.08 0) (length 2.54) (name "VDD") (number "1"))
+  )
+)"#;
+        let mut path = std::env::temp_dir();
+        path.push("copperleaf_sch_test.kicad_sym");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(lib.as_bytes()).unwrap();
+
+        let u1 = ComponentInst::new(
+            "U1",
+            SymbolBlock {
+                pins: vec![Pin::new(
+                    "VDD",
+                    Role::PowerIn,
+                    Limits::new(1.7_f64.volt(), 3.6_f64.volt(), 0.5_f64.amp()),
+                    None,
+                )],
+                symbol: Some("RP2040:RP2354a"),
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VDD", "V3V3");
+
+        crate::resolve_symbols(&mut d, path.to_str().unwrap());
+        let out = emit_schematic(&d);
+
+        // U1 is the first component, so symbol_position(0) = (25.4, 25.4).
+        // Pin tip for VDD at local (-15.24, 5.08) with rotation 0 and length 2.54
+        // is at absolute (25.4 + (-15.24) + 2.54, 25.4 + 5.08) = (12.7, 30.48).
+        assert!(out.contains("(at -15.24 5.08 0)"));
+        assert!(out.contains("(xy 12.7 30.48)"));
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn resolved_symbol_uses_library_pin_length() {
+        use std::io::Write;
+
+        let lib = r#"(kicad_symbol_lib
+  (symbol "RP2354a"
+    (pin power_in line (at -15.24 5.08 0) (length 3.81) (name "VDD") (number "1"))
+  )
+)"#;
+        let mut path = std::env::temp_dir();
+        path.push("copperleaf_sch_length_test.kicad_sym");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(lib.as_bytes()).unwrap();
+
+        let u1 = ComponentInst::new(
+            "U1",
+            SymbolBlock {
+                pins: vec![Pin::new(
+                    "VDD",
+                    Role::PowerIn,
+                    Limits::new(1.7_f64.volt(), 3.6_f64.volt(), 0.5_f64.amp()),
+                    None,
+                )],
+                symbol: Some("RP2040:RP2354a"),
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VDD", "V3V3");
+
+        crate::resolve_symbols(&mut d, path.to_str().unwrap());
+        let out = emit_schematic(&d);
+
+        // lib_symbol pin should use the library length.
+        assert!(out.contains("(length 3.81)"));
+        // Pin tip uses 3.81 instead of the default 2.54:
+        // absolute x = 25.4 + (-15.24) + 3.81 = 13.97, y = 25.4 + 5.08 = 30.48.
+        assert!(out.contains("(xy 13.97 30.48)"));
+
+        std::fs::remove_file(&path).ok();
     }
 }

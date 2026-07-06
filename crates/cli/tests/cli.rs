@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use copperleaf::{Block, ComponentInst, Design, Limits, Net, Pin, Role, UnitExt};
+use std::io::Write;
 
 fn cl_bin() -> std::path::PathBuf {
     std::env::var("CARGO_BIN_EXE_cl")
@@ -220,4 +221,92 @@ fn export_with_missing_file_exits_nonzero() {
         "expected clear error message, got: {}",
         stderr
     );
+}
+
+struct SymbolMcu {
+    pins: Vec<Pin>,
+}
+
+impl SymbolMcu {
+    fn new() -> Self {
+        Self {
+            pins: vec![
+                Pin::new(
+                    "VDD",
+                    Role::PowerIn,
+                    Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                    None,
+                ),
+                Pin::new(
+                    "VSS",
+                    Role::Gnd,
+                    Limits::new(0.0.volt(), 0.0.volt(), 0.0.amp()),
+                    None,
+                ),
+            ],
+        }
+    }
+}
+
+impl Block for SymbolMcu {
+    fn pins(&self) -> &[Pin] {
+        &self.pins
+    }
+    fn kicad_symbol(&self) -> Option<&str> {
+        Some("RP2040:RP2354a")
+    }
+}
+
+#[test]
+fn export_with_symbol_lib_resolves_pin_positions() {
+    let mut design = Design::default();
+    design.add_net(Net::power("V3V3", 3.3.volt()));
+    design.add_net(Net::ground());
+    design.add_component(ComponentInst::new("U1", SymbolMcu::new()));
+    design.connect("U1", "VDD", "V3V3");
+    design.connect("U1", "VSS", "GND");
+
+    let temp = test_dir("export_symbol_lib");
+    let design_path = temp.join("design.json");
+    std::fs::write(&design_path, serde_json::to_string_pretty(&design).unwrap()).unwrap();
+
+    let lib_path = temp.join("test.kicad_sym");
+    let mut lib_file = std::fs::File::create(&lib_path).unwrap();
+    lib_file
+        .write_all(
+            r#"(kicad_symbol_lib
+  (symbol "RP2354a"
+    (pin power_in line (at -15.24 5.08 0) (length 2.54) (name "VDD") (number "1"))
+    (pin power_in line (at -15.24 -5.08 0) (length 2.54) (name "VSS") (number "2"))
+  )
+)"#
+            .as_bytes(),
+        )
+        .unwrap();
+
+    let output = Command::new(cl_bin())
+        .arg("export")
+        .arg(&design_path)
+        .arg("-o")
+        .arg(&temp)
+        .arg("--symbol-lib")
+        .arg(&lib_path)
+        .output()
+        .expect("failed to run cl export --symbol-lib");
+
+    std::fs::remove_file(&design_path).ok();
+    std::fs::remove_file(&lib_path).ok();
+
+    assert!(
+        output.status.success(),
+        "cl export --symbol-lib failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let sch = std::fs::read_to_string(temp.join("design.kicad_sch"))
+        .expect("design.kicad_sch should exist");
+    assert!(sch.contains("(lib_id \"RP2040:RP2354a\")"));
+    assert!(sch.contains("(at -15.24 5.08 0)"));
+
+    std::fs::remove_dir_all(&temp).ok();
 }

@@ -192,7 +192,9 @@ Synthesis emits edits as **Patches** (see §7).
 ## 8. Part Library Format
 
 - Rust-first `#[derive(Component)]` with metadata (symbol, footprint, pins) and
-  **embedded constraints** (e.g., decoupling rules, interface rules).
+  **embedded constraints** (e.g., decoupling rules, interface rules). **Implemented:**
+  `copperleaf-derive` provides `#[derive(Component)]` and `#[component(symbol = "...")]`,
+  re-exported through `copperleaf-edsl`.
 - Companion `parts.toml` for parametric selection (voltage/current, ESR, package).
 
 ---

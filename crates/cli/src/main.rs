@@ -25,6 +25,9 @@ enum Commands {
         /// Output directory (defaults to current directory)
         #[arg(short = 'o', long, default_value = ".")]
         output: PathBuf,
+        /// Path to a KiCad symbol library (.kicad_sym) used to resolve pin positions
+        #[arg(long = "symbol-lib")]
+        symbol_lib: Option<PathBuf>,
     },
     /// Synthesize decoupling capacitors
     Decouple {
@@ -43,14 +46,18 @@ fn main() {
 
     match cli.command {
         Commands::Verify { design } => cmd_verify(&design),
-        Commands::Export { design, output } => cmd_export(&design, &output),
+        Commands::Export {
+            design,
+            output,
+            symbol_lib,
+        } => cmd_export(&design, &output, symbol_lib.as_ref()),
         Commands::Decouple { design } => cmd_decouple(&design),
         Commands::Report { design } => cmd_report(&design),
     }
 }
 
-fn cmd_export(design: &PathBuf, out_dir: &PathBuf) {
-    let d = load_design(design);
+fn cmd_export(design: &PathBuf, out_dir: &PathBuf, symbol_lib: Option<&PathBuf>) {
+    let mut d = load_design(design);
     let _ = fs::create_dir_all(out_dir);
 
     let base = design
@@ -67,6 +74,13 @@ fn cmd_export(design: &PathBuf, out_dir: &PathBuf) {
         }
         println!("Wrote {}", out_path.display());
     };
+
+    if let Some(path) = symbol_lib {
+        backend_kicad::resolve_symbols(&mut d, path.to_str().unwrap_or(""));
+        for diag in &d.diagnostics {
+            eprintln!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+        }
+    }
 
     write_file("net", &backend_kicad::emit_netlist(&d));
     write_file("kicad_sch", &backend_kicad::emit_schematic(&d));

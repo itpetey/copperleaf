@@ -5,6 +5,7 @@
 
 use copperleaf_core::{Amp, Ohm, Qty, Second, UnitExt, Volt};
 
+pub use copperleaf_derive::Component;
 pub use copperleaf_ir::*;
 #[cfg(feature = "parts")]
 pub use design_ext::DesignExt;
@@ -397,5 +398,31 @@ mod tests {
             d.pins_on_net("SDIO_CS")
                 .contains(&("R1".into(), "2".into()))
         );
+    }
+
+    #[test]
+    fn derive_component_generates_block_impl() {
+        #[derive(Clone, Debug, Component)]
+        struct MyChip {
+            pins: Vec<Pin>,
+        }
+
+        let chip = MyChip {
+            pins: vec![gnd(), power_in(1.7.volt(), 3.6.volt(), 0.5.amp())],
+        };
+        assert_eq!(chip.pins().len(), 2);
+        assert!(chip.kicad_symbol().is_none());
+    }
+
+    #[test]
+    fn derive_component_with_symbol_attribute() {
+        #[derive(Clone, Debug, Component)]
+        #[component(symbol = "RP2040:RP2354a")]
+        struct Rp2354a {
+            pins: Vec<Pin>,
+        }
+
+        let chip = Rp2354a { pins: vec![] };
+        assert_eq!(chip.kicad_symbol(), Some("RP2040:RP2354a"));
     }
 }
