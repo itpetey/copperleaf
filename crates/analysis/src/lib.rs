@@ -5,7 +5,7 @@
 //! over the IR.
 
 use copperleaf_core::{Diagnostic, Farad, Qty, Severity};
-use copperleaf_ir::{Constraint, Design, Net, NetKind, Pin, Role};
+use copperleaf_ir::{ComponentRecord, Constraint, Design, Net, NetKind, Pin, Role};
 use serde::{Deserialize, Serialize};
 
 /// Trait for analysis passes to expose a stable name.
@@ -35,6 +35,169 @@ pub struct DecouplingResult {
     pub caps: Vec<DecouplingCap>,
     /// Diagnostics emitted during synthesis.
     pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Returns a human-readable multi-line report summarizing the design.
+///
+/// The report includes graph stats, component list grouped by reference
+/// designator prefix, power and signal net summaries, ERC results
+/// (overvoltage and floating/NC pins), and decoupling synthesis output.
+pub fn report(design: &Design) -> String {
+    use std::collections::BTreeMap;
+
+    let mut out = String::new();
+
+    // Header
+    out.push_str("Copperleaf Design Report\n");
+    out.push_str("========================\n\n");
+
+    // Graph stats
+    let (nodes, edges) = design.graph.counts();
+    out.push_str(&format!("Graph: {} nodes, {} edges\n", nodes, edges));
+    out.push_str(&format!(
+        "Components: {}, Nets: {}, Constraints: {}\n\n",
+        design.components.len(),
+        design.nets.len(),
+        design.constraints.len()
+    ));
+
+    // Component list grouped by refdes prefix
+    out.push_str("Components\n");
+    out.push_str("----------\n");
+    let mut groups: BTreeMap<String, Vec<&ComponentRecord>> = BTreeMap::new();
+    for c in &design.components {
+        let prefix: String = c.refdes.chars().take_while(|ch| ch.is_alphabetic()).collect();
+        let prefix = if prefix.is_empty() {
+            "?".into()
+        } else {
+            prefix
+        };
+        groups.entry(prefix).or_default().push(c);
+    }
+    if groups.is_empty() {
+        out.push_str("  (none)\n");
+    } else {
+        for (prefix, comps) in &groups {
+            out.push_str(&format!("  [{}] ({}):\n", prefix, comps.len()));
+            for c in comps {
+                out.push_str(&format!("    - {} ({} pins)\n", c.refdes, c.pins.len()));
+            }
+        }
+    }
+    out.push('\n');
+
+    // Net summary
+    out.push_str("Nets\n");
+    out.push_str("----\n");
+    let mut power_nets: Vec<&Net> = Vec::new();
+    let mut signal_nets: Vec<&Net> = Vec::new();
+    for n in &design.nets {
+        match &n.kind {
+            NetKind::Power { .. } => power_nets.push(n),
+            NetKind::Signal { .. } => signal_nets.push(n),
+        }
+    }
+    out.push_str(&format!("  Power nets ({}):\n", power_nets.len()));
+    if power_nets.is_empty() {
+        out.push_str("    (none)\n");
+    } else {
+        for n in power_nets {
+            let v = match &n.kind {
+                NetKind::Power { v_nom, .. } => v_nom.as_base(),
+                _ => 0.0,
+            };
+            let pins = design.pins_on_net(&n.name);
+            out.push_str(&format!(
+                "    - {} ({:.2} V, {} pins)\n",
+                n.name,
+                v,
+                pins.len()
+            ));
+        }
+    }
+    out.push_str(&format!("  Signal nets ({}):\n", signal_nets.len()));
+    if signal_nets.is_empty() {
+        out.push_str("    (none)\n");
+    } else {
+        for n in signal_nets {
+            let pins = design.pins_on_net(&n.name);
+            out.push_str(&format!("    - {} ({} pins)\n", n.name, pins.len()));
+        }
+    }
+    out.push('\n');
+
+    // ERC results
+    out.push_str("ERC Results\n");
+    out.push_str("-----------\n");
+    let mut erc_diags: Vec<Diagnostic> = Vec::new();
+    for c in &design.components {
+        for pin in &c.pins {
+            let nets = design.nets_of_pin(&c.refdes, &pin.name);
+
+            // Overvoltage: power-input pin connected to a power net with v_nom > v_max
+            if matches!(pin.role, Role::PowerIn) {
+                for net_name in &nets {
+                    if let Some(net) = design.nets.iter().find(|n| n.name == *net_name) {
+                        if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
+                            erc_diags.push(diag);
+                        }
+                    }
+                }
+            }
+
+            // Floating/NC check: input-ish pins with no net connection
+            if matches!(pin.role, Role::PowerIn | Role::AnalogIn | Role::DigitalIO) && nets.is_empty() {
+                erc_diags.push(Diagnostic {
+                    code: "ERC:FLOATING_PIN".into(),
+                    severity: Severity::Warning,
+                    message: format!("Pin {}.{} is unconnected", c.refdes, pin.name),
+                    entities: vec![format!("{}.{}", c.refdes, pin.name)],
+                    hint: Some("Connect the pin to a net or mark it as no-connect".into()),
+                });
+            }
+        }
+    }
+    if erc_diags.is_empty() {
+        out.push_str("  [Info] ERC:OK — no issues detected\n");
+    } else {
+        for diag in erc_diags {
+            out.push_str(&format!(
+                "  [{:?}] {} — {}\n",
+                diag.severity, diag.code, diag.message
+            ));
+            if let Some(hint) = diag.hint {
+                out.push_str(&format!("         hint: {}\n", hint));
+            }
+        }
+    }
+    out.push('\n');
+
+    // Decoupling synthesis
+    out.push_str("Decoupling Synthesis\n");
+    out.push_str("--------------------\n");
+    let decap = synthesize_decoupling(design);
+    if decap.caps.is_empty() {
+        out.push_str("  [Info] No decoupling capacitors placed\n");
+    } else {
+        for cap in &decap.caps {
+            out.push_str(&format!(
+                "  {}: {} F on {} (from {}.{})\n",
+                cap.refdes,
+                cap.value.as_base(),
+                cap.net,
+                cap.source_component,
+                cap.source_pin
+            ));
+        }
+    }
+    for diag in &decap.diagnostics {
+        out.push_str(&format!(
+            "  [{:?}] {} — {}\n",
+            diag.severity, diag.code, diag.message
+        ));
+    }
+
+    out
 }
 
 /// Simple ERC: flag when a pin's maximum voltage is below a power net's nominal voltage.
@@ -371,5 +534,20 @@ mod tests {
         assert_eq!(summary.severity, Severity::Info);
         assert!(summary.message.contains("2"));
         assert_eq!(summary.entities, vec!["C1", "C2"]);
+    }
+
+    #[test]
+    fn report_contains_expected_sections() {
+        let d = build_connected_buck_design();
+        let r = report(&d);
+        assert!(r.contains("Copperleaf Design Report"));
+        assert!(r.contains("Graph:"));
+        assert!(r.contains("Components"));
+        assert!(r.contains("Nets"));
+        assert!(r.contains("ERC Results"));
+        assert!(r.contains("Decoupling Synthesis"));
+        assert!(r.contains("U1"));
+        assert!(r.contains("VBUS"));
+        assert!(r.contains("C1"));
     }
 }

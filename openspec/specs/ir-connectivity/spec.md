@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Make circuit connectivity part of the serializable intermediate representation so that designs can be saved to and loaded from JSON with their wiring intact, enabling external tools and workflows to operate on complete designs.
+
+## Requirements
 
 ### Requirement: Connection records are serializable
 The IR SHALL include a `Connection` struct with `refdes: String`, `pin: String`, and `net: String` fields. It SHALL derive `Clone`, `Debug`, `Serialize`, and `Deserialize`.

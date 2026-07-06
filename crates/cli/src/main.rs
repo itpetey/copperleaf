@@ -1,7 +1,7 @@
 use std::{env, fs};
 
 use copperleaf::{
-    ComponentInst, Constraint, Design, Limits, Net, NetClass, Pin, Role, UnitExt, backend_kicad,
+    ComponentInst, Constraint, Design, Net, NetClass, Role, UnitExt, backend_kicad,
     erc_voltage_pin_to_net, parts, synthesize_decoupling,
 };
 
@@ -24,12 +24,36 @@ fn main() {
         return;
     }
     match args[1].as_str() {
-        "verify" => cmd_verify(),
-        "export" => cmd_export(),
-        "json" => cmd_json(),
-        "decouple" => cmd_decouple(),
+        "verify" => cmd_verify(&args[2..]),
+        "export" => cmd_export(&args[2..]),
+        "json" => cmd_json(&args[2..]),
+        "decouple" => cmd_decouple(&args[2..]),
+        "report" => cmd_report(&args[2..]),
+        "emit" => cmd_emit(),
         "apply" => cmd_apply(&args[2..]),
         _ => usage(),
+    }
+}
+
+fn load_design(path: Option<&str>) -> Design {
+    match path {
+        Some(p) => {
+            let data = match fs::read_to_string(p) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Error reading design file '{}': {}", p, e);
+                    std::process::exit(1);
+                }
+            };
+            match serde_json::from_str(&data) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Error parsing design file '{}': {}", p, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        None => build_example_design(),
     }
 }
 
@@ -70,6 +94,16 @@ fn build_example_design() -> Design {
     d
 }
 
+fn read_or_exit(path: &str) -> String {
+    match fs::read_to_string(path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Error reading file '{}': {}", path, e);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn cmd_apply(args: &[String]) {
     if args.len() != 3 {
         return usage();
@@ -78,10 +112,22 @@ fn cmd_apply(args: &[String]) {
     let patch_path = &args[1];
     let out_path = &args[2];
 
-    let data = fs::read_to_string(in_path).expect("read design");
-    let mut d: Design = serde_json::from_str(&data).expect("parse design");
-    let patch_data = fs::read_to_string(patch_path).expect("read patch");
-    let patch: Patch = serde_json::from_str(&patch_data).expect("parse patch");
+    let data = read_or_exit(in_path);
+    let mut d: Design = match serde_json::from_str(&data) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Error parsing design file '{}': {}", in_path, e);
+            std::process::exit(1);
+        }
+    };
+    let patch_data = read_or_exit(patch_path);
+    let patch: Patch = match serde_json::from_str(&patch_data) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Error parsing patch file '{}': {}", patch_path, e);
+            std::process::exit(1);
+        }
+    };
 
     for op in patch.ops {
         match op {
@@ -95,12 +141,21 @@ fn cmd_apply(args: &[String]) {
         }
     }
 
-    let out = serde_json::to_string_pretty(&d).expect("serialize design");
-    fs::write(out_path, out).expect("write output");
+    let out = match serde_json::to_string_pretty(&d) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error serializing design: {}", e);
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = fs::write(out_path, out) {
+        eprintln!("Error writing output file '{}': {}", out_path, e);
+        std::process::exit(1);
+    }
 }
 
-fn cmd_decouple() {
-    let d = build_example_design();
+fn cmd_decouple(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
     let result = synthesize_decoupling(&d);
     if result.caps.is_empty() {
         println!("[Info] DECOUPLE: no capacitors placed");
@@ -121,42 +176,64 @@ fn cmd_decouple() {
     }
 }
 
-fn cmd_export() {
+fn cmd_emit() {
     let d = build_example_design();
+    match serde_json::to_string_pretty(&d) {
+        Ok(s) => println!("{}", s),
+        Err(e) => {
+            eprintln!("Error serializing design: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_export(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
     let txt = backend_kicad::emit_netlist_text(&d);
     println!("{}", txt);
 }
 
-fn cmd_json() {
-    let d = build_example_design();
+fn cmd_json(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
     match serde_json::to_string_pretty(&d) {
         Ok(s) => println!("{}", s),
-        Err(e) => eprintln!("Error serializing design: {}", e),
+        Err(e) => {
+            eprintln!("Error serializing design: {}", e);
+            std::process::exit(1);
+        }
     }
 }
 
-fn cmd_verify() {
-    let d = build_example_design();
-    let vdd_pin = Pin {
-        name: "VDD".into(),
-        role: Role::PowerIn,
-        limits: Limits {
-            v_min: 1.7.volt(),
-            v_max: 3.6.volt(),
-            i_max: 0.5.amp(),
-        },
-        sig: None,
-    };
-    let v3v3 = &d.nets.iter().find(|n| n.name == "V3V3").unwrap();
-    if let Some(diag) = erc_voltage_pin_to_net(v3v3, &vdd_pin) {
-        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-    } else {
+fn cmd_report(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
+    println!("{}", copperleaf::report(&d));
+}
+
+fn cmd_verify(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
+    let mut issues = false;
+    for c in &d.components {
+        for pin in &c.pins {
+            if !matches!(pin.role, Role::PowerIn) {
+                continue;
+            }
+            for net_name in d.nets_of_pin(&c.refdes, &pin.name) {
+                if let Some(net) = d.nets.iter().find(|n| n.name == net_name) {
+                    if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
+                        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+                        issues = true;
+                    }
+                }
+            }
+        }
+    }
+    if !issues {
         println!("[Info] ERC:OK — no overvoltage detected");
     }
 }
 
 fn usage() {
     eprintln!(
-        "Usage: copperleaf <verify|export|json|decouple|apply>\n  apply <in.json> <patch.json> <out.json>"
+        "Usage: copperleaf <verify|export|json|decouple|report|emit|apply>\n  verify|export|json|decouple|report [design.json]\n  emit\n  apply <in.json> <patch.json> <out.json>"
     );
 }
