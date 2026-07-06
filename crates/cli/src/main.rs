@@ -71,6 +71,7 @@ fn cmd_export(design: &PathBuf, out_dir: &PathBuf) {
     write_file("net", &backend_kicad::emit_netlist(&d));
     write_file("kicad_sch", &backend_kicad::emit_schematic(&d));
     write_file("kicad_pcb", &backend_kicad::emit_pcb(&d));
+    write_file("kicad_pro", &backend_kicad::emit_project(&base));
 }
 
 fn cmd_decouple(design: &PathBuf) {

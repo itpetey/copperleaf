@@ -1,4 +1,4 @@
-use copperleaf_ir::Design;
+use copperleaf_ir::{Design, Role};
 
 use crate::common::{format_float, refdes_prefix};
 use crate::sexpr::{Sexpr, deterministic_uuid, kv};
@@ -14,7 +14,7 @@ pub fn emit_schematic(design: &Design) -> String {
         ]),
         kv("paper", "A4"),
         title_block_node(),
-        lib_symbols_node(),
+        lib_symbols_node(design),
     ];
 
     for (idx, comp) in design.components.iter().enumerate() {
@@ -22,6 +22,9 @@ pub fn emit_schematic(design: &Design) -> String {
     }
 
     for conn in &design.connections {
+        if let Some(wire) = wire_node(design, conn) {
+            children.push(wire);
+        }
         children.push(label_node(design, conn));
     }
 
@@ -38,26 +41,95 @@ fn title_block_node() -> Sexpr {
         kv("company", ""),
         kv("rev", ""),
         kv("date", ""),
-        kv("source", "copperleaf"),
     ])
 }
 
-fn lib_symbols_node() -> Sexpr {
-    let symbol = Sexpr::list([
+/// Generate a `<symbol>` definition for each component in the design, embedded
+/// inside `<lib_symbols>`.  Every symbol gets a rectangular body and a `(pin
+/// ...)` entry for each of the component's pins, placed on the right edge of
+/// the body.
+fn lib_symbols_node(design: &Design) -> Sexpr {
+    let symbols: Vec<Sexpr> = design
+        .components
+        .iter()
+        .map(|comp| lib_symbol_for_component(comp))
+        .collect();
+
+    Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
+}
+
+/// Build a single `<symbol>` S-expression for one component.
+fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
+    let mut body = vec![
         Sexpr::atom("symbol"),
-        Sexpr::str("Generic:Box"),
+        Sexpr::str(format!("copperleaf:{}", comp.refdes)),
+        Sexpr::list([
+            Sexpr::atom("pin_names"),
+            Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
+        ]),
+        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
         Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
         Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        lib_property_node("Reference", "U", false),
+        lib_property_node("Value", "Box", false),
+        lib_property_node("Footprint", "", true),
+        lib_property_node("Datasheet", "", true),
         Sexpr::list([
-            Sexpr::atom("property"),
-            Sexpr::str("Reference"),
-            Sexpr::str("U"),
+            Sexpr::atom("symbol"),
+            Sexpr::str(format!("{}_0_1", comp.refdes)),
             Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
+                Sexpr::atom("rectangle"),
+                Sexpr::list([
+                    Sexpr::atom("start"),
+                    Sexpr::atom("-5.08"),
+                    Sexpr::atom("-5.08"),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("end"),
+                    Sexpr::atom("5.08"),
+                    Sexpr::atom("5.08"),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("stroke"),
+                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("fill"),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("none")]),
+                ]),
             ]),
+        ]),
+    ];
+
+    // Add a `<pin>` entry for every pin on the component.
+    for (i, pin) in comp.pins.iter().enumerate() {
+        body.push(lib_pin_node(pin, i, comp.pins.len()));
+    }
+
+    Sexpr::list(body)
+}
+
+/// A pin definition inside a lib_symbol — placed on the right edge of the
+/// symbol body, pointing left.
+fn lib_pin_node(pin: &copperleaf_ir::Pin, index: usize, total_pins: usize) -> Sexpr {
+    let y = pin_y_offset(index, total_pins);
+    let pin_type = role_to_pin_type(pin.role);
+
+    Sexpr::list([
+        Sexpr::atom("pin"),
+        Sexpr::atom(pin_type),
+        Sexpr::atom("line"),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom("7.62"),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("180"),
+        ]),
+        Sexpr::list([Sexpr::atom("length"), Sexpr::atom("2.54")]),
+        Sexpr::list([
+            Sexpr::atom("name"),
+            Sexpr::str(&pin.name),
             Sexpr::list([
                 Sexpr::atom("effects"),
                 Sexpr::list([
@@ -71,34 +143,81 @@ fn lib_symbols_node() -> Sexpr {
             ]),
         ]),
         Sexpr::list([
-            Sexpr::atom("symbol"),
-            Sexpr::str("Box_0_1"),
+            Sexpr::atom("number"),
+            Sexpr::str((index + 1).to_string()),
             Sexpr::list([
-                Sexpr::atom("rectangle"),
+                Sexpr::atom("effects"),
                 Sexpr::list([
-                    Sexpr::atom("start"),
-                    Sexpr::atom("-5.08"),
-                    Sexpr::atom("-5.08"),
+                    Sexpr::atom("font"),
+                    Sexpr::list([
+                        Sexpr::atom("size"),
+                        Sexpr::atom("1.27"),
+                        Sexpr::atom("1.27"),
+                    ]),
                 ]),
-                Sexpr::list([Sexpr::atom("end"), Sexpr::atom("5.08"), Sexpr::atom("5.08")]),
-                Sexpr::list([
-                    Sexpr::atom("stroke"),
-                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
-                ]),
-                Sexpr::list([Sexpr::atom("fill"), Sexpr::atom("none")]),
             ]),
         ]),
-    ]);
-    Sexpr::list([Sexpr::atom("lib_symbols"), symbol])
+    ])
+}
+
+fn role_to_pin_type(role: Role) -> &'static str {
+    match role {
+        Role::PowerIn | Role::Gnd => "power_in",
+        Role::PowerOut => "power_out",
+        Role::AnalogIn => "input",
+        Role::AnalogOut => "output",
+        Role::DigitalIO | Role::DiffPos | Role::DiffNeg => "bidirectional",
+    }
+}
+
+/// Y-offset for pin *index* out of *total_pins*, centred vertically.
+/// Pins are spaced 2.54 mm apart.
+fn pin_y_offset(index: usize, total_pins: usize) -> f64 {
+    if total_pins <= 1 {
+        0.0
+    } else {
+        let spacing = 2.54;
+        let total_height = (total_pins as f64 - 1.0) * spacing;
+        -total_height / 2.0 + index as f64 * spacing
+    }
+}
+
+/// A property inside a lib_symbol definition.  All lib_symbol properties sit at
+/// the origin; hidden ones (Footprint/Datasheet) carry a `(hide yes)` effect.
+fn lib_property_node(key: &str, value: &str, hide: bool) -> Sexpr {
+    let mut effects_children = vec![Sexpr::list([
+        Sexpr::atom("font"),
+        Sexpr::list([
+            Sexpr::atom("size"),
+            Sexpr::atom("1.27"),
+            Sexpr::atom("1.27"),
+        ]),
+    ])];
+    if hide {
+        effects_children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    Sexpr::list([
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+        ]),
+        Sexpr::list(std::iter::once(Sexpr::atom("effects")).chain(effects_children)),
+    ])
 }
 
 fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
     let (x, y) = symbol_position(idx);
-    let prefix = refdes_prefix(&comp.refdes);
     Sexpr::list([
         Sexpr::atom("symbol"),
-        Sexpr::list([Sexpr::atom("lib_id"), Sexpr::str("Generic:Box")]),
+        Sexpr::list([
+            Sexpr::atom("lib_id"),
+            Sexpr::str(format!("copperleaf:{}", comp.refdes)),
+        ]),
         Sexpr::list([
             Sexpr::atom("at"),
             Sexpr::atom(format_float(x, 2)),
@@ -106,14 +225,28 @@ fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Se
             Sexpr::atom("0"),
         ]),
         Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("1")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("1")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("dnp"), Sexpr::atom("no")]),
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_uuid(&format!("sch:{}", comp.refdes))),
         ]),
         property_node("Reference", &comp.refdes, x, y - 6.35),
-        property_node("Value", &prefix, x, y + 6.35),
+        property_node("Value", &refdes_prefix(&comp.refdes), x, y + 6.35),
+        Sexpr::list([
+            Sexpr::atom("instances"),
+            Sexpr::list([
+                Sexpr::atom("project"),
+                Sexpr::str(""),
+                Sexpr::list([
+                    Sexpr::atom("path"),
+                    Sexpr::str(format!("/{}", deterministic_uuid("sch:root"))),
+                    Sexpr::list([Sexpr::atom("reference"), Sexpr::str(&comp.refdes)]),
+                    Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
+                ]),
+            ]),
+        ]),
     ])
 }
 
@@ -142,11 +275,66 @@ fn property_node(key: &str, value: &str, x: f64, y: f64) -> Sexpr {
     ])
 }
 
+/// Emit a `<wire>` S‑expression from the component's pin tip to the label
+/// position.  Returns `None` when the pin cannot be found (no wire to draw).
+fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr> {
+    let comp_idx = component_index_by_refdes(design, &conn.refdes);
+    let comp = design.components.get(comp_idx)?;
+    let pin_idx = pin_index_by_name(&comp.pins, &conn.pin)?;
+    let (sym_x, sym_y) = symbol_position(comp_idx);
+    let y_off = pin_y_offset(pin_idx, comp.pins.len());
+
+    let pin_tip_x = sym_x + 7.62;
+    let pin_tip_y = sym_y + y_off;
+    let label_x = pin_tip_x + 2.54;
+    let label_y = pin_tip_y;
+
+    Some(Sexpr::list([
+        Sexpr::atom("wire"),
+        Sexpr::list([
+            Sexpr::atom("pts"),
+            Sexpr::list([
+                Sexpr::atom("xy"),
+                Sexpr::atom(format_float(pin_tip_x, 2)),
+                Sexpr::atom(format_float(pin_tip_y, 2)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("xy"),
+                Sexpr::atom(format_float(label_x, 2)),
+                Sexpr::atom(format_float(label_y, 2)),
+            ]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("stroke"),
+            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(&format!(
+                "sch:wire:{}:{}:{}",
+                conn.refdes, conn.pin, conn.net
+            ))),
+        ]),
+    ]))
+}
+
 fn label_node(design: &Design, conn: &copperleaf_ir::Connection) -> Sexpr {
-    let idx = component_index_by_refdes(design, conn.refdes.as_str());
-    let (x, y) = symbol_position(idx);
-    let label_x = x + 7.62;
-    let label_y = y;
+    let comp_idx = component_index_by_refdes(design, &conn.refdes);
+    let comp = design.components.get(comp_idx);
+    let (sym_x, sym_y) = symbol_position(comp_idx);
+
+    // Determine the vertical offset for this specific pin; fall back to 0.0
+    // when the component or pin is not found so we still emit a label.
+    let y_off = comp
+        .and_then(|c| {
+            let i = pin_index_by_name(&c.pins, &conn.pin)?;
+            Some(pin_y_offset(i, c.pins.len()))
+        })
+        .unwrap_or(0.0);
+
+    let label_x = sym_x + 7.62 + 2.54; // pin_tip_x + 2.54
+    let label_y = sym_y + y_off;
+
     Sexpr::list([
         Sexpr::atom("label"),
         Sexpr::str(&conn.net),
@@ -183,6 +371,10 @@ fn component_index_by_refdes(design: &Design, refdes: &str) -> usize {
         .iter()
         .position(|c| c.refdes == refdes)
         .unwrap_or(0)
+}
+
+fn pin_index_by_name(pins: &[copperleaf_ir::Pin], pin_name: &str) -> Option<usize> {
+    pins.iter().position(|p| p.name == pin_name)
 }
 
 fn sheet_instances_node() -> Sexpr {
@@ -277,11 +469,46 @@ mod tests {
     }
 
     #[test]
-    fn labels_placed_near_owning_symbol() {
+    fn components_have_individual_lib_symbols() {
         let d = make_design();
         let out = emit_schematic(&d);
-        // U2 is at (50.8, 25.4); its label should be at (58.42, 25.4).
-        assert!(out.contains("(at 58.42 25.4 0)"));
+        assert!(out.contains("(symbol \"copperleaf:U1\""));
+        assert!(out.contains("(symbol \"copperleaf:U2\""));
+        assert!(out.contains("(lib_id \"copperleaf:U1\")"));
+        assert!(out.contains("(lib_id \"copperleaf:U2\")"));
+    }
+
+    #[test]
+    fn lib_symbols_contain_pin_definitions() {
+        let d = make_design();
+        let out = emit_schematic(&d);
+        // Each component has a VDD pin with power_in type (multi-line formatted).
+        assert!(out.contains("(pin power_in line"));
+        assert!(out.contains("(at 7.62 0 180)"));
+        assert!(out.contains("(length 2.54)"));
+        assert!(out.contains("(name \"VDD\""));
+        assert!(out.contains("(number \"1\""));
+    }
+
+    #[test]
+    fn wires_connect_pins_to_labels() {
+        let d = make_design();
+        let out = emit_schematic(&d);
+        // U1 at (25.4, 25.4), pin tip at (33.02, 25.4), label at (35.56, 25.4)
+        // Coordinates appear on separate lines in the formatted output.
+        assert!(out.contains("(xy 33.02 25.4)"));
+        assert!(out.contains("(xy 35.56 25.4)"));
+        // U2 at (50.8, 25.4), pin tip at (58.42, 25.4), label at (60.96, 25.4)
+        assert!(out.contains("(xy 58.42 25.4)"));
+        assert!(out.contains("(xy 60.96 25.4)"));
+    }
+
+    #[test]
+    fn labels_placed_at_end_of_wire() {
+        let d = make_design();
+        let out = emit_schematic(&d);
+        // U2 label should be at (60.96, 25.4) — 2.54 mm right of its pin tip.
+        assert!(out.contains("(at 60.96 25.4 0)"));
         // Ensure no float imprecision artifacts.
         assert!(!out.contains("99999999999"));
     }
@@ -307,5 +534,67 @@ mod tests {
         assert_ne!(u1_uuid, u2_uuid);
         assert!(out1.contains(&u1_uuid));
         assert!(out1.contains(&u2_uuid));
+    }
+
+    #[test]
+    fn multi_pin_component_has_pins_spaced_vertically() {
+        let u1 = ComponentInst::new(
+            "U1",
+            TestBlock {
+                pins: vec![
+                    Pin::new(
+                        "VIN",
+                        Role::PowerIn,
+                        Limits::new(0.0_f64.volt(), 6.0_f64.volt(), 1.0_f64.amp()),
+                        None,
+                    ),
+                    Pin::new(
+                        "GND",
+                        Role::Gnd,
+                        Limits::new(0.0_f64.volt(), 0.3_f64.volt(), 1.0_f64.amp()),
+                        None,
+                    ),
+                    Pin::new(
+                        "VOUT",
+                        Role::PowerOut,
+                        Limits::new(0.0_f64.volt(), 6.0_f64.volt(), 0.5_f64.amp()),
+                        None,
+                    ),
+                ],
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("VIN", 5.0_f64.volt()));
+        d.add_net(Net::ground());
+        d.add_net(Net::power("VOUT", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VIN", "VIN");
+        d.connect("U1", "GND", "GND");
+        d.connect("U1", "VOUT", "VOUT");
+
+        let out = emit_schematic(&d);
+
+        // Three pins should be at y = -2.54 (VIN), 0 (GND), +2.54 (VOUT)
+        assert!(out.contains("(at 7.62 -2.54 180)"));
+        assert!(out.contains("(at 7.62 0 180)"));
+        assert!(out.contains("(at 7.62 2.54 180)"));
+
+        // Wires should go from each pin tip to a label 2.54 mm to the right.
+        // Coordinates appear on separate lines in the formatted output.
+        assert!(out.contains("(xy 33.02 22.86)"));
+        assert!(out.contains("(xy 35.56 22.86)"));
+        assert!(out.contains("(xy 33.02 25.4)"));
+        assert!(out.contains("(xy 35.56 25.4)"));
+        assert!(out.contains("(xy 33.02 27.94)"));
+        assert!(out.contains("(xy 35.56 27.94)"));
+
+        // Labels at the end of each wire (multi-line formatted).
+        assert!(out.contains("\"VIN\""));
+        assert!(out.contains("\"GND\""));
+        assert!(out.contains("\"VOUT\""));
+        assert!(out.contains("(at 35.56 22.86 0)"));
+        assert!(out.contains("(at 35.56 25.4 0)"));
+        assert!(out.contains("(at 35.56 27.94 0)"));
     }
 }

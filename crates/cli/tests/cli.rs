@@ -187,8 +187,8 @@ fn export_with_design_file_writes_named_outputs() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let net = std::fs::read_to_string(temp.join("my_design.net"))
-        .expect("my_design.net should exist");
+    let net =
+        std::fs::read_to_string(temp.join("my_design.net")).expect("my_design.net should exist");
     assert!(net.starts_with("(export"));
 
     let sch = std::fs::read_to_string(temp.join("my_design.kicad_sch"))

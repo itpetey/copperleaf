@@ -81,6 +81,7 @@ dependencies = [
  "copperleaf-core",
  "copperleaf-ir",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

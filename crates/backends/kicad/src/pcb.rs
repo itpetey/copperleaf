@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use copperleaf_ir::{Design, NetClass};
 
-use crate::common::{build_net_codes, fmt_mm, format_float};
+use crate::common::{build_net_codes, fmt_mm, format_float, refdes_prefix};
 use crate::sexpr::{Sexpr, kv};
 
 /// Emit a KiCad S-expression PCB file for the given design.
@@ -56,10 +56,57 @@ fn general_node() -> Sexpr {
 }
 
 fn layers_node() -> Sexpr {
+    // Standard KiCad 6 layer table.  Footprints reference F.SilkS / F.Fab and
+    // the board outline uses Edge.Cuts, so all of these must be declared or
+    // KiCad refuses to load the board.
     Sexpr::list([
         Sexpr::atom("layers"),
         Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("31"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("13"),
+            Sexpr::str("F.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("15"),
+            Sexpr::str("B.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("5"),
+            Sexpr::str("F.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Silkscreen"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("7"),
+            Sexpr::str("B.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Silkscreen"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("25"),
+            Sexpr::str("Edge.Cuts"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("31"),
+            Sexpr::str("F.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Courtyard"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("29"),
+            Sexpr::str("B.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Courtyard"),
+        ]),
+        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
     ])
 }
 
@@ -168,6 +215,20 @@ fn footprint_node(
     let x = 10.0 + (idx as f64 % 10.0) * PITCH;
     let y = 10.0 + (idx as f64 / 10.0).floor() * PITCH;
 
+    let n_pins = comp.pins.len();
+    let pad_span = if n_pins == 0 {
+        0.0
+    } else {
+        (n_pins as f64 - 1.0) * 2.54
+    };
+    // Silkscreen outline snug around the pad row. Pads sit on y=0 spaced 2.54mm;
+    // pad diameter is 1.524mm, so pad edges reach ±0.762mm. Give 0.5mm margin.
+    let body_w = pad_span + 2.0 * (0.762 + 0.5);
+    let body_h = 2.0 * (0.762 + 0.5);
+    let half_w = body_w / 2.0;
+    // Centre the box on the pad row's midpoint.
+    let body_cx = pad_span / 2.0;
+
     let mut children = vec![
         Sexpr::atom("footprint"),
         Sexpr::str("copperleaf:Generic"),
@@ -181,7 +242,60 @@ fn footprint_node(
             Sexpr::atom("fp_text"),
             Sexpr::atom("reference"),
             Sexpr::str(&comp.refdes),
-            Sexpr::list([Sexpr::atom("at"), Sexpr::atom("0"), Sexpr::atom("-2")]),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_float(body_cx, 2)),
+                Sexpr::atom(format_float(-body_h / 2.0 - 1.0, 2)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("effects"),
+                Sexpr::list([
+                    Sexpr::atom("font"),
+                    Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
+                    Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+                ]),
+                Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+            ]),
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.SilkS")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("fp_text"),
+            Sexpr::atom("value"),
+            Sexpr::str(refdes_prefix(&comp.refdes).as_str()),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_float(body_cx, 2)),
+                Sexpr::atom(format_float(body_h / 2.0 + 1.0, 2)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("effects"),
+                Sexpr::list([
+                    Sexpr::atom("font"),
+                    Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
+                    Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+                ]),
+                Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+            ]),
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.Fab")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("fp_rect"),
+            Sexpr::list([
+                Sexpr::atom("start"),
+                Sexpr::atom(format_float(body_cx - half_w, 2)),
+                Sexpr::atom(format_float(-body_h / 2.0, 2)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("end"),
+                Sexpr::atom(format_float(body_cx + half_w, 2)),
+                Sexpr::atom(format_float(body_h / 2.0, 2)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("stroke"),
+                Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
+                Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
+            ]),
+            Sexpr::list([Sexpr::atom("fill"), Sexpr::atom("none")]),
             Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.SilkS")]),
         ]),
     ];

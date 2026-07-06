@@ -9,3 +9,4 @@ license.workspace = true
 copperleaf-core.workspace = true
 copperleaf-ir.workspace = true
 serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true, features = ["std"] }
