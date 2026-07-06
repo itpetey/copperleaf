@@ -97,8 +97,39 @@ fn json_snapshot_design_basic() {
   ],
   "components": [],
   "constraints": [],
-  "diagnostics": []
+  "diagnostics": [],
+  "connections": [
+    {
+      "refdes": "U1",
+      "pin": "VDD",
+      "net": "V3V3"
+    }
+  ]
 }"#;
 
     assert_eq!(json, expected);
+}
+
+#[test]
+fn json_snapshot_round_trip_with_connections() {
+    let mut d = Design::default();
+    d.add_net(Net::power("V3V3", 3.3.volt()));
+    d.add_net(Net::ground());
+    d.connect("U1", "VDD", "V3V3");
+    d.connect("U1", "GND", "GND");
+    d.connect("U2", "VDD", "V3V3");
+
+    let json = serde_json::to_string_pretty(&d).unwrap();
+    let restored: Design = serde_json::from_str(&json).unwrap();
+
+    let mut restored_pins = restored.pins_on_net("V3V3");
+    restored_pins.sort();
+    let mut expected_pins = vec![("U1".into(), "VDD".into()), ("U2".into(), "VDD".into())];
+    expected_pins.sort();
+    assert_eq!(restored_pins, expected_pins);
+
+    assert_eq!(restored.nets_of_pin("U1", "GND"), vec![String::from("GND")]);
+    assert!(json.contains("\"connections\""));
+    assert!(json.contains("\"refdes\": \"U1\""));
+    assert!(json.contains("\"net\": \"V3V3\""));
 }

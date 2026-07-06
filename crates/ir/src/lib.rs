@@ -162,6 +162,14 @@ pub struct ComponentRecord {
     pub constraints: Vec<Constraint>,
 }
 
+/// A serializable connection record linking a component pin to a net.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Connection {
+    pub refdes: String,
+    pub pin: String,
+    pub net: String,
+}
+
 /// Graph node: either a named net or a concrete (refdes.pin) endpoint.
 #[derive(Clone, Debug)]
 pub enum Node {
@@ -184,14 +192,47 @@ pub struct DesignGraph {
 
 // Design container (graph elided for now)
 /// Top-level container for a design’s nets, components, constraints and diagnostics.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize)]
 pub struct Design {
     pub nets: Vec<Net>,
     pub components: Vec<ComponentRecord>,
     pub constraints: Vec<Constraint>,
     pub diagnostics: Vec<Diagnostic>,
+    pub connections: Vec<Connection>,
     #[serde(skip)]
     pub graph: DesignGraph,
+}
+
+/// Helper struct used to deserialize a [`Design`] without its derived graph.
+/// After deserialization, connections are replayed into a fresh [`DesignGraph`].
+#[derive(Deserialize)]
+struct DesignRaw {
+    nets: Vec<Net>,
+    components: Vec<ComponentRecord>,
+    constraints: Vec<Constraint>,
+    diagnostics: Vec<Diagnostic>,
+    connections: Vec<Connection>,
+}
+
+impl<'de> Deserialize<'de> for Design {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = DesignRaw::deserialize(deserializer)?;
+        let mut design = Design {
+            nets: raw.nets,
+            components: raw.components,
+            constraints: raw.constraints,
+            diagnostics: raw.diagnostics,
+            connections: raw.connections,
+            graph: DesignGraph::default(),
+        };
+        // Take ownership so connect() can rebuild the graph and re-populate
+        // the connections vec, naturally deduplicating any duplicate records.
+        let conns = std::mem::take(&mut design.connections);
+        for conn in &conns {
+            design.connect(&conn.refdes, &conn.pin, &conn.net);
+        }
+        Ok(design)
+    }
 }
 
 impl Limits {
@@ -376,6 +417,16 @@ impl Design {
 
     /// Connect a component pin to a net (creates nodes if missing).
     pub fn connect(&mut self, refdes: &str, pin: &str, net: &str) {
+        let conn = Connection {
+            refdes: refdes.to_string(),
+            pin: pin.to_string(),
+            net: net.to_string(),
+        };
+        if !self.connections.iter().any(|c| {
+            c.refdes == conn.refdes && c.pin == conn.pin && c.net == conn.net
+        }) {
+            self.connections.push(conn);
+        }
         let p_idx = self.graph.ensure_pin(refdes, pin);
         let n_idx = self.graph.ensure_net(net);
         if self.graph.g.find_edge(p_idx, n_idx).is_none() {
@@ -409,5 +460,84 @@ mod tests {
         assert_eq!(pins, vec![("U1".into(), "VDD".into())]);
         let nets = d.nets_of_pin("U1", "VDD");
         assert_eq!(nets, vec![String::from("V3V3")]);
+    }
+
+    #[test]
+    fn default_design_serializes_empty_connections_array() {
+        let d = Design::default();
+        let json = serde_json::to_string(&d).unwrap();
+        assert!(json.contains("\"connections\":[]"));
+    }
+
+    #[test]
+    fn connection_round_trips_through_json() {
+        let conn = Connection {
+            refdes: "U1".into(),
+            pin: "VDD".into(),
+            net: "V3V3".into(),
+        };
+        let json = serde_json::to_string(&conn).unwrap();
+        assert!(json.contains("\"refdes\":\"U1\""));
+        assert!(json.contains("\"pin\":\"VDD\""));
+        assert!(json.contains("\"net\":\"V3V3\""));
+
+        let restored: Connection = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.refdes, "U1");
+        assert_eq!(restored.pin, "VDD");
+        assert_eq!(restored.net, "V3V3");
+    }
+
+    #[test]
+    fn connect_populates_connections_and_deduplicates() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.connect("U1", "VDD", "V3V3");
+        assert_eq!(d.connections.len(), 1);
+        assert_eq!(d.connections[0].refdes, "U1");
+        assert_eq!(d.connections[0].pin, "VDD");
+        assert_eq!(d.connections[0].net, "V3V3");
+
+        d.connect("U1", "VDD", "V3V3");
+        assert_eq!(d.connections.len(), 1);
+        assert_eq!(d.pins_on_net("V3V3"), vec![("U1".into(), "VDD".into())]);
+    }
+
+    #[test]
+    fn design_round_trip_preserves_connectivity() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.connect("U1", "VDD", "V3V3");
+        d.connect("U1", "GND", "GND");
+        d.connect("U2", "VDD", "V3V3");
+
+        let json = serde_json::to_string(&d).unwrap();
+        let restored: Design = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(d.connections, restored.connections);
+
+        let mut restored_pins = restored.pins_on_net("V3V3");
+        restored_pins.sort();
+        let mut expected_pins = vec![("U1".into(), "VDD".into()), ("U2".into(), "VDD".into())];
+        expected_pins.sort();
+        assert_eq!(restored_pins, expected_pins);
+        assert_eq!(restored.nets_of_pin("U1", "VDD"), vec![String::from("V3V3")]);
+        assert_eq!(restored.nets_of_pin("U1", "GND"), vec![String::from("GND")]);
+    }
+
+    #[test]
+    fn design_round_trip_preserves_graph_counts() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.add_net(Net::power("GND", 0.0.volt()));
+        d.connect("U1", "VDD", "V3V3");
+        d.connect("U1", "GND", "GND");
+        d.connect("U2", "VDD", "V3V3");
+
+        let before = d.graph.counts();
+        let json = serde_json::to_string(&d).unwrap();
+        let restored: Design = serde_json::from_str(&json).unwrap();
+        let after = restored.graph.counts();
+
+        assert_eq!(before, after);
     }
 }

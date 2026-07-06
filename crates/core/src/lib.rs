@@ -214,6 +214,13 @@ impl<U: UnitMarker> Qty<U> {
     }
 }
 
+impl Qty<Second> {
+    /// Convert a stored period (in seconds) back to a frequency in megahertz.
+    pub fn as_mhz(&self) -> f64 {
+        1.0 / self.as_base() / 1.0e6
+    }
+}
+
 impl<U: UnitMarker> Serialize for Qty<U> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(Serialize)]
@@ -289,5 +296,15 @@ impl UnitExt for f64 {
     }
     fn pf(self) -> Qty<Farad> {
         Qty(Farad::from_base(self * 1.0e-12), PhantomData)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn as_mhz_converts_period_to_frequency() {
+        assert!((50.0.mhz().as_mhz() - 50.0).abs() < 1e-9);
     }
 }
