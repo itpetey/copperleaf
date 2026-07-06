@@ -261,10 +261,10 @@ pub fn erc_overvoltage(design: &Design) -> Vec<Diagnostic> {
     for component in &design.components {
         for pin in &component.pins {
             for net_name in design.nets_of_pin(&component.refdes, &pin.name) {
-                if let Some(net) = design.nets.iter().find(|n| n.name == net_name) {
-                    if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
-                        diags.push(diag);
-                    }
+                if let Some(net) = design.nets.iter().find(|n| n.name == net_name)
+                    && let Some(diag) = erc_voltage_pin_to_net(net, pin)
+                {
+                    diags.push(diag);
                 }
             }
         }
@@ -463,9 +463,9 @@ mod tests {
         d.add_net(Net::power("VBUS", 5.0.volt()));
         d.add_net(Net::ground());
 
-        let buck = Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+        let buck = Buck::new(3.3.volt(), 2.0.amp());
         let u1 = ComponentInst::new("U1", buck);
-        d.add_component(&u1);
+        d.add_component(u1);
         d.connect("U1", "VIN", "VBUS");
         d.connect("U1", "GND", "GND");
         d
@@ -511,9 +511,9 @@ mod tests {
         d.add_net(Net::power("VBUS", 5.0.volt()));
         d.add_net(Net::ground());
 
-        let buck = Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+        let buck = Buck::new(3.3.volt(), 2.0.amp());
         let u1 = ComponentInst::new("U1", buck);
-        d.add_component(&u1);
+        d.add_component(u1);
         // VIN deliberately left unconnected
 
         let result = synthesize_decoupling(&d);

@@ -59,7 +59,9 @@ dependencies = [
 name = "copperleaf-edsl"
 version = "0.1.0"
 dependencies = [
+ "copperleaf-core",
  "copperleaf-ir",
+ "copperleaf-parts",
 ]
 
 [[package]]

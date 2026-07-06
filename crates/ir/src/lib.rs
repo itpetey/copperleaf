@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 // Component trait and instance wrapper
 /// Trait implemented by parts to expose identity, pins, and default constraints.
 pub trait Block {
-    fn id(&self) -> &str;
     fn pin(&self, idx: usize) -> Option<&Pin> {
         let pins = self.pins();
         // Decrement the idx here because pins are 1-based and the array is 0-based.
@@ -439,9 +438,9 @@ impl Design {
     ///
     /// Graph connectivity is separate — use [`Design::connect`] to wire pins
     /// to nets after the component has been added.
-    pub fn add_component<B: Block>(&mut self, inst: &ComponentInst<B>) {
+    pub fn add_component<B: Block>(&mut self, inst: ComponentInst<B>) {
         self.components.push(ComponentRecord {
-            refdes: inst.refdes.clone(),
+            refdes: inst.refdes,
             pins: inst.block.pins().to_vec(),
             constraints: inst.block.constraints(),
         });
@@ -453,6 +452,23 @@ impl Design {
     /// Add a top-level constraint to the design.
     pub fn add_constraint(&mut self, c: Constraint) {
         self.constraints.push(c);
+    }
+
+    /// Connect a component pin to a net using `"refdes.pin"` notation.
+    ///
+    /// Panics if `pin` does not contain a `.` separator.
+    pub fn wire(&mut self, pin: &str, net: &str) {
+        let Some((refdes, pin_name)) = pin.split_once('.') else {
+            panic!("malformed pin string '{}': expected refdes.pin", pin);
+        };
+        self.connect(refdes, pin_name, net);
+    }
+
+    /// Connect each pin in `pins` to `net` using [`Design::wire`] semantics.
+    pub fn connect_net(&mut self, net: &str, pins: &[&str]) {
+        for pin in pins {
+            self.wire(pin, net);
+        }
     }
 
     /// Connect a component pin to a net (creates nodes if missing).
@@ -488,6 +504,34 @@ impl Design {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wire_parses_refdes_pin_notation() {
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3.volt()));
+        d.wire("U1.VDD", "V3V3");
+        let pins = d.pins_on_net("V3V3");
+        assert_eq!(pins, vec![("U1".into(), "VDD".into())]);
+    }
+
+    #[test]
+    #[should_panic(expected = "malformed pin string")]
+    fn wire_panics_on_missing_dot() {
+        let mut d = Design::default();
+        d.wire("invalid", "V3V3");
+    }
+
+    #[test]
+    fn connect_net_wires_multiple_pins() {
+        let mut d = Design::default();
+        d.add_net(Net::power("SDIO_CLK", 3.3.volt()));
+        d.connect_net("SDIO_CLK", &["U1.SDIO_CLK", "U2.GPIO2"]);
+        let mut pins = d.pins_on_net("SDIO_CLK");
+        pins.sort();
+        let mut expected = vec![("U1".into(), "SDIO_CLK".into()), ("U2".into(), "GPIO2".into())];
+        expected.sort();
+        assert_eq!(pins, expected);
+    }
 
     #[test]
     fn connect_builds_graph() {

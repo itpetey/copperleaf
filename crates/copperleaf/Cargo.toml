@@ -9,6 +9,6 @@ license.workspace = true
 copperleaf-analysis = { path = "../analysis" }
 copperleaf-backend-kicad = { path = "../backends/kicad" }
 copperleaf-core = { path = "../core" }
-copperleaf-edsl = { path = "../edsl" }
+copperleaf-edsl = { path = "../edsl", features = ["parts"] }
 copperleaf-ir = { path = "../ir" }
 copperleaf-parts = { path = "../parts" }

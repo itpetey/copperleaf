@@ -18,9 +18,9 @@ fn main() {
     });
 
     // 2) Pick parts and instantiate them
-    let buck = parts::Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+    let buck = parts::Buck::new(3.3.volt(), 2.0.amp());
     let u_reg = ComponentInst::new("U1", buck);
-    let mcu = parts::Mcu::new("STM32F405RG");
+    let mcu = parts::Mcu::new();
     let u_mcu = ComponentInst::new("U2", mcu);
 
     // 3) Build a design and add top‑level constraints
@@ -28,8 +28,8 @@ fn main() {
     d.add_net(vbus);
     d.add_net(gnd);
     d.add_net(v3v3);
-    d.add_component(&u_reg);
-    d.add_component(&u_mcu);
+    d.add_component(u_reg);
+    d.add_component(u_mcu);
     d.add_constraint(Constraint::ResonanceIndex { max: 0.5 });
     d.add_constraint(Constraint::MaxJunction {
         temp: 85.0.celsius(),

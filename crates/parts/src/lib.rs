@@ -8,7 +8,6 @@ use copperleaf_ir::*;
 /// Simple synchronous buck regulator model with minimal pins and ratings.
 #[derive(Clone, Debug)]
 pub struct Buck {
-    id: String,
     pins: Vec<Pin>,
     pub v_out: Qty<Volt>,
     pub i_max: Qty<Amp>,
@@ -17,15 +16,13 @@ pub struct Buck {
 /// Generic microcontroller model with USB pins and power rails.
 #[derive(Clone, Debug)]
 pub struct Mcu {
-    id: String,
     pins: Vec<Pin>,
 }
 
 impl Buck {
     /// Create a new buck regulator with output voltage and current limit.
-    pub fn new(id: &str, v_out: Qty<Volt>, i_max: Qty<Amp>) -> Self {
+    pub fn new(v_out: Qty<Volt>, i_max: Qty<Amp>) -> Self {
         Self {
-            id: id.to_owned(),
             v_out,
             i_max,
             pins: vec![
@@ -65,9 +62,6 @@ impl Buck {
 }
 
 impl Block for Buck {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -79,9 +73,15 @@ impl Block for Buck {
     }
 }
 
+impl Default for Mcu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Mcu {
     /// Create a new MCU with a small selection of common pins.
-    pub fn new(id: &str) -> Self {
+    pub fn new() -> Self {
         let usb_spec = SigSpec {
             kind: SigKind::Usb2Hs,
             bandwidth: Some(480.0.mhz()),
@@ -89,7 +89,6 @@ impl Mcu {
             target_impedance: Some(90.0.ohm()),
         };
         Self {
-            id: id.to_owned(),
             pins: vec![
                 Pin {
                     name: "VDD".into(),
@@ -137,9 +136,6 @@ impl Mcu {
 }
 
 impl Block for Mcu {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -160,16 +156,14 @@ impl Block for Mcu {
 /// Standard two-pin capacitor.
 #[derive(Clone, Debug)]
 pub struct Capacitor {
-    id: String,
     pins: Vec<Pin>,
     pub value: Qty<Farad>,
 }
 
 impl Capacitor {
     /// Create a generic two-pin capacitor with the given reference designator and value.
-    pub fn new(id: &str, value: Qty<Farad>) -> Self {
+    pub fn new(value: Qty<Farad>) -> Self {
         Self {
-            id: id.to_owned(),
             value,
             pins: vec![
                 Pin {
@@ -197,9 +191,8 @@ impl Capacitor {
     }
 
     /// Create a decoupling capacitor with PowerIn and Gnd pins rated for 50 V.
-    pub fn decoupling(id: &str, value: Qty<Farad>) -> Self {
+    pub fn decoupling(value: Qty<Farad>) -> Self {
         Self {
-            id: id.to_owned(),
             value,
             pins: vec![
                 Pin {
@@ -228,9 +221,6 @@ impl Capacitor {
 }
 
 impl Block for Capacitor {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -239,7 +229,6 @@ impl Block for Capacitor {
 /// Standard two-pin resistor.
 #[derive(Clone, Debug)]
 pub struct Resistor {
-    id: String,
     pins: Vec<Pin>,
     pub value: Qty<Ohm>,
     /// Net the resistor terminates on (e.g., `VCC` for a pull-up, `GND` for a pull-down).
@@ -248,9 +237,8 @@ pub struct Resistor {
 
 impl Resistor {
     /// Create a generic two-pin resistor.
-    pub fn new(id: &str, value: Qty<Ohm>) -> Self {
+    pub fn new(value: Qty<Ohm>) -> Self {
         Self {
-            id: id.to_owned(),
             value,
             net: String::new(),
             pins: vec![
@@ -279,9 +267,8 @@ impl Resistor {
     }
 
     /// Create a pull-up resistor connected to `net`.
-    pub fn pullup(id: &str, value: Qty<Ohm>, net: &str) -> Self {
+    pub fn pullup(value: Qty<Ohm>, net: &str) -> Self {
         Self {
-            id: id.to_owned(),
             value,
             net: net.to_owned(),
             pins: vec![
@@ -310,15 +297,12 @@ impl Resistor {
     }
 
     /// Create a pull-down resistor connected to `net`.
-    pub fn pulldown(id: &str, value: Qty<Ohm>, net: &str) -> Self {
-        Self::pullup(id, value, net)
+    pub fn pulldown(value: Qty<Ohm>, net: &str) -> Self {
+        Self::pullup(value, net)
     }
 }
 
 impl Block for Resistor {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -327,16 +311,14 @@ impl Block for Resistor {
 /// Standard two-pin crystal.
 #[derive(Clone, Debug)]
 pub struct Crystal {
-    id: String,
     pins: Vec<Pin>,
     pub frequency: Qty<Second>,
 }
 
 impl Crystal {
     /// Create a two-pin crystal with both pins as AnalogIn inputs.
-    pub fn new(id: &str, frequency: Qty<Second>) -> Self {
+    pub fn new(frequency: Qty<Second>) -> Self {
         Self {
-            id: id.to_owned(),
             frequency,
             pins: vec![
                 Pin {
@@ -365,9 +347,6 @@ impl Crystal {
 }
 
 impl Block for Crystal {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -376,16 +355,14 @@ impl Block for Crystal {
 /// Standard two-pin inductor.
 #[derive(Clone, Debug)]
 pub struct Inductor {
-    id: String,
     pins: Vec<Pin>,
     pub value: Qty<Henry>,
 }
 
 impl Inductor {
     /// Create a generic two-pin inductor.
-    pub fn new(id: &str, value: Qty<Henry>) -> Self {
+    pub fn new(value: Qty<Henry>) -> Self {
         Self {
-            id: id.to_owned(),
             value,
             pins: vec![
                 Pin {
@@ -414,9 +391,6 @@ impl Inductor {
 }
 
 impl Block for Inductor {
-    fn id(&self) -> &str {
-        &self.id
-    }
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
@@ -428,8 +402,7 @@ mod tests {
 
     #[test]
     fn capacitor_new_has_two_digital_io_pins() {
-        let c = Capacitor::new("C1", 100.0.nf());
-        assert_eq!(c.id(), "C1");
+        let c = Capacitor::new(100.0.nf());
         assert_eq!(c.pins().len(), 2);
         assert_eq!(c.pins()[0].name, "1");
         assert_eq!(c.pins()[1].name, "2");
@@ -440,7 +413,7 @@ mod tests {
 
     #[test]
     fn capacitor_decoupling_has_power_in_and_gnd() {
-        let c = Capacitor::decoupling("C2", 10.0.uf());
+        let c = Capacitor::decoupling(10.0.uf());
         assert_eq!(c.pins().len(), 2);
         assert_eq!(c.pins()[0].name, "1");
         assert_eq!(c.pins()[1].name, "2");
@@ -451,8 +424,7 @@ mod tests {
 
     #[test]
     fn resistor_new_has_two_pins() {
-        let r = Resistor::new("R1", 10.0.kohm());
-        assert_eq!(r.id(), "R1");
+        let r = Resistor::new(10.0.kohm());
         assert_eq!(r.pins().len(), 2);
         assert!(matches!(r.pins()[0].role, Role::DigitalIO));
         assert!(matches!(r.pins()[1].role, Role::DigitalIO));
@@ -461,8 +433,8 @@ mod tests {
 
     #[test]
     fn resistor_pullup_and_pulldown_have_digital_io_pins() {
-        let pullup = Resistor::pullup("R2", 10.0.kohm(), "VCC");
-        let pulldown = Resistor::pulldown("R3", 10.0.kohm(), "GND");
+        let pullup = Resistor::pullup(10.0.kohm(), "VCC");
+        let pulldown = Resistor::pulldown(10.0.kohm(), "GND");
         assert_eq!(pullup.pins().len(), 2);
         assert_eq!(pulldown.pins().len(), 2);
         assert!(pullup.pins().iter().all(|p| matches!(p.role, Role::DigitalIO)));
@@ -471,17 +443,16 @@ mod tests {
 
     #[test]
     fn resistor_pullup_and_pulldown_store_net() {
-        let pullup = Resistor::pullup("R2", 10.0.kohm(), "VCC");
-        let pulldown = Resistor::pulldown("R3", 10.0.kohm(), "GND");
+        let pullup = Resistor::pullup(10.0.kohm(), "VCC");
+        let pulldown = Resistor::pulldown(10.0.kohm(), "GND");
         assert_eq!(pullup.net, "VCC");
         assert_eq!(pulldown.net, "GND");
-        assert_eq!(Resistor::new("R4", 1.0.kohm()).net, "");
+        assert_eq!(Resistor::new(1.0.kohm()).net, "");
     }
 
     #[test]
     fn crystal_new_has_two_analog_in_pins() {
-        let y = Crystal::new("Y1", 25.0.mhz());
-        assert_eq!(y.id(), "Y1");
+        let y = Crystal::new(25.0.mhz());
         assert_eq!(y.pins().len(), 2);
         assert!(y.pins().iter().all(|p| matches!(p.role, Role::AnalogIn)));
         assert!((y.frequency.as_mhz() - 25.0).abs() < 1e-9);
@@ -489,8 +460,7 @@ mod tests {
 
     #[test]
     fn inductor_new_has_two_pins_and_stores_value() {
-        let l = Inductor::new("L1", 10.0e-6.henry());
-        assert_eq!(l.id(), "L1");
+        let l = Inductor::new(10.0e-6.henry());
         assert_eq!(l.pins().len(), 2);
         assert!(approx_eq(l.value.as_base(), 10e-6));
     }

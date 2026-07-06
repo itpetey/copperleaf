@@ -16,18 +16,18 @@ fn main() {
         clearance: 0.2.mm(),
     });
 
-    let buck = parts::Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+    let buck = parts::Buck::new(3.3.volt(), 2.0.amp());
     let u_reg = ComponentInst::new("U1", buck);
 
-    let mcu = parts::Mcu::new("STM32F405RG");
+    let mcu = parts::Mcu::new();
     let u_mcu = ComponentInst::new("U2", mcu);
 
     let mut d = Design::default();
     d.add_net(vbus);
     d.add_net(gnd);
     d.add_net(v3v3);
-    d.add_component(&u_reg);
-    d.add_component(&u_mcu);
+    d.add_component(u_reg);
+    d.add_component(u_mcu);
 
     let vdd_pin = Pin {
         name: "VDD".into(),

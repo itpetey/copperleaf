@@ -70,18 +70,18 @@ fn build_example_design() -> Design {
         clearance: 0.2.mm(),
     });
 
-    let buck = parts::Buck::new("MPM3610", 3.3.volt(), 2.0.amp());
+    let buck = parts::Buck::new(3.3.volt(), 2.0.amp());
     let u_reg = ComponentInst::new("U1", buck);
 
-    let mcu = parts::Mcu::new("STM32F405RG");
+    let mcu = parts::Mcu::new();
     let u_mcu = ComponentInst::new("U2", mcu);
 
     let mut d = Design::default();
     d.add_net(vbus);
     d.add_net(gnd);
     d.add_net(v3v3);
-    d.add_component(&u_reg);
-    d.add_component(&u_mcu);
+    d.add_component(u_reg);
+    d.add_component(u_mcu);
     d.connect("U1", "VIN", "VBUS");
     d.connect("U1", "GND", "GND");
     d.connect("U2", "VDD", "V3V3");
@@ -218,11 +218,11 @@ fn cmd_verify(args: &[String]) {
                 continue;
             }
             for net_name in d.nets_of_pin(&c.refdes, &pin.name) {
-                if let Some(net) = d.nets.iter().find(|n| n.name == net_name) {
-                    if let Some(diag) = erc_voltage_pin_to_net(net, pin) {
-                        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-                        issues = true;
-                    }
+                if let Some(net) = d.nets.iter().find(|n| n.name == net_name)
+                    && let Some(diag) = erc_voltage_pin_to_net(net, pin)
+                {
+                    println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
+                    issues = true;
                 }
             }
         }

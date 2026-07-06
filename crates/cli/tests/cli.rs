@@ -45,12 +45,12 @@ fn verify_runs_on_emitted_design_with_patched_connections() {
 
     // The emitted example design already contains connections. Patch U2.VDD from
     // V3V3 (3.3 V) to VBUS (5 V) so the ERC overvoltage check produces a result.
-    if let Some(connections) = design.get_mut("connections") {
-        if let Some(arr) = connections.as_array_mut() {
-            for conn in arr.iter_mut() {
-                if conn["refdes"] == "U2" && conn["pin"] == "VDD" {
-                    conn["net"] = serde_json::json!("VBUS");
-                }
+    if let Some(connections) = design.get_mut("connections")
+        && let Some(arr) = connections.as_array_mut()
+    {
+        for conn in arr.iter_mut() {
+            if conn["refdes"] == "U2" && conn["pin"] == "VDD" {
+                conn["net"] = serde_json::json!("VBUS");
             }
         }
     }
