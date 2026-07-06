@@ -1,16 +1,13 @@
-//! KiCad backend (placeholder).
-//!
-//! Provides a minimal text netlist emitter to aid experimentation. The
-//! format is not stable and is intended for demos and tests only.
+//! KiCad backend: netlist, schematic, and PCB emitters for the Copperleaf IR.
 
-use copperleaf_ir::Design;
+pub mod common;
+pub mod netlist;
+pub mod pcb;
+pub mod schematic;
+pub mod sexpr;
 
-/// Emit a toy KiCad-like netlist as a string for the given design.
-pub fn emit_netlist_text(design: &Design) -> String {
-    let mut s = String::new();
-    s.push_str("# KiCad-like netlist (placeholder)\n");
-    for net in &design.nets {
-        s.push_str(&format!("(net \"{}\")\n", net.name));
-    }
-    s
-}
+pub use common::{build_net_codes, fmt_mm, format_float, refdes_prefix};
+pub use netlist::emit_netlist;
+pub use pcb::emit_pcb;
+pub use schematic::emit_schematic;
+pub use sexpr::{Sexpr, deterministic_uuid, kv};

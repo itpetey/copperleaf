@@ -31,7 +31,9 @@ You should see an ERC message if the example connects a pin beyond its voltage r
 The CLI binary is now named `cl`. It offers quick verification, export, and JSON views using the same example design:
 
 - Verify (ERC snippet): `cl verify`
-- Export a toy KiCad‑like netlist: `cl export`
+- Export a KiCad netlist: `cl export`
+- Export a KiCad schematic: `cl export-sch`
+- Export a KiCad PCB: `cl export-pcb`
 - Serialize the design to JSON: `cl json`
 
 Running from the repo without installing:
@@ -97,11 +99,13 @@ Serialize the example design to JSON for debugging or downstream tooling:
 
 - `cl json` (or `cargo run -p copperleaf-cli -- json`)
 
-### Export (Toy) Netlist
+### Export to KiCad
 
-Emit a placeholder KiCad‑like netlist from the example design:
+Emit real KiCad S-expression files from the example design:
 
-- `cl export` (or `cargo run -p copperleaf-cli -- export`)
+- Netlist: `cl export` (or `cargo run -p copperleaf-cli -- export`)
+- Schematic: `cl export-sch` (or `cargo run -p copperleaf-cli -- export-sch`)
+- PCB: `cl export-pcb` (or `cargo run -p copperleaf-cli -- export-pcb`)
 
 ## Tips
 

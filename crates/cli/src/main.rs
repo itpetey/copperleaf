@@ -26,6 +26,8 @@ fn main() {
     match args[1].as_str() {
         "verify" => cmd_verify(&args[2..]),
         "export" => cmd_export(&args[2..]),
+        "export-sch" => cmd_export_sch(&args[2..]),
+        "export-pcb" => cmd_export_pcb(&args[2..]),
         "json" => cmd_json(&args[2..]),
         "decouple" => cmd_decouple(&args[2..]),
         "report" => cmd_report(&args[2..]),
@@ -157,8 +159,17 @@ fn cmd_emit() {
 
 fn cmd_export(args: &[String]) {
     let d = load_design(args.first().map(|s| s.as_str()));
-    let txt = backend_kicad::emit_netlist_text(&d);
-    println!("{}", txt);
+    println!("{}", backend_kicad::emit_netlist(&d));
+}
+
+fn cmd_export_sch(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
+    println!("{}", backend_kicad::emit_schematic(&d));
+}
+
+fn cmd_export_pcb(args: &[String]) {
+    let d = load_design(args.first().map(|s| s.as_str()));
+    println!("{}", backend_kicad::emit_pcb(&d));
 }
 
 fn cmd_json(args: &[String]) {
@@ -234,6 +245,6 @@ fn read_or_exit(path: &str) -> String {
 
 fn usage() {
     eprintln!(
-        "Usage: copperleaf <verify|export|json|decouple|report|emit|apply>\n  verify|export|json|decouple|report [design.json]\n  emit\n  apply <in.json> <patch.json> <out.json>"
+        "Usage: copperleaf <verify|export|export-sch|export-pcb|json|decouple|report|emit|apply>\n  verify|export|export-sch|export-pcb|json|decouple|report [design.json]\n  emit\n  apply <in.json> <patch.json> <out.json>"
     );
 }

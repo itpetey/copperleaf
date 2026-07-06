@@ -83,3 +83,131 @@ fn verify_runs_on_emitted_design_with_patched_connections() {
         stdout
     );
 }
+
+#[test]
+fn export_emits_kicad_netlist() {
+    let output = Command::new(cl_bin())
+        .arg("export")
+        .output()
+        .expect("failed to run cl export");
+
+    assert!(
+        output.status.success(),
+        "cl export failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.starts_with("(export"));
+    assert!(stdout.contains("(components"));
+    assert!(stdout.contains("(nets"));
+}
+
+#[test]
+fn export_sch_emits_kicad_schematic() {
+    let output = Command::new(cl_bin())
+        .arg("export-sch")
+        .output()
+        .expect("failed to run cl export-sch");
+
+    assert!(
+        output.status.success(),
+        "cl export-sch failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.starts_with("(kicad_sch"));
+}
+
+#[test]
+fn export_pcb_emits_kicad_pcb() {
+    let output = Command::new(cl_bin())
+        .arg("export-pcb")
+        .output()
+        .expect("failed to run cl export-pcb");
+
+    assert!(
+        output.status.success(),
+        "cl export-pcb failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.starts_with("(kicad_pcb"));
+    assert!(stdout.contains("(net_class \"Default\""));
+}
+
+#[test]
+fn export_subcommands_accept_external_design_file() {
+    let emit = Command::new(cl_bin())
+        .arg("emit")
+        .output()
+        .expect("failed to run cl emit");
+    assert!(emit.status.success());
+
+    let temp_dir = std::env::temp_dir();
+    let design_path = temp_dir.join(format!(
+        "copperleaf_cli_export_test_{}.json",
+        std::process::id()
+    ));
+    std::fs::write(&design_path, &emit.stdout).unwrap();
+
+    let export = Command::new(cl_bin())
+        .arg("export")
+        .arg(&design_path)
+        .output()
+        .expect("failed to run cl export with file");
+    let export_sch = Command::new(cl_bin())
+        .arg("export-sch")
+        .arg(&design_path)
+        .output()
+        .expect("failed to run cl export-sch with file");
+    let export_pcb = Command::new(cl_bin())
+        .arg("export-pcb")
+        .arg(&design_path)
+        .output()
+        .expect("failed to run cl export-pcb with file");
+
+    std::fs::remove_file(&design_path).ok();
+
+    assert!(
+        export.status.success(),
+        "cl export <file> failed: {}",
+        String::from_utf8_lossy(&export.stderr)
+    );
+    assert!(
+        export_sch.status.success(),
+        "cl export-sch <file> failed: {}",
+        String::from_utf8_lossy(&export_sch.stderr)
+    );
+    assert!(
+        export_pcb.status.success(),
+        "cl export-pcb <file> failed: {}",
+        String::from_utf8_lossy(&export_pcb.stderr)
+    );
+
+    assert!(String::from_utf8_lossy(&export.stdout).starts_with("(export"));
+    assert!(String::from_utf8_lossy(&export_sch.stdout).starts_with("(kicad_sch"));
+    assert!(String::from_utf8_lossy(&export_pcb.stdout).starts_with("(kicad_pcb"));
+}
+
+#[test]
+fn export_with_missing_file_exits_nonzero() {
+    let output = Command::new(cl_bin())
+        .arg("export")
+        .arg("definitely_does_not_exist.json")
+        .output()
+        .expect("failed to run cl export");
+
+    assert!(
+        !output.status.success(),
+        "cl export with missing file should fail"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Error reading design file"),
+        "expected clear error message, got: {}",
+        stderr
+    );
+}

@@ -6,7 +6,7 @@
   - `crates/core`: units (uom-backed), diagnostics, IDs.
   - `crates/ir`: IR (pins, nets, constraints, design) + serde.
   - `crates/analysis`: ERC and analysis passes.
-  - `crates/backends/kicad`: minimal netlist/schematic emitter.
+  - `crates/backends/kicad`: KiCad netlist, schematic, and PCB emitters.
   - `crates/edsl`: builder/macros (stubs for now).
   - `crates/parts`: standard parts (e.g., Buck, MCU).
   - `crates/copperleaf`: public facade; re-exports subcrates.
@@ -14,7 +14,7 @@
 
 ## Build, Test, and Development Commands
 - Build all: `cargo build`
-- Run CLI: `cl verify|export|json` (installed) or `cargo run -p copperleaf-cli -- verify|export|json` (from repo)
+- Run CLI: `cl verify|export|export-sch|export-pcb|json` (installed) or `cargo run -p copperleaf-cli -- verify|export|export-sch|export-pcb|json` (from repo)
 - Run example: `cargo run -p copperleaf --example basic`
 - Tests: `cargo test` (unit tests across crates)
 - Lint (if installed): `cargo clippy --all-targets -- -D warnings`

@@ -2,9 +2,10 @@
 name = "copperleaf-backend-kicad"
 version.workspace = true
 edition.workspace = true
-description = "KiCad backend (minimal placeholder)"
+description = "KiCad netlist, schematic, and PCB emitters"
 license.workspace = true
 
 [dependencies]
+copperleaf-core.workspace = true
 copperleaf-ir.workspace = true
 serde = { workspace = true, features = ["derive", "std"] }
