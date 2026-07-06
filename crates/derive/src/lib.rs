@@ -7,7 +7,30 @@ use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, Type, parse_macro_input
 /// Derive `Block` for a struct that contains a `pins: Vec<Pin>` field.
 ///
 /// Optionally annotate the struct with `#[component(symbol = "...")]` to set
-/// the `kicad_symbol()` return value.
+/// the `kicad_symbol()` return value, and/or
+/// `#[component(constraints(...))]` to specify default constraints.
+///
+/// # Examples
+///
+/// ```ignore
+/// #[derive(Component)]
+/// #[component(symbol = "Connector:PinHeader_2x5")]
+/// struct JtagHeader {
+///     pins: Vec<Pin>,
+/// }
+///
+/// #[derive(Component)]
+/// #[component(
+///     symbol = "MCU:RP2354a",
+///     constraints(
+///         Constraint::Decoupling { values: vec![100.0.nf(), 1.0.uf()], per_pin: true },
+///         Constraint::LengthMatch { group: "USB_D".into(), skew_ps: 200.0 },
+///     )
+/// )]
+/// struct MyMcu {
+///     pins: Vec<Pin>,
+/// }
+/// ```
 #[proc_macro_derive(Component, attributes(component))]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -42,10 +65,22 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
         return compile_error("Field `pins` must be of type `Vec<Pin>`");
     }
 
-    let symbol = parse_component_symbol(&input.attrs);
+    let (symbol, constraints_tokens) = parse_component_attrs(&input.attrs);
     let symbol_expr = match symbol {
         Some(s) => quote! { Some(#s) },
         None => quote! { None },
+    };
+
+    let constraints_expr = match constraints_tokens {
+        Some(tokens) => {
+            quote! {
+                {
+                    use ::copperleaf_core::UnitExt;
+                    ::std::vec![ #tokens ]
+                }
+            }
+        }
+        None => quote! { ::std::vec::Vec::new() },
     };
 
     let expanded = quote! {
@@ -55,7 +90,7 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
             }
 
             fn constraints(&self) -> ::std::vec::Vec<::copperleaf_ir::Constraint> {
-                ::std::vec::Vec::new()
+                #constraints_expr
             }
 
             fn kicad_symbol(&self) -> Option<&str> {
@@ -87,7 +122,16 @@ fn is_vec_pin(ty: &Type) -> bool {
     inner_segments.len() == 1 && inner_segments[0].ident == "Pin"
 }
 
-fn parse_component_symbol(attrs: &[Attribute]) -> Option<String> {
+/// Parse `#[component(...)]` attributes, extracting:
+/// - `symbol` (optional) — a string literal for the KiCad symbol reference.
+/// - `constraints(...)` (optional) — a comma-separated list of `Constraint`
+///   expressions. The token stream is passed through as-is into a `vec![]`
+///   in the generated code, so users can write arbitrary Rust expressions
+///   (including unit extension methods like `100.0.nf()`).
+fn parse_component_attrs(attrs: &[Attribute]) -> (Option<String>, Option<proc_macro2::TokenStream>) {
+    let mut symbol = None;
+    let mut constraints_tokens = None;
+
     for attr in attrs {
         if !attr.path().is_ident("component") {
             continue;
@@ -95,26 +139,35 @@ fn parse_component_symbol(attrs: &[Attribute]) -> Option<String> {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
-        let nested = list
+
+        // Parse the inner comma-separated Meta items (e.g. `symbol = "..."`,
+        // `constraints(...)`) so we can inspect each one.
+        let Ok(nested) = list
             .parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
-            .ok()?;
+        else {
+            continue;
+        };
+
         for meta in nested {
-            let Meta::NameValue(nv) = meta else {
-                continue;
-            };
-            if !nv.path.is_ident("symbol") {
-                continue;
+            match meta {
+                Meta::NameValue(nv) if nv.path.is_ident("symbol") => {
+                    if let Expr::Lit(expr_lit) = &nv.value {
+                        if let Lit::Str(s) = &expr_lit.lit {
+                            symbol = Some(s.value());
+                        }
+                    }
+                }
+                Meta::List(list) if list.path.is_ident("constraints") => {
+                    // Pass the inner token stream through — it'll be spliced
+                    // directly into `vec![ ... ]` in the generated code.
+                    constraints_tokens = Some(list.tokens);
+                }
+                _ => {}
             }
-            let Expr::Lit(expr_lit) = &nv.value else {
-                continue;
-            };
-            let Lit::Str(s) = &expr_lit.lit else {
-                continue;
-            };
-            return Some(s.value());
         }
     }
-    None
+
+    (symbol, constraints_tokens)
 }
 
 fn compile_error(msg: &str) -> TokenStream {

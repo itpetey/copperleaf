@@ -425,4 +425,61 @@ mod tests {
         let chip = Rp2354a { pins: vec![] };
         assert_eq!(chip.kicad_symbol(), Some("RP2040:RP2354a"));
     }
+
+    #[test]
+    fn derive_component_with_constraints() {
+        #[derive(Clone, Debug, Component)]
+        #[component(
+            symbol = "MCU:RP2354a",
+            constraints(
+                Constraint::Decoupling { values: vec![100.0.nf(), 1.0.uf()], per_pin: true },
+                Constraint::LengthMatch { group: "USB_D".into(), skew_ps: 200.0 },
+            )
+        )]
+        struct MyMcu {
+            pins: Vec<Pin>,
+        }
+
+        let chip = MyMcu { pins: vec![] };
+        assert_eq!(chip.kicad_symbol(), Some("MCU:RP2354a"));
+        let constraints = chip.constraints();
+        assert_eq!(constraints.len(), 2);
+        assert!(matches!(constraints[0], Constraint::Decoupling { .. }));
+        assert!(matches!(constraints[1], Constraint::LengthMatch { .. }));
+    }
+
+    #[test]
+    fn derive_component_with_constraints_only() {
+        #[derive(Clone, Debug, Component)]
+        #[component(constraints(
+            Constraint::MaxJunction { temp: 85.0.celsius() },
+        ))]
+        struct TempSensitive {
+            pins: Vec<Pin>,
+        }
+
+        let chip = TempSensitive {
+            pins: vec![gnd(), power_in(1.7.volt(), 3.6.volt(), 0.5.amp())],
+        };
+        assert!(chip.kicad_symbol().is_none());
+        let constraints = chip.constraints();
+        assert_eq!(constraints.len(), 1);
+        assert!(matches!(constraints[0], Constraint::MaxJunction { .. }));
+    }
+
+    #[test]
+    fn derive_component_with_single_constraint() {
+        #[derive(Clone, Debug, Component)]
+        #[component(constraints(
+            Constraint::Impedance { target: 90.0.ohm(), tol_pct: 10.0 }
+        ))]
+        struct UsbDevice {
+            pins: Vec<Pin>,
+        }
+
+        let chip = UsbDevice { pins: vec![] };
+        let constraints = chip.constraints();
+        assert_eq!(constraints.len(), 1);
+        assert!(matches!(constraints[0], Constraint::Impedance { .. }));
+    }
 }
