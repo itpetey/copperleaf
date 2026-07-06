@@ -128,7 +128,9 @@ fn is_vec_pin(ty: &Type) -> bool {
 ///   expressions. The token stream is passed through as-is into a `vec![]`
 ///   in the generated code, so users can write arbitrary Rust expressions
 ///   (including unit extension methods like `100.0.nf()`).
-fn parse_component_attrs(attrs: &[Attribute]) -> (Option<String>, Option<proc_macro2::TokenStream>) {
+fn parse_component_attrs(
+    attrs: &[Attribute],
+) -> (Option<String>, Option<proc_macro2::TokenStream>) {
     let mut symbol = None;
     let mut constraints_tokens = None;
 
