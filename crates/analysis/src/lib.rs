@@ -42,6 +42,10 @@ pub fn erc_floating_inputs(design: &Design) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for component in &design.components {
         for pin in &component.pins {
+            // NC / NC_* pins are intentionally unconnected — skip them.
+            if pin.name == "NC" || pin.name.starts_with("NC_") {
+                continue;
+            }
             if matches!(pin.role, Role::DigitalIO | Role::AnalogIn) && pin.sig.is_none() {
                 let nets = design.nets_of_pin(&component.refdes, &pin.name);
                 if nets.is_empty() {
