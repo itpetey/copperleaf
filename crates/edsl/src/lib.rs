@@ -19,8 +19,11 @@ pub mod design_ext {
 
     /// Extension trait adding passive convenience methods to [`Design`].
     pub trait DesignExt {
-        /// Add a capacitor with the given value and wire both pins.
+        /// Add a generic capacitor with the given value and wire both pins.
         fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str);
+
+        /// Add a decoupling capacitor with the given value and wire both pins.
+        fn add_de_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str);
 
         /// Add a resistor with the given value and wire both pins.
         fn add_res(&mut self, refdes: &str, value: Qty<Ohm>, net_a: &str, net_b: &str);
@@ -29,6 +32,14 @@ pub mod design_ext {
     impl DesignExt for Design {
         fn add_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str) {
             let c = Capacitor::new(value);
+            let inst = ComponentInst::new(refdes, c);
+            self.add_component(inst);
+            self.wire(&format!("{}.{}", refdes, "1"), net_pos);
+            self.wire(&format!("{}.{}", refdes, "2"), net_neg);
+        }
+
+        fn add_de_cap(&mut self, refdes: &str, value: Qty<Farad>, net_pos: &str, net_neg: &str) {
+            let c = Capacitor::decoupling(value);
             let inst = ComponentInst::new(refdes, c);
             self.add_component(inst);
             self.wire(&format!("{}.{}", refdes, "1"), net_pos);
@@ -349,6 +360,25 @@ mod tests {
         assert!(d.component_by_refdes("C1").is_some());
         assert!(d.pins_on_net("VDD").contains(&("C1".into(), "1".into())));
         assert!(d.pins_on_net("GND").contains(&("C1".into(), "2".into())));
+    }
+
+    #[test]
+    #[cfg(feature = "parts")]
+    fn add_de_cap_adds_decoupling_component_and_wires_pins() {
+        use crate::DesignExt;
+
+        let mut d = Design::default();
+        d.add_net(Net::power("VDD", 3.3.volt()));
+        d.add_net(Net::ground());
+        d.add_de_cap("C1", 100.0.nf(), "VDD", "GND");
+
+        assert!(d.component_by_refdes("C1").is_some());
+        assert!(d.pins_on_net("VDD").contains(&("C1".into(), "1".into())));
+        assert!(d.pins_on_net("GND").contains(&("C1".into(), "2".into())));
+
+        let pins = &d.component_by_refdes("C1").unwrap().pins;
+        assert!(matches!(pins[0].role, Role::PowerIn));
+        assert!(matches!(pins[1].role, Role::Gnd));
     }
 
     #[test]
