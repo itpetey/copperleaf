@@ -103,9 +103,10 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
 
         // Populate footprint from the symbol library if not already set.
         if comp.kicad_footprint.is_none()
-            && let Some(fp) = &sym.footprint {
-                comp.kicad_footprint = Some(fp.clone());
-            }
+            && let Some(fp) = &sym.footprint
+        {
+            comp.kicad_footprint = Some(fp.clone());
+        }
 
         for pin in &mut comp.pins {
             if pin.pos.is_some() {
