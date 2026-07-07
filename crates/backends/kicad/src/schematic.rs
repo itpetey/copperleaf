@@ -62,6 +62,10 @@ fn lib_symbols_node(design: &Design) -> Sexpr {
 fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
     let fallback = format!("copperleaf:{}", comp.refdes);
     let symbol_name = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
+    // Extract the symbol base name (after library prefix) for the unit sub-symbol.
+    // KiCad requires the unit name to start with the symbol name, not the refdes.
+    let symbol_base = symbol_name.split(':').next_back().unwrap_or(&comp.refdes);
+    let fp_default = comp.kicad_footprint.as_deref().unwrap_or("");
     let mut body = vec![
         Sexpr::atom("symbol"),
         Sexpr::str(symbol_name),
@@ -74,11 +78,11 @@ fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
         Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
         lib_property_node("Reference", "U", false),
         lib_property_node("Value", "Box", false),
-        lib_property_node("Footprint", "", true),
+        lib_property_node("Footprint", fp_default, true),
         lib_property_node("Datasheet", "", true),
         Sexpr::list([
             Sexpr::atom("symbol"),
-            Sexpr::str(format!("{}_0_1", comp.refdes)),
+            Sexpr::str(format!("{}_0_1", symbol_base)),
             Sexpr::list([
                 Sexpr::atom("rectangle"),
                 Sexpr::list([
@@ -219,39 +223,48 @@ fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Se
     let (x, y) = symbol_position(idx);
     let fallback = format!("copperleaf:{}", comp.refdes);
     let lib_id = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
-    Sexpr::list([
-        Sexpr::atom("symbol"),
-        Sexpr::list([Sexpr::atom("lib_id"), Sexpr::str(lib_id)]),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("dnp"), Sexpr::atom("no")]),
-        Sexpr::list([
-            Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!("sch:{}", comp.refdes))),
-        ]),
+
+    let mut properties = vec![
         property_node("Reference", &comp.refdes, x, y - 6.35),
         property_node("Value", &refdes_prefix(&comp.refdes), x, y + 6.35),
-        Sexpr::list([
-            Sexpr::atom("instances"),
-            Sexpr::list([
-                Sexpr::atom("project"),
-                Sexpr::str(""),
+    ];
+    if let Some(fp) = &comp.kicad_footprint {
+        // Place the Footprint property below Value, matching KiCad's default layout.
+        properties.push(property_node("Footprint", fp, x, y + 12.7));
+    }
+
+    Sexpr::list(
+        std::iter::once(Sexpr::atom("symbol"))
+            .chain(std::iter::once(Sexpr::list([Sexpr::atom("lib_id"), Sexpr::str(lib_id)])))
+            .chain(std::iter::once(Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_float(x, 2)),
+                Sexpr::atom(format_float(y, 2)),
+                Sexpr::atom("0"),
+            ])))
+            .chain(std::iter::once(Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")])))
+            .chain(std::iter::once(Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")])))
+            .chain(std::iter::once(Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")])))
+            .chain(std::iter::once(Sexpr::list([Sexpr::atom("dnp"), Sexpr::atom("no")])))
+            .chain(std::iter::once(Sexpr::list([
+                Sexpr::atom("uuid"),
+                Sexpr::str(deterministic_uuid(&format!("sch:{}", comp.refdes))),
+            ])))
+            .chain(properties)
+            .chain(std::iter::once(Sexpr::list([
+                Sexpr::atom("instances"),
                 Sexpr::list([
-                    Sexpr::atom("path"),
-                    Sexpr::str(format!("/{}", deterministic_uuid("sch:root"))),
-                    Sexpr::list([Sexpr::atom("reference"), Sexpr::str(&comp.refdes)]),
-                    Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
+                    Sexpr::atom("project"),
+                    Sexpr::str(""),
+                    Sexpr::list([
+                        Sexpr::atom("path"),
+                        Sexpr::str(format!("/{}", deterministic_uuid("sch:root"))),
+                        Sexpr::list([Sexpr::atom("reference"), Sexpr::str(&comp.refdes)]),
+                        Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
+                    ]),
                 ]),
-            ]),
-        ]),
-    ])
+            ]))),
+    )
 }
 
 fn property_node(key: &str, value: &str, x: f64, y: f64) -> Sexpr {
@@ -655,6 +668,7 @@ mod tests {
         let out = emit_schematic(&d);
         assert!(out.contains("(lib_id \"RP2040:RP2354a\")"));
         assert!(out.contains("(symbol \"RP2040:RP2354a\""));
+        assert!(out.contains("(symbol \"RP2354a_0_1\""));
         assert!(out.contains("(at -15.24 5.08 0)"));
     }
 
@@ -690,7 +704,7 @@ mod tests {
         d.add_component(u1);
         d.connect("U1", "VDD", "V3V3");
 
-        crate::resolve_symbols(&mut d, path.to_str().unwrap());
+        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // U1 is the first component, so symbol_position(0) = (25.4, 25.4).
@@ -734,7 +748,7 @@ mod tests {
         d.add_component(u1);
         d.connect("U1", "VDD", "V3V3");
 
-        crate::resolve_symbols(&mut d, path.to_str().unwrap());
+        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // lib_symbol pin should use the library length.

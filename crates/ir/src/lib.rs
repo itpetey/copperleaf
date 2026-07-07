@@ -26,6 +26,15 @@ pub trait Block {
     fn kicad_symbol(&self) -> Option<&str> {
         None
     }
+    fn kicad_footprint(&self) -> Option<&str> {
+        None
+    }
+    /// Optional path to the `.kicad_sym` file containing this component's symbol.
+    /// When set, the symbol resolver can find pin positions and footprints
+    /// without needing a `--symbol-lib` CLI flag.
+    fn kicad_symbol_lib_path(&self) -> Option<&str> {
+        None
+    }
 }
 
 // Roles and signal kinds
@@ -172,7 +181,7 @@ pub struct ComponentInst<B: Block> {
 ///
 /// This is the serializable shadow of a [`ComponentInst`] — the generic block
 /// type is erased so that heterogeneous parts can live in a single [`Design`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ComponentRecord {
     /// Reference designator (e.g. `U1`).
     pub refdes: String,
@@ -182,6 +191,11 @@ pub struct ComponentRecord {
     pub constraints: Vec<Constraint>,
     /// Optional KiCad library symbol reference (e.g. `RP2040:RP2354a`).
     pub kicad_symbol: Option<String>,
+    /// Optional KiCad footprint (e.g. `Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm`).
+    pub kicad_footprint: Option<String>,
+    /// Optional path to the `.kicad_sym` file for this component's symbol.
+    /// When set, `resolve_symbols` can find it automatically.
+    pub kicad_symbol_lib_path: Option<String>,
 }
 
 /// A serializable connection record linking a component pin to a net.
@@ -449,6 +463,8 @@ impl Design {
             pins: inst.block.pins().to_vec(),
             constraints: inst.block.constraints(),
             kicad_symbol: inst.block.kicad_symbol().map(|s| s.to_owned()),
+            kicad_footprint: inst.block.kicad_footprint().map(|s| s.to_owned()),
+            kicad_symbol_lib_path: inst.block.kicad_symbol_lib_path().map(|s| s.to_owned()),
         });
     }
     /// Returns the component record with the given reference designator.
@@ -721,6 +737,23 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Debug)]
+    struct FullBlock {
+        pins: Vec<Pin>,
+    }
+
+    impl Block for FullBlock {
+        fn pins(&self) -> &[Pin] {
+            &self.pins
+        }
+        fn kicad_symbol(&self) -> Option<&str> {
+            Some("MCU:STM32F4")
+        }
+        fn kicad_footprint(&self) -> Option<&str> {
+            Some("Package_QFP:LQFP-64_10x10mm_P0.5mm")
+        }
+    }
+
     #[test]
     fn component_without_kicad_symbol_gets_none() {
         let mut d = Design::default();
@@ -752,5 +785,42 @@ mod tests {
             d.components[0].kicad_symbol,
             Some("RP2040:RP2354a".to_string())
         );
+    }
+
+    #[test]
+    fn component_with_kicad_footprint_gets_some() {
+        let mut d = Design::default();
+        let block = FullBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        assert_eq!(
+            d.components[0].kicad_symbol,
+            Some("MCU:STM32F4".to_string())
+        );
+        assert_eq!(
+            d.components[0].kicad_footprint,
+            Some("Package_QFP:LQFP-64_10x10mm_P0.5mm".to_string())
+        );
+    }
+
+    #[test]
+    fn component_without_kicad_footprint_gets_none() {
+        let mut d = Design::default();
+        let block = SymbolBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        assert_eq!(d.components[0].kicad_footprint, None);
     }
 }

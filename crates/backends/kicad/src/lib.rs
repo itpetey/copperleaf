@@ -24,35 +24,16 @@ pub use sym_parser::{PinDef, SymbolDef, find_symbol, parse_symbol_lib};
 /// Resolve KiCad symbol pin positions for components that declare a
 /// `kicad_symbol` but do not yet have per-pin positions set.
 ///
-/// Reads the `.kicad_sym` file at `lib_path` once, parses it, and matches each
-/// IR pin by name (case-insensitive) against the symbol library. Missing
-/// symbols or unmatched pins produce warning diagnostics attached to `design`.
-pub fn resolve_symbols(design: &mut Design, lib_path: &str) {
-    let symbols = match fs::read_to_string(lib_path) {
-        Ok(content) => match parse_symbol_lib(&content) {
-            Ok(syms) => syms,
-            Err(e) => {
-                design.diagnostics.push(Diagnostic {
-                    code: "SYM:PARSE".into(),
-                    severity: Severity::Warning,
-                    message: format!("Failed to parse symbol library '{}': {}", lib_path, e),
-                    entities: vec![lib_path.into()],
-                    hint: Some("Check the file is a valid .kicad_sym file".into()),
-                });
-                return;
-            }
-        },
-        Err(e) => {
-            design.diagnostics.push(Diagnostic {
-                code: "SYM:READ".into(),
-                severity: Severity::Warning,
-                message: format!("Failed to read symbol library '{}': {}", lib_path, e),
-                entities: vec![lib_path.into()],
-                hint: Some("Verify the --symbol-lib path is correct".into()),
-            });
-            return;
-        }
-    };
+/// For each component, the symbol library is resolved in this order:
+/// 1. The component's own `kicad_symbol_lib_path` (if set).
+/// 2. The `fallback_lib_path` (if provided, typically from `--symbol-lib`).
+///
+/// Libraries are cached by path so multiple components sharing the same file
+/// only read it once. Missing symbols or unmatched pins produce warning
+/// diagnostics attached to `design`.
+pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
+    // Cache: path -> parsed symbols
+    let mut lib_cache: std::collections::HashMap<String, Vec<SymbolDef>> = std::collections::HashMap::new();
 
     for comp in &mut design.components {
         let Some(sym_id) = &comp.kicad_symbol else {
@@ -62,7 +43,53 @@ pub fn resolve_symbols(design: &mut Design, lib_path: &str) {
             continue;
         }
 
-        let Some(sym) = find_symbol(&symbols, sym_id) else {
+        // Determine which library path to use for this component.
+        let lib_path = comp
+            .kicad_symbol_lib_path
+            .as_deref()
+            .or(fallback_lib_path);
+
+        let Some(lib_path) = lib_path else {
+            // No library path available — skip silently; the component
+            // will use fallback positions.
+            continue;
+        };
+
+        // Load (or fetch from cache) the symbol library.
+        let symbols = lib_cache.entry(lib_path.to_owned()).or_insert_with(|| {
+            match fs::read_to_string(lib_path) {
+                Ok(content) => match parse_symbol_lib(&content) {
+                    Ok(syms) => syms,
+                    Err(e) => {
+                        design.diagnostics.push(Diagnostic {
+                            code: "SYM:PARSE".into(),
+                            severity: Severity::Warning,
+                            message: format!("Failed to parse symbol library '{}': {}", lib_path, e),
+                            entities: vec![lib_path.into()],
+                            hint: Some("Check the file is a valid .kicad_sym file".into()),
+                        });
+                        return Vec::new();
+                    }
+                },
+                Err(e) => {
+                    design.diagnostics.push(Diagnostic {
+                        code: "SYM:READ".into(),
+                        severity: Severity::Warning,
+                        message: format!("Failed to read symbol library '{}': {}", lib_path, e),
+                        entities: vec![lib_path.into()],
+                        hint: Some("Verify the symbol library path is correct".into()),
+                    });
+                    return Vec::new();
+                }
+            }
+        });
+
+        if symbols.is_empty() {
+            // Already emitted a diagnostic during load.
+            continue;
+        }
+
+        let Some(sym) = find_symbol(symbols, sym_id) else {
             design.diagnostics.push(Diagnostic {
                 code: "SYM:NOT_FOUND".into(),
                 severity: Severity::Warning,
@@ -72,6 +99,13 @@ pub fn resolve_symbols(design: &mut Design, lib_path: &str) {
             });
             continue;
         };
+
+        // Populate footprint from the symbol library if not already set.
+        if comp.kicad_footprint.is_none() {
+            if let Some(fp) = &sym.footprint {
+                comp.kicad_footprint = Some(fp.clone());
+            }
+        }
 
         for pin in &mut comp.pins {
             if pin.pos.is_some() {
@@ -111,6 +145,7 @@ mod tests {
     fn sample_sym_lib() -> &'static str {
         r#"(kicad_symbol_lib
   (symbol "RP2354a"
+    (property "Footprint" "Package_QFP:LQFP-64_10x10mm_P0.5mm" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
     (pin power_in line (at -15.24 5.08 0) (length 2.54) (name "VDD") (number "1"))
     (pin power_in line (at -15.24 -5.08 0) (length 2.54) (name "GND") (number "2"))
   )
@@ -132,6 +167,7 @@ mod tests {
     struct SymBlock {
         pins: Vec<Pin>,
         symbol: Option<&'static str>,
+        footprint: Option<&'static str>,
     }
 
     impl copperleaf_ir::Block for SymBlock {
@@ -140,6 +176,9 @@ mod tests {
         }
         fn kicad_symbol(&self) -> Option<&str> {
             self.symbol
+        }
+        fn kicad_footprint(&self) -> Option<&str> {
+            self.footprint
         }
     }
 
@@ -163,10 +202,11 @@ mod tests {
                 ),
             ],
             symbol: Some("RP2040:RP2354a"),
+            footprint: None,
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, path.to_str().unwrap());
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, Some((-15.24, 5.08)));
@@ -192,10 +232,11 @@ mod tests {
                 None,
             )],
             symbol: Some("Missing:Missing"),
+            footprint: None,
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, path.to_str().unwrap());
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         assert!(
             d.diagnostics
@@ -220,10 +261,11 @@ mod tests {
                 None,
             )],
             symbol: Some("RP2040:RP2354a"),
+            footprint: None,
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, path.to_str().unwrap());
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         assert!(
             d.diagnostics
@@ -251,10 +293,11 @@ mod tests {
         let block = SymBlock {
             pins: vec![pin],
             symbol: Some("RP2040:RP2354a"),
+            footprint: None,
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, path.to_str().unwrap());
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, Some((1.0, 2.0)));
@@ -276,14 +319,104 @@ mod tests {
                 None,
             )],
             symbol: None,
+            footprint: None,
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, path.to_str().unwrap());
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, None);
         assert!(d.diagnostics.is_empty());
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn resolve_fills_footprint_from_library() {
+        let path = temp_lib(sample_sym_lib());
+        let mut d = Design::default();
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+            symbol: Some("RP2040:RP2354a"),
+            footprint: None,
+        };
+        d.add_component(ComponentInst::new("U1", block));
+
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+
+        let u1 = d.component_by_refdes("U1").unwrap();
+        assert_eq!(
+            u1.kicad_footprint,
+            Some("Package_QFP:LQFP-64_10x10mm_P0.5mm".to_string())
+        );
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn resolve_does_not_override_explicit_footprint() {
+        let lib = r#"(kicad_symbol_lib
+  (symbol "SOIC8"
+    (property "Footprint" "Library:WrongFootprint" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin power_in line (at 0 0 180) (length 2.54) (name "VDD") (number "1"))
+  )
+)"#;
+        let path = temp_lib(lib);
+        let mut d = Design::default();
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "VDD",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+            symbol: Some("MyLib:SOIC8"),
+            footprint: Some("User:ChosenFootprint"),
+        };
+        d.add_component(ComponentInst::new("U1", block));
+
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+
+        let u1 = d.component_by_refdes("U1").unwrap();
+        assert_eq!(
+            u1.kicad_footprint,
+            Some("User:ChosenFootprint".to_string())
+        );
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn resolve_skips_footprint_for_symbol_without_footprint_property() {
+        let lib = r#"(kicad_symbol_lib
+  (symbol "NoFp"
+    (pin power_in line (at 0 0 180) (length 2.54) (name "VIN") (number "1"))
+  )
+)"#;
+        let path = temp_lib(lib);
+        let mut d = Design::default();
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "VIN",
+                Role::PowerIn,
+                Limits::new(1.7.volt(), 3.6.volt(), 0.5.amp()),
+                None,
+            )],
+            symbol: Some("MyLib:NoFp"),
+            footprint: None,
+        };
+        d.add_component(ComponentInst::new("U1", block));
+
+        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+
+        let u1 = d.component_by_refdes("U1").unwrap();
+        assert_eq!(u1.kicad_footprint, None);
 
         std::fs::remove_file(&path).ok();
     }

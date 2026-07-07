@@ -549,6 +549,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U2", "VDD", "V3V3");
 
@@ -588,6 +589,7 @@ mod tests {
                 per_pin: false,
             }],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U3", "VIN", "VBUS");
         d.connect("U3", "EN", "VBUS");
@@ -621,6 +623,7 @@ mod tests {
                 per_pin: true,
             }],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U4", "VIN", "VBUS");
         d.connect("U4", "VIN", "VCC");
@@ -699,6 +702,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "NC", "V3V3");
 
@@ -737,6 +741,7 @@ mod tests {
             ],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
 
         let diags = erc_nc_pin_connected(&d);
@@ -759,6 +764,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
 
         let diags = erc_floating_inputs(&d);
@@ -795,6 +801,7 @@ mod tests {
             ],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "GPIO1", "V3V3");
 
@@ -819,6 +826,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VDD", "VBUS");
 
@@ -843,6 +851,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VDD", "V3V3");
 
@@ -878,6 +887,7 @@ mod tests {
             ],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VDD", "VBUS");
         d.connect("U1", "NC", "VBUS");
@@ -904,6 +914,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "GPIO", "VBUS");
 
@@ -928,6 +939,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
 
         let diags = erc_floating_power_inputs(&d);
@@ -953,6 +965,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VDD", "V3V3");
 
@@ -978,6 +991,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VIN", "VBUS");
         d.connect("U1", "VIN", "VCC");
@@ -1019,6 +1033,7 @@ mod tests {
             ],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
         d.connect("U1", "VIN", "VBUS");
         d.connect("U1", "VIN", "VCC");
@@ -1045,6 +1060,7 @@ mod tests {
             }],
             constraints: vec![],
             kicad_symbol: None,
+        ..Default::default()
         });
 
         let r = report(&d);

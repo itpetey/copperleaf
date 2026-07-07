@@ -75,11 +75,12 @@ fn cmd_export(design: &PathBuf, out_dir: &PathBuf, symbol_lib: Option<&PathBuf>)
         println!("Wrote {}", out_path.display());
     };
 
-    if let Some(path) = symbol_lib {
-        backend_kicad::resolve_symbols(&mut d, path.to_str().unwrap_or(""));
-        for diag in &d.diagnostics {
-            eprintln!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-        }
+    // Resolve symbols using component-level library paths, falling back to
+    // --symbol-lib if provided (which may be None if not specified).
+    let fallback = symbol_lib.and_then(|p| p.to_str());
+    backend_kicad::resolve_symbols(&mut d, fallback);
+    for diag in &d.diagnostics {
+        eprintln!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
     }
 
     write_file("net", &backend_kicad::emit_netlist(&d));

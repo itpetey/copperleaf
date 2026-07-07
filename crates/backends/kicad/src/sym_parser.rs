@@ -12,6 +12,8 @@ pub struct SymbolDef {
     pub lib_id: String,
     /// Pins belonging to the symbol.
     pub pins: Vec<PinDef>,
+    /// Optional default footprint (e.g. `"Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm"`).
+    pub footprint: Option<String>,
 }
 
 /// A pin extracted from a KiCad symbol definition.
@@ -64,18 +66,30 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     let lib_id = string_value(children.get(1)?);
 
     let mut pins = Vec::new();
-    collect_pins(&children[2..], &mut pins);
+    let mut footprint = None;
+    collect_pins_and_footprint(&children[2..], &mut pins, &mut footprint);
 
-    Some(SymbolDef { lib_id, pins })
+    Some(SymbolDef { lib_id, pins, footprint })
 }
 
-/// Recursively collect `(pin ...)` nodes from a symbol tree. KiCad nests pins
-/// inside unit sub-symbols such as `(symbol "Name_0_1" (pin ...) ...)`.
-fn collect_pins(nodes: &[Sexpr], pins: &mut Vec<PinDef>) {
+/// Recursively collect `(pin ...)` and `(property "Footprint" ...)` nodes from
+/// a symbol tree. KiCad nests pins inside unit sub-symbols such as
+/// `(symbol "Name_0_1" (pin ...) ...)`.
+fn collect_pins_and_footprint(
+    nodes: &[Sexpr],
+    pins: &mut Vec<PinDef>,
+    footprint: &mut Option<String>,
+) {
     for node in nodes {
         if let Some(pin) = parse_pin_node(node) {
             pins.push(pin);
             continue;
+        }
+        if footprint.is_none() {
+            if let Some(fp) = parse_footprint_property(node) {
+                *footprint = Some(fp);
+                continue;
+            }
         }
         // Recurse into nested `(symbol ...)` sub-nodes.
         if let Sexpr::List(children) = node
@@ -83,7 +97,7 @@ fn collect_pins(nodes: &[Sexpr], pins: &mut Vec<PinDef>) {
             && head == "symbol"
             && children.len() > 2
         {
-            collect_pins(&children[2..], pins);
+            collect_pins_and_footprint(&children[2..], pins, footprint);
         }
     }
 }
@@ -150,6 +164,32 @@ fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
         pin_type,
         length,
     })
+}
+
+/// Try to parse a `(property "Footprint" "value" ...)` node and return the
+/// footprint value if found.
+fn parse_footprint_property(node: &Sexpr) -> Option<String> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    if children.len() < 3 {
+        return None;
+    }
+    let Sexpr::Atom(head) = &children[0] else {
+        return None;
+    };
+    if head != "property" {
+        return None;
+    }
+    let key = string_value(children.get(1)?);
+    if key != "Footprint" {
+        return None;
+    }
+    let val = string_value(children.get(2)?);
+    if val.is_empty() {
+        return None;
+    }
+    Some(val)
 }
 
 fn string_value(expr: &Sexpr) -> String {
@@ -267,5 +307,39 @@ mod tests {
         assert_eq!(pins[2].name, "NO_AT");
         assert_eq!(pins[2].pos, (0.0, 0.0));
         assert_eq!(pins[2].rotation, 0.0);
+    }
+
+    #[test]
+    fn parse_extracts_footprint_property() {
+        let lib = r#"(kicad_symbol_lib
+  (symbol "SOIC8"
+    (property "Reference" "U" (at 0 0 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "SOIC8" (at 0 0 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin power_in line (at 0 0 180) (length 2.54) (name "VDD") (number "1"))
+  )
+  (symbol "NoFootprint"
+    (pin power_in line (at 0 0 180) (length 2.54) (name "VIN") (number "1"))
+  )
+)"#;
+        let symbols = parse_symbol_lib(lib).unwrap();
+        assert_eq!(symbols[0].footprint, Some("Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm".to_string()));
+        assert_eq!(symbols[1].footprint, None);
+    }
+
+    #[test]
+    fn parse_extracts_footprint_from_nested_unit_symbol() {
+        let lib = r#"(kicad_symbol_lib
+  (symbol "OpAmp"
+    (property "Footprint" "Package_DIP:DIP-8_W7.62mm" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (symbol "OpAmp_0_1"
+      (pin input line (at -5.08 2.54 0) (length 2.54) (name "IN+") (number "3"))
+    )
+  )
+)"#;
+        let symbols = parse_symbol_lib(lib).unwrap();
+        assert_eq!(symbols[0].footprint, Some("Package_DIP:DIP-8_W7.62mm".to_string()));
+        assert_eq!(symbols[0].pins.len(), 1);
+        assert_eq!(symbols[0].pins[0].name, "IN+");
     }
 }

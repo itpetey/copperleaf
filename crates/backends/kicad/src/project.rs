@@ -94,8 +94,8 @@ pub fn emit_project(name: &str) -> String {
                 }
             ],
             "meta": { "version": 5 },
-            "net_colors": [],
-            "netclass_assignments": [],
+            "net_colors": null,
+            "netclass_assignments": null,
             "netclass_patterns": []
         },
         "pcbnew": {
@@ -106,7 +106,15 @@ pub fn emit_project(name: &str) -> String {
             "annotate_start_num": 0,
             "bom_export_filename": "",
             "bom_fmt_presets": [],
-            "bom_fmt_settings": [],
+            "bom_fmt_settings": {
+                "field_delimiter": ",",
+                "keep_line_breaks": false,
+                "keep_tabs": false,
+                "name": "CSV",
+                "ref_delimiter": ",",
+                "ref_range_delimiter": "",
+                "string_delimiter": "\""
+            },
             "bom_presets": [],
             "bom_settings": { "exclude_dnp": false, "fields_ordered": [], "fields_not_in_bom": [], "filter_string": "", "group_symbols": true, "include_dnp": true, "name": "Grouping", "normalize_field_names": false, "sort_string": "", "subgrouping": [] },
             "connection_grid_size": 50.0,
@@ -183,5 +191,34 @@ mod tests {
         let v: Value = serde_json::from_str(&emit_project("proj")).unwrap();
         let lp = &v["pcbnew"]["last_paths"];
         assert!(lp.get("netlist").is_some());
+    }
+
+    /// KiCad's `JSON_SETTINGS::SaveToFile` calls `nlohmann::json::update()` to
+    /// merge its in-memory settings into the on-disk file.  The `update` method
+    /// recurses when the *source* value is an object, converting `null` targets
+    /// to empty objects along the way — but it throws `type_error(313)` when
+    /// the target is a non-null, non-object value such as an array.
+    ///
+    /// These tests guard against fields that must be objects (or null) but were
+    /// previously emitted as `[]`, causing KiCad to abort on save.
+    #[test]
+    fn bom_fmt_settings_is_object_not_array() {
+        let v: Value = serde_json::from_str(&emit_project("x")).unwrap();
+        let bfs = &v["schematic"]["bom_fmt_settings"];
+        assert!(bfs.is_object(), "bom_fmt_settings must be an object, got {bfs}");
+        assert_eq!(bfs["name"], "CSV");
+        assert_eq!(bfs["field_delimiter"], ",");
+    }
+
+    #[test]
+    fn net_colors_is_null_not_array() {
+        let v: Value = serde_json::from_str(&emit_project("x")).unwrap();
+        assert!(v["net_settings"]["net_colors"].is_null());
+    }
+
+    #[test]
+    fn netclass_assignments_is_null_not_array() {
+        let v: Value = serde_json::from_str(&emit_project("x")).unwrap();
+        assert!(v["net_settings"]["netclass_assignments"].is_null());
     }
 }

@@ -58,7 +58,7 @@ fn end_to_end_resolve_and_emit_uses_symbol_positions() {
 
     let lib_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rp2354a.kicad_sym");
-    resolve_symbols(&mut d, lib_path.to_str().unwrap());
+    resolve_symbols(&mut d, Some(lib_path.to_str().unwrap()));
 
     assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
 
