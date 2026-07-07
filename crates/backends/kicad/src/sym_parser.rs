@@ -309,6 +309,88 @@ fn resolve_extends(symbols: &mut Vec<SymbolDef>) {
     }
 }
 
+/// Flatten a symbol that uses `(extends "ParentName")` into a self-contained
+/// symbol by removing the `extends` reference and copying the parent's
+/// sub-symbols (units with pins and graphics) into the child.
+///
+/// This is needed when embedding extends-based symbols in `lib_symbols`
+/// without the parent definition — KiCad cannot resolve the extends reference
+/// from the schematic alone.
+pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
+    let Sexpr::List(mut children) = sym.raw.clone() else {
+        return sym.raw.clone();
+    };
+
+    let parent_name = match &sym.extends {
+        Some(name) => name.split(':').next_back().unwrap_or(name).to_string(),
+        None => return sym.raw.clone(),
+    };
+
+    let Some(parent) = symbols.iter().find(|s| s.lib_id == parent_name) else {
+        return sym.raw.clone();
+    };
+
+    // Remove the (extends "ParentName") node.
+    children.retain(|child| match child {
+        Sexpr::List(parts) if parts.len() >= 2 => {
+            match &parts[0] {
+                Sexpr::Atom(key) => key != "extends",
+                _ => true,
+            }
+        }
+        _ => true,
+    });
+
+    // Copy parent's sub-symbol units and graphical elements into the child.
+    // Sub-symbols must be renamed from "ParentName_*" to "ChildName_*" because
+    // KiCad validates that sub-symbol unit names start with the symbol name.
+    let child_prefix = format!("{}_", sym.lib_id);
+    let parent_prefix = format!("{}_", parent_name);
+    if let Sexpr::List(parent_children) = &parent.raw {
+        for pchild in &parent_children[2..] {
+            let include = match pchild {
+                Sexpr::List(parts) if parts.len() >= 2 => {
+                    match &parts[0] {
+                        Sexpr::Atom(key) if key == "symbol" => true,
+                        Sexpr::Atom(key) if matches!(key.as_str(), "polyline" | "rectangle" | "circle" | "arc" | "pin") => true,
+                        _ => false,
+                    }
+                }
+                _ => false,
+            };
+            if !include {
+                continue;
+            }
+            // Rename sub-symbols from parent prefix to child prefix.
+            let renamed = match pchild {
+                Sexpr::List(parts) if parts.len() >= 2
+                    && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol")
+                => {
+                    if let Sexpr::Atom(name) = &parts[1] {
+                        let name_unquoted = name.trim_matches('"');
+                        if let Some(rest) = name_unquoted.strip_prefix(&parent_prefix) {
+                            let new_name = format!("{}{}", child_prefix, rest);
+                            let mut new_parts = parts.clone();
+                            new_parts[1] = Sexpr::str(&new_name);
+                            Sexpr::List(new_parts)
+                        } else {
+                            pchild.clone()
+                        }
+                    } else {
+                        pchild.clone()
+                    }
+                }
+                _ => pchild.clone(),
+            };
+            if !children.contains(&renamed) {
+                children.push(renamed);
+            }
+        }
+    }
+
+    Sexpr::List(children)
+}
+
 fn string_value(expr: &Sexpr) -> String {
     match expr {
         Sexpr::Atom(s) => {

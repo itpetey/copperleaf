@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use copperleaf_ir::{Design, Role};
 
 use crate::{
@@ -23,11 +25,35 @@ pub fn emit_schematic(design: &Design) -> String {
         children.push(symbol_instance_node(idx, comp));
     }
 
+    // Group connections by net and emit wires in a daisy-chain per net
+    // with a single label at the midpoint, rather than one label per pin.
+    // This avoids hundreds of floating labels that don't move with components.
+    let mut net_conns: HashMap<&str, Vec<&copperleaf_ir::Connection>> = HashMap::new();
     for conn in &design.connections {
-        if let Some(wire) = wire_node(design, conn) {
-            children.push(wire);
+        net_conns.entry(conn.net.as_str()).or_default().push(conn);
+    }
+
+    for (net_name, conns) in &net_conns {
+        // Collect pin tip positions for all pins on this net.
+        let mut tips: Vec<(f64, f64)> = Vec::with_capacity(conns.len());
+        for conn in conns {
+            if let Some((tip, _)) = pin_tip_and_label(design, conn) {
+                tips.push(tip);
+            }
         }
-        children.push(label_node(design, conn));
+        if tips.is_empty() {
+            continue;
+        }
+
+        // Daisy-chain: wire tip0 → tip1, tip1 → tip2, …
+        for pair in tips.windows(2) {
+            children.push(wire_between(pair[0], pair[1], net_name));
+        }
+
+        // Single label for the net, placed at the average of all pin tips.
+        let avg_x = tips.iter().map(|(x, _)| x).sum::<f64>() / tips.len() as f64;
+        let avg_y = tips.iter().map(|(_, y)| y).sum::<f64>() / tips.len() as f64;
+        children.push(label_at(net_name, avg_x, avg_y));
     }
 
     children.push(sheet_instances_node());
@@ -44,19 +70,15 @@ fn component_index_by_refdes(design: &Design, refdes: &str) -> usize {
         .unwrap_or(0)
 }
 
-fn label_node(design: &Design, conn: &copperleaf_ir::Connection) -> Sexpr {
-    let (_, (label_x, label_y)) = pin_tip_and_label(design, conn).unwrap_or_else(|| {
-        let (sym_x, sym_y) = symbol_position(component_index_by_refdes(design, &conn.refdes));
-        ((0.0, 0.0), (sym_x + 7.62 + 2.54, sym_y))
-    });
-
+/// Emit a `<label>` S‑expression at the given coordinates.
+fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
     Sexpr::list([
         Sexpr::atom("label"),
-        Sexpr::str(&conn.net),
+        Sexpr::str(name),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom(format_float(label_x, 2)),
-            Sexpr::atom(format_float(label_y, 2)),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
             Sexpr::atom("0"),
         ]),
         Sexpr::list([
@@ -72,10 +94,7 @@ fn label_node(design: &Design, conn: &copperleaf_ir::Connection) -> Sexpr {
         ]),
         Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!(
-                "sch:label:{}:{}",
-                conn.refdes, conn.pin
-            ))),
+            Sexpr::str(deterministic_uuid(&format!("sch:label:{}", name))),
         ]),
     ])
 }
@@ -433,24 +452,21 @@ fn title_block_node() -> Sexpr {
     ])
 }
 
-/// Emit a `<wire>` S‑expression from the component's pin tip to the label
-/// position.  Returns `None` when the pin cannot be found (no wire to draw).
-fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr> {
-    let ((pin_tip_x, pin_tip_y), (label_x, label_y)) = pin_tip_and_label(design, conn)?;
-
-    Some(Sexpr::list([
+/// Emit a `<wire>` S‑expression between two arbitrary points.
+fn wire_between(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
+    Sexpr::list([
         Sexpr::atom("wire"),
         Sexpr::list([
             Sexpr::atom("pts"),
             Sexpr::list([
                 Sexpr::atom("xy"),
-                Sexpr::atom(format_float(pin_tip_x, 2)),
-                Sexpr::atom(format_float(pin_tip_y, 2)),
+                Sexpr::atom(format_float(from.0, 2)),
+                Sexpr::atom(format_float(from.1, 2)),
             ]),
             Sexpr::list([
                 Sexpr::atom("xy"),
-                Sexpr::atom(format_float(label_x, 2)),
-                Sexpr::atom(format_float(label_y, 2)),
+                Sexpr::atom(format_float(to.0, 2)),
+                Sexpr::atom(format_float(to.1, 2)),
             ]),
         ]),
         Sexpr::list([
@@ -460,11 +476,11 @@ fn wire_node(design: &Design, conn: &copperleaf_ir::Connection) -> Option<Sexpr>
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_uuid(&format!(
-                "sch:wire:{}:{}:{}",
-                conn.refdes, conn.pin, conn.net
+                "sch:wire:{}:{:.2}:{:.2}",
+                net_name, from.0, from.1
             ))),
         ]),
-    ]))
+    ])
 }
 
 #[cfg(test)]

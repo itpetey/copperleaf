@@ -11,7 +11,7 @@ pub use pcb::emit_pcb;
 pub use project::emit_project;
 pub use schematic::emit_schematic;
 pub use sexpr::{Sexpr, deterministic_uuid, kv};
-pub use sym_parser::{PinDef, SymbolDef, find_symbol, parse_symbol_lib};
+pub use sym_parser::{PinDef, SymbolDef, find_symbol, flatten_extends, parse_symbol_lib};
 
 pub mod common;
 pub mod netlist;
@@ -111,7 +111,13 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
         // Store the raw symbol S-expression so the schematic emitter can
         // embed the real definition (graphics, properties, pins) instead of
         // a placeholder box.
-        comp.kicad_symbol_raw = Some(format!("{}", sym.raw));
+        // If the symbol uses (extends "Parent"), flatten it so the embedded
+        // definition is self-contained.
+        if sym.extends.is_some() {
+            comp.kicad_symbol_raw = Some(format!("{}", flatten_extends(sym, symbols)));
+        } else {
+            comp.kicad_symbol_raw = Some(format!("{}", sym.raw));
+        }
 
         for pin in &mut comp.pins {
             if pin.pos.is_some() {
