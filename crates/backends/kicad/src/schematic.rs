@@ -2,7 +2,7 @@ use copperleaf_ir::{Design, Role};
 
 use crate::{
     common::{format_float, refdes_prefix},
-    sexpr::{Sexpr, deterministic_uuid, kv},
+    sexpr::{Sexpr, deterministic_uuid, kv, parse},
 };
 
 /// Emit a minimal structurally-valid KiCad 6 schematic for the given design.
@@ -166,7 +166,29 @@ fn lib_property_node(key: &str, value: &str, hide: bool) -> Sexpr {
 }
 
 /// Build a single `<symbol>` S-expression for one component.
+///
+/// When `kicad_symbol_raw` is set (populated by `resolve_symbols` from a
+/// `.kicad_sym` library), the real symbol definition is embedded verbatim —
+/// with the library nickname prepended to the symbol name — so KiCad renders
+/// the actual graphics, properties, and pins. Otherwise a placeholder box is
+/// generated.
 fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
+    // If we have a raw symbol definition from the .kicad_sym library, embed it
+    // verbatim (with the library prefix added to the symbol name) instead of
+    // generating a placeholder.
+    if let Some(raw) = &comp.kicad_symbol_raw
+        && let Ok(Sexpr::List(mut children)) = parse(raw)
+    {
+        // The second element is the symbol name; replace it with the
+        // library-prefixed name (e.g. "RP2350A" -> "MCU_RaspberryPi:RP2350A").
+        if children.len() >= 2 {
+            let symbol_name = comp.kicad_symbol.as_deref().unwrap_or("");
+            children[1] = Sexpr::str(symbol_name);
+        }
+        return Sexpr::List(children);
+    }
+
+    // --- Placeholder fallback (no library symbol resolved) ---
     let fallback = format!("copperleaf:{}", comp.refdes);
     let symbol_name = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
     // Extract the symbol base name (after library prefix) for the unit sub-symbol.
@@ -280,8 +302,8 @@ fn pin_y_offset(index: usize, total_pins: usize) -> f64 {
     }
 }
 
-fn property_node(key: &str, value: &str, x: f64, y: f64) -> Sexpr {
-    Sexpr::list([
+fn property_node(key: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
+    let mut children = vec![
         Sexpr::atom("property"),
         Sexpr::str(key),
         Sexpr::str(value),
@@ -291,18 +313,22 @@ fn property_node(key: &str, value: &str, x: f64, y: f64) -> Sexpr {
             Sexpr::atom(format_float(y, 2)),
             Sexpr::atom("0"),
         ]),
+    ];
+    if hide {
+        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    children.push(Sexpr::list([
+        Sexpr::atom("effects"),
         Sexpr::list([
-            Sexpr::atom("effects"),
+            Sexpr::atom("font"),
             Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("1.27"),
-                    Sexpr::atom("1.27"),
-                ]),
+                Sexpr::atom("size"),
+                Sexpr::atom("1.27"),
+                Sexpr::atom("1.27"),
             ]),
         ]),
-    ])
+    ]));
+    Sexpr::list(children)
 }
 
 fn role_to_pin_type(role: Role) -> &'static str {
@@ -332,12 +358,13 @@ fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Se
     let lib_id = comp.kicad_symbol.as_deref().unwrap_or(&fallback);
 
     let mut properties = vec![
-        property_node("Reference", &comp.refdes, x, y - 6.35),
-        property_node("Value", &refdes_prefix(&comp.refdes), x, y + 6.35),
+        property_node("Reference", &comp.refdes, x, y - 6.35, false),
+        property_node("Value", &refdes_prefix(&comp.refdes), x, y + 6.35, false),
     ];
     if let Some(fp) = &comp.kicad_footprint {
-        // Place the Footprint property below Value, matching KiCad's default layout.
-        properties.push(property_node("Footprint", fp, x, y + 12.7));
+        // Hidden footprint property at the symbol position, matching KiCad's
+        // default layout.
+        properties.push(property_node("Footprint", fp, x, y, true));
     }
 
     Sexpr::list(
@@ -773,6 +800,129 @@ mod tests {
         // Pin tip uses 3.81 instead of the default 2.54:
         // absolute x = 25.4 + (-15.24) + 3.81 = 13.97, y = 25.4 + 5.08 = 30.48.
         assert!(out.contains("(xy 13.97 30.48)"));
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn resolved_symbol_embeds_real_definition_not_placeholder() {
+        use std::io::Write;
+
+        let lib = r#"(kicad_symbol_lib
+  (symbol "RP2354a"
+    (property "Reference" "U" (at 0 0 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "RP2354a" (at 0 0 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_QFP:LQFP-64_10x10mm_P0.5mm" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Datasheet" "https://example.com/datasheet.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Description" "A test microcontroller" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (symbol "RP2354a_0_1"
+      (rectangle (start -5.08 5.08) (end 5.08 -5.08)
+        (stroke (width 0.254) (type default))
+        (fill (type background)))
+    )
+    (symbol "RP2354a_1_1"
+      (pin power_in line (at -10.16 2.54 0) (length 3.81) (name "VDD") (number "42"))
+      (pin power_in line (at -10.16 -2.54 0) (length 3.81) (name "GND") (number "1"))
+    )
+  )
+)"#;
+        let mut path = std::env::temp_dir();
+        path.push("copperleaf_sch_raw_embed_test.kicad_sym");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(lib.as_bytes()).unwrap();
+
+        let u1 = ComponentInst::new(
+            "U1",
+            SymbolBlock {
+                pins: vec![
+                    Pin::new(
+                        "VDD",
+                        Role::PowerIn,
+                        Limits::new(1.7_f64.volt(), 3.6_f64.volt(), 0.5_f64.amp()),
+                        None,
+                    ),
+                    Pin::new(
+                        "GND",
+                        Role::Gnd,
+                        Limits::new(0.0_f64.volt(), 0.0_f64.volt(), 0.1_f64.amp()),
+                        None,
+                    ),
+                ],
+                symbol: Some("RP2040:RP2354a"),
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VDD", "V3V3");
+        d.connect("U1", "GND", "GND");
+
+        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        let out = emit_schematic(&d);
+
+        // The lib_symbol should use the library-prefixed name.
+        assert!(out.contains("(symbol \"RP2040:RP2354a\""));
+        // Real property values from the library, not the placeholder "Box".
+        assert!(out.contains("(property \"Value\" \"RP2354a\""));
+        assert!(out.contains("(property \"Datasheet\" \"https://example.com/datasheet.pdf\""));
+        assert!(out.contains("(property \"Description\" \"A test microcontroller\""));
+        // Real pin numbers from the library (42 and 1), not sequential (1 and 2).
+        assert!(out.contains("(number \"42\")"));
+        assert!(out.contains("(number \"1\")"));
+        // Real graphics from the library.
+        assert!(out.contains("(rectangle"));
+        assert!(out.contains("(start -5.08 5.08)"));
+        // The placeholder "Box" value must NOT appear for this symbol.
+        // (It may appear for other components without a library symbol.)
+        let sch_section = out.split("(symbol").nth(1).unwrap_or("");
+        assert!(!sch_section.contains("(property \"Value\" \"Box\""));
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn footprint_property_in_symbol_instance_is_hidden() {
+        use std::io::Write;
+
+        let lib = r#"(kicad_symbol_lib
+  (symbol "RP2354a"
+    (property "Footprint" "Package_QFP:LQFP-64_10x10mm_P0.5mm" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin power_in line (at 0 0 0) (length 2.54) (name "VDD") (number "1"))
+  )
+)"#;
+        let mut path = std::env::temp_dir();
+        path.push("copperleaf_sch_hide_test.kicad_sym");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(lib.as_bytes()).unwrap();
+
+        let u1 = ComponentInst::new(
+            "U1",
+            SymbolBlock {
+                pins: vec![Pin::new(
+                    "VDD",
+                    Role::PowerIn,
+                    Limits::new(1.7_f64.volt(), 3.6_f64.volt(), 0.5_f64.amp()),
+                    None,
+                )],
+                symbol: Some("RP2040:RP2354a"),
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::power("V3V3", 3.3_f64.volt()));
+        d.add_component(u1);
+        d.connect("U1", "VDD", "V3V3");
+
+        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        let out = emit_schematic(&d);
+
+        // The symbol instance's Footprint property should carry (hide yes).
+        // Find the symbol instance section (after lib_symbols) and check it.
+        let instance_section = out.split("(instances").next().unwrap_or("");
+        let last_symbol = instance_section.rsplit("(symbol").next().unwrap_or("");
+        assert!(last_symbol.contains("(property \"Footprint\""));
+        assert!(last_symbol.contains("(hide yes)"));
 
         std::fs::remove_file(&path).ok();
     }

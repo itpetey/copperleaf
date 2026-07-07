@@ -27,10 +27,15 @@ pub struct PinDef {
 pub struct SymbolDef {
     /// Library ID, e.g. `"RP2354a"`.
     pub lib_id: String,
-    /// Pins belonging to the symbol.
+    /// Pins belonging to the symbol (after `extends` resolution).
     pub pins: Vec<PinDef>,
+    /// Optional parent symbol name from `(extends "Parent")`, if any.
+    pub extends: Option<String>,
     /// Optional default footprint (e.g. `"Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm"`).
     pub footprint: Option<String>,
+    /// The full raw S-expression tree of this symbol, for embedding verbatim
+    /// in schematic `lib_symbols` sections.
+    pub raw: Sexpr,
 }
 
 /// Find a symbol definition by library ID.
@@ -44,6 +49,9 @@ pub fn find_symbol<'a>(symbols: &'a [SymbolDef], lib_id: &str) -> Option<&'a Sym
 }
 
 /// Parse a `.kicad_sym` file contents into a list of [`SymbolDef`]s.
+///
+/// After parsing, any `(extends "ParentName")` references are resolved so that
+/// child symbols inherit all pins from their parent symbol.
 pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
     let sexpr = parse(input)?;
     let Sexpr::List(nodes) = &sexpr else {
@@ -56,6 +64,10 @@ pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
             symbols.push(sym);
         }
     }
+
+    // Resolve (extends ...) inheritance chains.
+    resolve_extends(&mut symbols);
+
     Ok(symbols)
 }
 
@@ -195,6 +207,18 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
 
     let lib_id = string_value(children.get(1)?);
 
+    // Detect (extends "ParentName") in the top-level children.
+    let mut extends: Option<String> = None;
+    for child in &children[2..] {
+        if let Sexpr::List(parts) = child
+            && parts.len() == 2
+            && let Sexpr::Atom(key) = &parts[0]
+            && key == "extends"
+        {
+            extends = Some(string_value(&parts[1]));
+        }
+    }
+
     let mut pins = Vec::new();
     let mut footprint = None;
     collect_pins_and_footprint(&children[2..], &mut pins, &mut footprint);
@@ -202,8 +226,87 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     Some(SymbolDef {
         lib_id,
         pins,
+        extends,
         footprint,
+        raw: node.clone(),
     })
+}
+
+/// Resolve `(extends "ParentName")` chains by merging inherited pins into
+/// child symbols. Performs a topological walk so that multi-level inheritance
+/// (A extends B extends C) works correctly.
+///
+/// Parent symbols are identified by stripping any library prefix from the
+/// extends target, matching the same logic as [`find_symbol`].
+fn resolve_extends(symbols: &mut Vec<SymbolDef>) {
+    // Build a lookup map.
+    let mut by_name: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for (i, sym) in symbols.iter().enumerate() {
+        by_name.insert(sym.lib_id.clone(), i);
+    }
+
+    // Resolved flags to handle diamond inheritance / cycles.
+    let mut resolved: Vec<bool> = vec![false; symbols.len()];
+
+    fn resolve_one(
+        i: usize,
+        symbols: &mut [SymbolDef],
+        by_name: &std::collections::HashMap<String, usize>,
+        resolved: &mut Vec<bool>,
+        visited: &mut std::collections::HashSet<usize>,
+    ) {
+        if resolved[i] {
+            return;
+        }
+        let parent_name = match symbols[i].extends.clone() {
+            Some(ref name) => name.clone(),
+            None => {
+                resolved[i] = true;
+                return;
+            }
+        };
+
+        // Find parent (strip library prefix if present).
+        let parent_lib_id = parent_name.split(':').next_back().unwrap_or(&parent_name).to_string();
+        let Some(&parent_idx) = by_name.get(&parent_lib_id) else {
+            // Parent symbol not in this library — cannot resolve.
+            resolved[i] = true;
+            return;
+        };
+
+        if parent_idx == i {
+            // Self-referencing extends — skip.
+            resolved[i] = true;
+            return;
+        }
+
+        // Cycle detection.
+        if !visited.insert(i) {
+            // Cycle detected; skip.
+            resolved[i] = true;
+            return;
+        }
+
+        // Resolve parent first.
+        resolve_one(parent_idx, symbols, by_name, resolved, visited);
+
+        // Merge parent's pins into child (avoiding duplicates by pin name).
+        let parent_pins = symbols[parent_idx].pins.clone();
+        let child_pin_names: std::collections::HashSet<String> =
+            symbols[i].pins.iter().map(|p| p.name.clone()).collect();
+        for pin in &parent_pins {
+            if !child_pin_names.contains(&pin.name) {
+                symbols[i].pins.push(pin.clone());
+            }
+        }
+
+        resolved[i] = true;
+    }
+
+    for i in 0..symbols.len() {
+        let mut visited = std::collections::HashSet::new();
+        resolve_one(i, symbols, &by_name, &mut resolved, &mut visited);
+    }
 }
 
 fn string_value(expr: &Sexpr) -> String {

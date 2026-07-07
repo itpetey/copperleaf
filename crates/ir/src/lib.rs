@@ -182,6 +182,11 @@ pub struct ComponentRecord {
     /// Optional path to the `.kicad_sym` file for this component's symbol.
     /// When set, `resolve_symbols` can find it automatically.
     pub kicad_symbol_lib_path: Option<String>,
+    /// Raw S-expression text of the KiCad symbol definition, populated by
+    /// `resolve_symbols` when a `.kicad_sym` library is available. When set,
+    /// the schematic emitter embeds this verbatim instead of a placeholder.
+    #[serde(skip)]
+    pub kicad_symbol_raw: Option<String>,
 }
 
 /// A serializable connection record linking a component pin to a net.
@@ -465,6 +470,7 @@ impl Design {
             kicad_symbol: inst.block.kicad_symbol().map(|s| s.to_owned()),
             kicad_footprint: inst.block.kicad_footprint().map(|s| s.to_owned()),
             kicad_symbol_lib_path: inst.block.kicad_symbol_lib_path().map(|s| s.to_owned()),
+            kicad_symbol_raw: None,
         });
     }
     /// Returns the component record with the given reference designator.

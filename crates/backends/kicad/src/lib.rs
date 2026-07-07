@@ -108,6 +108,11 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
             comp.kicad_footprint = Some(fp.clone());
         }
 
+        // Store the raw symbol S-expression so the schematic emitter can
+        // embed the real definition (graphics, properties, pins) instead of
+        // a placeholder box.
+        comp.kicad_symbol_raw = Some(format!("{}", sym.raw));
+
         for pin in &mut comp.pins {
             if pin.pos.is_some() {
                 continue;
