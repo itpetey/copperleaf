@@ -5,17 +5,6 @@
 
 use crate::sexpr::{ParseError, Sexpr, parse};
 
-/// A symbol extracted from a KiCad symbol library file.
-#[derive(Clone, Debug, PartialEq)]
-pub struct SymbolDef {
-    /// Library ID, e.g. `"RP2354a"`.
-    pub lib_id: String,
-    /// Pins belonging to the symbol.
-    pub pins: Vec<PinDef>,
-    /// Optional default footprint (e.g. `"Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm"`).
-    pub footprint: Option<String>,
-}
-
 /// A pin extracted from a KiCad symbol definition.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PinDef {
@@ -33,6 +22,27 @@ pub struct PinDef {
     pub length: f64,
 }
 
+/// A symbol extracted from a KiCad symbol library file.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SymbolDef {
+    /// Library ID, e.g. `"RP2354a"`.
+    pub lib_id: String,
+    /// Pins belonging to the symbol.
+    pub pins: Vec<PinDef>,
+    /// Optional default footprint (e.g. `"Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm"`).
+    pub footprint: Option<String>,
+}
+
+/// Find a symbol definition by library ID.
+///
+/// `lib_id` may include a library nickname prefix (e.g. `"RP2040:RP2354a"`).
+/// The prefix is stripped before matching because a `.kicad_sym` file contains
+/// only the symbol name, not the library nickname.
+pub fn find_symbol<'a>(symbols: &'a [SymbolDef], lib_id: &str) -> Option<&'a SymbolDef> {
+    let name = lib_id.split(':').next_back().unwrap_or(lib_id);
+    symbols.iter().find(|s| s.lib_id == name)
+}
+
 /// Parse a `.kicad_sym` file contents into a list of [`SymbolDef`]s.
 pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
     let sexpr = parse(input)?;
@@ -47,29 +57,6 @@ pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
         }
     }
     Ok(symbols)
-}
-
-fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
-    let Sexpr::List(children) = node else {
-        return None;
-    };
-    if children.is_empty() {
-        return None;
-    }
-    let Sexpr::Atom(head) = &children[0] else {
-        return None;
-    };
-    if head != "symbol" {
-        return None;
-    }
-
-    let lib_id = string_value(children.get(1)?);
-
-    let mut pins = Vec::new();
-    let mut footprint = None;
-    collect_pins_and_footprint(&children[2..], &mut pins, &mut footprint);
-
-    Some(SymbolDef { lib_id, pins, footprint })
 }
 
 /// Recursively collect `(pin ...)` and `(property "Footprint" ...)` nodes from
@@ -100,6 +87,32 @@ fn collect_pins_and_footprint(
             collect_pins_and_footprint(&children[2..], pins, footprint);
         }
     }
+}
+
+/// Try to parse a `(property "Footprint" "value" ...)` node and return the
+/// footprint value if found.
+fn parse_footprint_property(node: &Sexpr) -> Option<String> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    if children.len() < 3 {
+        return None;
+    }
+    let Sexpr::Atom(head) = &children[0] else {
+        return None;
+    };
+    if head != "property" {
+        return None;
+    }
+    let key = string_value(children.get(1)?);
+    if key != "Footprint" {
+        return None;
+    }
+    let val = string_value(children.get(2)?);
+    if val.is_empty() {
+        return None;
+    }
+    Some(val)
 }
 
 fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
@@ -166,30 +179,31 @@ fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
     })
 }
 
-/// Try to parse a `(property "Footprint" "value" ...)` node and return the
-/// footprint value if found.
-fn parse_footprint_property(node: &Sexpr) -> Option<String> {
+fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     let Sexpr::List(children) = node else {
         return None;
     };
-    if children.len() < 3 {
+    if children.is_empty() {
         return None;
     }
     let Sexpr::Atom(head) = &children[0] else {
         return None;
     };
-    if head != "property" {
+    if head != "symbol" {
         return None;
     }
-    let key = string_value(children.get(1)?);
-    if key != "Footprint" {
-        return None;
-    }
-    let val = string_value(children.get(2)?);
-    if val.is_empty() {
-        return None;
-    }
-    Some(val)
+
+    let lib_id = string_value(children.get(1)?);
+
+    let mut pins = Vec::new();
+    let mut footprint = None;
+    collect_pins_and_footprint(&children[2..], &mut pins, &mut footprint);
+
+    Some(SymbolDef {
+        lib_id,
+        pins,
+        footprint,
+    })
 }
 
 fn string_value(expr: &Sexpr) -> String {
@@ -206,16 +220,6 @@ fn string_value(expr: &Sexpr) -> String {
         }
         _ => String::new(),
     }
-}
-
-/// Find a symbol definition by library ID.
-///
-/// `lib_id` may include a library nickname prefix (e.g. `"RP2040:RP2354a"`).
-/// The prefix is stripped before matching because a `.kicad_sym` file contains
-/// only the symbol name, not the library nickname.
-pub fn find_symbol<'a>(symbols: &'a [SymbolDef], lib_id: &str) -> Option<&'a SymbolDef> {
-    let name = lib_id.split(':').next_back().unwrap_or(lib_id);
-    symbols.iter().find(|s| s.lib_id == name)
 }
 
 #[cfg(test)]
@@ -323,7 +327,10 @@ mod tests {
   )
 )"#;
         let symbols = parse_symbol_lib(lib).unwrap();
-        assert_eq!(symbols[0].footprint, Some("Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm".to_string()));
+        assert_eq!(
+            symbols[0].footprint,
+            Some("Package_SOIC:SOIC-8_3.9x4.9mm_P1.27mm".to_string())
+        );
         assert_eq!(symbols[1].footprint, None);
     }
 
@@ -338,7 +345,10 @@ mod tests {
   )
 )"#;
         let symbols = parse_symbol_lib(lib).unwrap();
-        assert_eq!(symbols[0].footprint, Some("Package_DIP:DIP-8_W7.62mm".to_string()));
+        assert_eq!(
+            symbols[0].footprint,
+            Some("Package_DIP:DIP-8_W7.62mm".to_string())
+        );
         assert_eq!(symbols[0].pins.len(), 1);
         assert_eq!(symbols[0].pins[0].name, "IN+");
     }

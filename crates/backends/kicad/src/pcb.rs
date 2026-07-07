@@ -2,8 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use copperleaf_ir::{Design, NetClass};
 
-use crate::common::{build_net_codes, fmt_mm, format_float, refdes_prefix};
-use crate::sexpr::{Sexpr, kv};
+use crate::{
+    common::{build_net_codes, fmt_mm, format_float, refdes_prefix},
+    sexpr::{Sexpr, kv},
+};
 
 /// Emit a KiCad S-expression PCB file for the given design.
 pub fn emit_pcb(design: &Design) -> String {
@@ -45,136 +47,6 @@ pub fn emit_pcb(design: &Design) -> String {
 
     let pcb = Sexpr::list(std::iter::once(Sexpr::atom("kicad_pcb")).chain(children));
     format!("{}\n", pcb)
-}
-
-fn general_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("general"),
-        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("1.6")]),
-        Sexpr::list([Sexpr::atom("legacy_teardrops"), Sexpr::atom("no")]),
-    ])
-}
-
-fn layers_node() -> Sexpr {
-    // Standard KiCad 6 layer table.  Footprints reference F.SilkS / F.Fab and
-    // the board outline uses Edge.Cuts, so all of these must be declared or
-    // KiCad refuses to load the board.
-    Sexpr::list([
-        Sexpr::atom("layers"),
-        Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("13"),
-            Sexpr::str("F.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("15"),
-            Sexpr::str("B.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("5"),
-            Sexpr::str("F.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("7"),
-            Sexpr::str("B.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("25"),
-            Sexpr::str("Edge.Cuts"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("31"),
-            Sexpr::str("F.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Courtyard"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("29"),
-            Sexpr::str("B.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Courtyard"),
-        ]),
-        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
-    ])
-}
-
-fn setup_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("setup"),
-        Sexpr::list([Sexpr::atom("pad_to_mask_clearance"), Sexpr::atom("0")]),
-        Sexpr::list([
-            Sexpr::atom("pcbplotparams"),
-            Sexpr::list([
-                Sexpr::atom("layerselection"),
-                Sexpr::atom("0x00010fc_ffffffff"),
-            ]),
-        ]),
-    ])
-}
-
-fn net_class_nodes(design: &Design, net_codes: &[(String, usize)]) -> Vec<Sexpr> {
-    let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
-    let mut default_nets: Vec<String> = Vec::new();
-
-    for (name, _) in net_codes {
-        let net = design.nets.iter().find(|n| &n.name == name);
-        let class = net.map(|n| &n.class);
-        match class {
-            Some(NetClass {
-                min_width: Some(w),
-                clearance: Some(c),
-            }) => {
-                let key = (fmt_mm(w.as_base()), fmt_mm(c.as_base()));
-                groups.entry(key).or_default().push(name.clone());
-            }
-            _ => default_nets.push(name.clone()),
-        }
-    }
-
-    let mut nodes = vec![net_class_node("Default", "", "0.2", "0.25", &default_nets)];
-
-    for ((width, clearance), nets) in groups {
-        let name = format!("Power_{}mm_{}mm", width, clearance);
-        nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
-    }
-
-    nodes
-}
-
-fn net_class_node(
-    name: &str,
-    desc: &str,
-    clearance: &str,
-    trace_width: &str,
-    nets: &[String],
-) -> Sexpr {
-    let mut children = vec![
-        Sexpr::atom("net_class"),
-        Sexpr::str(name),
-        Sexpr::str(desc),
-        Sexpr::list([Sexpr::atom("clearance"), Sexpr::atom(clearance)]),
-        Sexpr::list([Sexpr::atom("trace_width"), Sexpr::atom(trace_width)]),
-        Sexpr::list([Sexpr::atom("via_dia"), Sexpr::atom("0.8")]),
-        Sexpr::list([Sexpr::atom("via_drill"), Sexpr::atom("0.4")]),
-        Sexpr::list([Sexpr::atom("uvia_dia"), Sexpr::atom("0.3")]),
-        Sexpr::list([Sexpr::atom("uvia_drill"), Sexpr::atom("0.1")]),
-    ];
-    for net in nets {
-        children.push(Sexpr::list([Sexpr::atom("add_net"), Sexpr::str(net)]));
-    }
-    Sexpr::list(children)
 }
 
 fn board_outline() -> Vec<Sexpr> {
@@ -339,6 +211,136 @@ fn footprint_node(
     }
 
     Sexpr::list(children)
+}
+
+fn general_node() -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("general"),
+        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("1.6")]),
+        Sexpr::list([Sexpr::atom("legacy_teardrops"), Sexpr::atom("no")]),
+    ])
+}
+
+fn layers_node() -> Sexpr {
+    // Standard KiCad 6 layer table.  Footprints reference F.SilkS / F.Fab and
+    // the board outline uses Edge.Cuts, so all of these must be declared or
+    // KiCad refuses to load the board.
+    Sexpr::list([
+        Sexpr::atom("layers"),
+        Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("13"),
+            Sexpr::str("F.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("15"),
+            Sexpr::str("B.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("5"),
+            Sexpr::str("F.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Silkscreen"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("7"),
+            Sexpr::str("B.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Silkscreen"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("25"),
+            Sexpr::str("Edge.Cuts"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("31"),
+            Sexpr::str("F.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Courtyard"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("29"),
+            Sexpr::str("B.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Courtyard"),
+        ]),
+        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
+    ])
+}
+
+fn net_class_node(
+    name: &str,
+    desc: &str,
+    clearance: &str,
+    trace_width: &str,
+    nets: &[String],
+) -> Sexpr {
+    let mut children = vec![
+        Sexpr::atom("net_class"),
+        Sexpr::str(name),
+        Sexpr::str(desc),
+        Sexpr::list([Sexpr::atom("clearance"), Sexpr::atom(clearance)]),
+        Sexpr::list([Sexpr::atom("trace_width"), Sexpr::atom(trace_width)]),
+        Sexpr::list([Sexpr::atom("via_dia"), Sexpr::atom("0.8")]),
+        Sexpr::list([Sexpr::atom("via_drill"), Sexpr::atom("0.4")]),
+        Sexpr::list([Sexpr::atom("uvia_dia"), Sexpr::atom("0.3")]),
+        Sexpr::list([Sexpr::atom("uvia_drill"), Sexpr::atom("0.1")]),
+    ];
+    for net in nets {
+        children.push(Sexpr::list([Sexpr::atom("add_net"), Sexpr::str(net)]));
+    }
+    Sexpr::list(children)
+}
+
+fn net_class_nodes(design: &Design, net_codes: &[(String, usize)]) -> Vec<Sexpr> {
+    let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    let mut default_nets: Vec<String> = Vec::new();
+
+    for (name, _) in net_codes {
+        let net = design.nets.iter().find(|n| &n.name == name);
+        let class = net.map(|n| &n.class);
+        match class {
+            Some(NetClass {
+                min_width: Some(w),
+                clearance: Some(c),
+            }) => {
+                let key = (fmt_mm(w.as_base()), fmt_mm(c.as_base()));
+                groups.entry(key).or_default().push(name.clone());
+            }
+            _ => default_nets.push(name.clone()),
+        }
+    }
+
+    let mut nodes = vec![net_class_node("Default", "", "0.2", "0.25", &default_nets)];
+
+    for ((width, clearance), nets) in groups {
+        let name = format!("Power_{}mm_{}mm", width, clearance);
+        nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
+    }
+
+    nodes
+}
+
+fn setup_node() -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("setup"),
+        Sexpr::list([Sexpr::atom("pad_to_mask_clearance"), Sexpr::atom("0")]),
+        Sexpr::list([
+            Sexpr::atom("pcbplotparams"),
+            Sexpr::list([
+                Sexpr::atom("layerselection"),
+                Sexpr::atom("0x00010fc_ffffffff"),
+            ]),
+        ]),
+    ])
 }
 
 #[cfg(test)]

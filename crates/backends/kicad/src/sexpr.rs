@@ -13,6 +13,32 @@ pub enum Sexpr {
     Raw(String),
 }
 
+/// Error returned when an S-expression cannot be parsed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ParseError {
+    /// Input ended while a string or list was still open.
+    UnexpectedEof,
+    /// A closing `)` had no matching opening `(`.
+    UnmatchedParen { pos: usize },
+    /// An invalid escape sequence was encountered inside a quoted string.
+    BadEscape { pos: usize },
+    /// An unexpected character was found at the given byte position.
+    UnexpectedChar { ch: char, pos: usize },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Token {
+    LParen,
+    RParen,
+    Atom(String),
+    String(String),
+}
+
+struct Parser<'a> {
+    tokens: &'a [Token],
+    pos: usize,
+}
+
 impl Sexpr {
     /// Construct a list from an iterator of child nodes.
     pub fn list(children: impl IntoIterator<Item = Sexpr>) -> Self {
@@ -92,23 +118,6 @@ impl fmt::Display for Sexpr {
     }
 }
 
-fn escape_str(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-/// Error returned when an S-expression cannot be parsed.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ParseError {
-    /// Input ended while a string or list was still open.
-    UnexpectedEof,
-    /// A closing `)` had no matching opening `(`.
-    UnmatchedParen { pos: usize },
-    /// An invalid escape sequence was encountered inside a quoted string.
-    BadEscape { pos: usize },
-    /// An unexpected character was found at the given byte position.
-    UnexpectedChar { ch: char, pos: usize },
-}
-
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -124,12 +133,99 @@ impl fmt::Display for ParseError {
 
 impl error::Error for ParseError {}
 
-#[derive(Clone, Debug, PartialEq)]
-enum Token {
-    LParen,
-    RParen,
-    Atom(String),
-    String(String),
+impl<'a> Parser<'a> {
+    fn parse_expr(&mut self) -> Result<Sexpr, ParseError> {
+        match self.tokens.get(self.pos) {
+            Some(Token::LParen) => self.parse_list(),
+            Some(Token::Atom(s)) => {
+                self.pos += 1;
+                Ok(Sexpr::Atom(s.clone()))
+            }
+            Some(Token::String(s)) => {
+                self.pos += 1;
+                Ok(Sexpr::str(s.clone()))
+            }
+            Some(Token::RParen) => Err(ParseError::UnmatchedParen { pos: self.pos }),
+            None => Err(ParseError::UnexpectedEof),
+        }
+    }
+
+    fn parse_list(&mut self) -> Result<Sexpr, ParseError> {
+        // Consume '('
+        self.pos += 1;
+        let mut children = Vec::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::RParen) => {
+                    self.pos += 1;
+                    return Ok(Sexpr::List(children));
+                }
+                Some(_) => children.push(self.parse_expr()?),
+                None => return Err(ParseError::UnexpectedEof),
+            }
+        }
+    }
+}
+
+/// Deterministic UUID-formatted string (8-4-4-4-12 hex) derived from `seed`.
+pub fn deterministic_uuid(seed: &str) -> String {
+    let h1 = fnv1a_64(seed, 0);
+    let h2 = fnv1a_64(seed, 0x6c14_4f3a_7af5_c5d2); // arbitrary fixed salt
+    let b1 = h1.to_be_bytes();
+    let b2 = h2.to_be_bytes();
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        b1[0],
+        b1[1],
+        b1[2],
+        b1[3],
+        b1[4],
+        b1[5],
+        b1[6],
+        b1[7],
+        b2[0],
+        b2[1],
+        b2[2],
+        b2[3],
+        b2[4],
+        b2[5],
+        b2[6],
+        b2[7]
+    )
+}
+
+/// Convenience: `(key "val")`.
+pub fn kv(key: impl AsRef<str>, val: impl AsRef<str>) -> Sexpr {
+    Sexpr::list([Sexpr::atom(key.as_ref().to_string()), Sexpr::str(val)])
+}
+
+/// Parse a KiCad S-expression string into an [`Sexpr`] tree.
+pub fn parse(input: &str) -> Result<Sexpr, ParseError> {
+    let tokens = tokenize(input)?;
+    let mut parser = Parser {
+        tokens: &tokens,
+        pos: 0,
+    };
+    let expr = parser.parse_expr()?;
+    if parser.pos < tokens.len() {
+        return Err(ParseError::UnmatchedParen { pos: parser.pos });
+    }
+    Ok(expr)
+}
+
+fn escape_str(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn fnv1a_64(seed: &str, salt: u64) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET ^ salt;
+    for b in seed.bytes() {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 /// Tokenize a KiCad S-expression string.
@@ -186,102 +282,6 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     }
 
     Ok(tokens)
-}
-
-/// Parse a KiCad S-expression string into an [`Sexpr`] tree.
-pub fn parse(input: &str) -> Result<Sexpr, ParseError> {
-    let tokens = tokenize(input)?;
-    let mut parser = Parser {
-        tokens: &tokens,
-        pos: 0,
-    };
-    let expr = parser.parse_expr()?;
-    if parser.pos < tokens.len() {
-        return Err(ParseError::UnmatchedParen { pos: parser.pos });
-    }
-    Ok(expr)
-}
-
-struct Parser<'a> {
-    tokens: &'a [Token],
-    pos: usize,
-}
-
-impl<'a> Parser<'a> {
-    fn parse_expr(&mut self) -> Result<Sexpr, ParseError> {
-        match self.tokens.get(self.pos) {
-            Some(Token::LParen) => self.parse_list(),
-            Some(Token::Atom(s)) => {
-                self.pos += 1;
-                Ok(Sexpr::Atom(s.clone()))
-            }
-            Some(Token::String(s)) => {
-                self.pos += 1;
-                Ok(Sexpr::str(s.clone()))
-            }
-            Some(Token::RParen) => Err(ParseError::UnmatchedParen { pos: self.pos }),
-            None => Err(ParseError::UnexpectedEof),
-        }
-    }
-
-    fn parse_list(&mut self) -> Result<Sexpr, ParseError> {
-        // Consume '('
-        self.pos += 1;
-        let mut children = Vec::new();
-        loop {
-            match self.tokens.get(self.pos) {
-                Some(Token::RParen) => {
-                    self.pos += 1;
-                    return Ok(Sexpr::List(children));
-                }
-                Some(_) => children.push(self.parse_expr()?),
-                None => return Err(ParseError::UnexpectedEof),
-            }
-        }
-    }
-}
-
-/// Convenience: `(key "val")`.
-pub fn kv(key: impl AsRef<str>, val: impl AsRef<str>) -> Sexpr {
-    Sexpr::list([Sexpr::atom(key.as_ref().to_string()), Sexpr::str(val)])
-}
-
-fn fnv1a_64(seed: &str, salt: u64) -> u64 {
-    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-    let mut hash = FNV_OFFSET ^ salt;
-    for b in seed.bytes() {
-        hash ^= b as u64;
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    hash
-}
-
-/// Deterministic UUID-formatted string (8-4-4-4-12 hex) derived from `seed`.
-pub fn deterministic_uuid(seed: &str) -> String {
-    let h1 = fnv1a_64(seed, 0);
-    let h2 = fnv1a_64(seed, 0x6c14_4f3a_7af5_c5d2); // arbitrary fixed salt
-    let b1 = h1.to_be_bytes();
-    let b2 = h2.to_be_bytes();
-    format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        b1[0],
-        b1[1],
-        b1[2],
-        b1[3],
-        b1[4],
-        b1[5],
-        b1[6],
-        b1[7],
-        b2[0],
-        b2[1],
-        b2[2],
-        b2[3],
-        b2[4],
-        b2[5],
-        b2[6],
-        b2[7]
-    )
 }
 
 #[cfg(test)]

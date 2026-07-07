@@ -43,9 +43,17 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Attribute, Data, DeriveInput, Expr, Ident, Lit, Meta, Type, parse_macro_input};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Derive entry point
-// ─────────────────────────────────────────────────────────────────────────────
+/// Parsed `#[component(...)]` attributes.
+struct ComponentAttrs {
+    /// `symbol = "Lib:Name"` — the KiCad symbol reference.
+    symbol: Option<String>,
+    /// Absolute path to the `.kicad_sym` file, resolved at compile time.
+    symbol_lib_path: Option<String>,
+    /// `footprint = "Pkg:Footprint"` — explicit override (auto-resolved if absent).
+    footprint: Option<String>,
+    /// Token stream inside `constraints(...)`.
+    constraints_tokens: Option<proc_macro2::TokenStream>,
+}
 
 /// Derive `Block` for a struct that contains a `pins: Vec<Pin>` field.
 #[proc_macro_derive(Component, attributes(component))]
@@ -154,20 +162,241 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     })
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Attribute parsing
-// ─────────────────────────────────────────────────────────────────────────────
+fn compile_error(msg: &str) -> TokenStream {
+    let msg = format!("derive(Component): {}", msg);
+    TokenStream::from(quote! {
+        compile_error!(#msg);
+    })
+}
 
-/// Parsed `#[component(...)]` attributes.
-struct ComponentAttrs {
-    /// `symbol = "Lib:Name"` — the KiCad symbol reference.
-    symbol: Option<String>,
-    /// Absolute path to the `.kicad_sym` file, resolved at compile time.
-    symbol_lib_path: Option<String>,
-    /// `footprint = "Pkg:Footprint"` — explicit override (auto-resolved if absent).
-    footprint: Option<String>,
-    /// Token stream inside `constraints(...)`.
-    constraints_tokens: Option<proc_macro2::TokenStream>,
+/// Return a list of well-known KiCad symbol directories for the current platform.
+fn default_kicad_sym_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    // macOS (KiCad app bundle)
+    if cfg!(target_os = "macos") {
+        dirs.push(PathBuf::from(
+            "/Applications/KiCad.app/Contents/SharedSupport/symbols",
+        ));
+        dirs.push(PathBuf::from(
+            "/opt/homebrew/Caskroom/kicad/10.0.4/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+        ));
+        if let Ok(home) = env::var("HOME") {
+            dirs.push(
+                Path::new(&home)
+                    .join("Library")
+                    .join("Application Support")
+                    .join("kicad")
+                    .join("symbols"),
+            );
+        }
+    }
+
+    // Linux
+    if cfg!(target_os = "linux") {
+        dirs.push(PathBuf::from("/usr/share/kicad/symbols"));
+        dirs.push(PathBuf::from("/usr/local/share/kicad/symbols"));
+        if let Ok(home) = env::var("HOME") {
+            for ver in ["8.0", "7.0"] {
+                dirs.push(
+                    Path::new(&home)
+                        .join(".local")
+                        .join("share")
+                        .join("kicad")
+                        .join(ver)
+                        .join("symbols"),
+                );
+            }
+        }
+    }
+
+    // Windows
+    if cfg!(target_os = "windows") {
+        dirs.push(PathBuf::from(r"C:\Program Files\KiCad\share\kicad\symbols"));
+        if let Ok(program_files) = env::var("ProgramFiles") {
+            dirs.push(
+                Path::new(&program_files)
+                    .join("KiCad")
+                    .join("share")
+                    .join("kicad")
+                    .join("symbols"),
+            );
+        }
+        if let Ok(appdata) = env::var("APPDATA") {
+            dirs.push(Path::new(&appdata).join("kicad").join("symbols"));
+        }
+    }
+
+    dirs
+}
+
+/// Extract the `Footprint` property value for a symbol named `sym_name` from
+/// the given `.kicad_sym` file.
+///
+/// Uses simple paren-matching to find the symbol definition, then searches for
+/// `(property "Footprint" "VALUE" ...)` inside it.
+///
+/// Emits a compile warning (via eprintln) if the symbol is found but has no
+/// Footprint property.
+fn extract_footprint_from_file(
+    file_path: &str,
+    sym_name: &str,
+    component_name: &Ident,
+    errors: &mut Vec<String>,
+) -> Option<String> {
+    let content = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            errors.push(format!("cannot read symbol library `{}`: {}", file_path, e,));
+            return None;
+        }
+    };
+
+    // Find the opening of `(symbol "sym_name" ...)`.
+    let search_for = format!("(symbol \"{}\"", sym_name);
+    let Some(start) = content.find(&search_for) else {
+        errors.push(format!(
+            "symbol `{}` not found in library `{}`",
+            sym_name, file_path,
+        ));
+        return None;
+    };
+
+    // Track paren nesting to find the matching closing paren.
+    let mut depth = 0u32;
+    let mut in_string = false;
+    let mut end = content.len();
+    for (i, ch) in content[start..].char_indices() {
+        let abs_i = start + i;
+        if ch == '"' {
+            in_string = !in_string;
+        }
+        if !in_string {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        end = abs_i + 1; // include the )
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let symbol_body = &content[start..end];
+
+    // Search for (property "Footprint" "VALUE") inside the symbol body.
+    let fp_search = r#"(property "Footprint" ""#;
+    if let Some(fp_start) = symbol_body.find(fp_search) {
+        let after_key = &symbol_body[fp_start + fp_search.len()..];
+        if let Some(fp_end) = after_key.find('"') {
+            let value = &after_key[..fp_end];
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+
+    // Symbol found but no Footprint property.
+    eprintln!(
+        "warning: symbol `{}` in `{}` (component `{}`) has no `Footprint` property.\n\
+         Consider adding one or specifying `footprint` explicitly in `#[component(...)]`.",
+        sym_name, file_path, component_name,
+    );
+    None
+}
+
+/// Search for a `.kicad_sym` file matching `lib_name` in various locations.
+///
+/// Search order:
+/// 1. Explicit `symbol_lib_path` attribute (resolved relative to CARGO_MANIFEST_DIR).
+/// 2. `KICAD_SYMBOL_DIR` environment variable.
+/// 3. `CARGO_MANIFEST_DIR` (project root).
+/// 4. Platform-specific standard KiCad installation paths.
+fn find_sym_file(
+    lib_name: &str,
+    explicit_path: Option<&str>,
+    component_name: &Ident,
+    errors: &mut Vec<String>,
+) -> Option<String> {
+    let file_name = format!("{}.kicad_sym", lib_name);
+
+    // 1. Explicit path from attribute.
+    if let Some(path) = explicit_path {
+        let p = resolve_path(path);
+        if p.is_file() {
+            return Some(p.to_string_lossy().to_string());
+        }
+        errors.push(format!(
+            "symbol_lib_path \"{}\" not found for component `{}` (resolved to `{}`)",
+            path,
+            component_name,
+            p.display(),
+        ));
+        return None;
+    }
+
+    // 2. KICAD_SYMBOL_DIR environment variable.
+    if let Ok(dirs) = env::var("KICAD_SYMBOL_DIR") {
+        for dir in env::split_paths(&dirs) {
+            let candidate = dir.join(&file_name);
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    // 3. CARGO_MANIFEST_DIR (project root).
+    if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
+        let candidate = Path::new(&manifest).join(&file_name);
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+
+    // 4. Platform-specific standard KiCad paths.
+    for dir in default_kicad_sym_dirs() {
+        let candidate = dir.join(&file_name);
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+
+    // Not found anywhere. When no explicit `symbol_lib_path` was provided,
+    // this is a soft failure — we warn and continue without auto-resolution.
+    // The runtime `resolve_symbols` may still pick it up via `--symbol-lib`.
+    eprintln!(
+        "warning: symbol library `{}.kicad_sym` not found for component `{}`.\n\
+         Pin positions and footprint will not be auto-resolved at compile time.\n\
+         Either place the file in the project root, set `KICAD_SYMBOL_DIR`, \
+         or add `symbol_lib_path` to the `#[component(...)]` attribute.",
+        lib_name, component_name,
+    );
+    None
+}
+
+fn is_vec_pin(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+    let segments: Vec<_> = type_path.path.segments.iter().collect();
+    if segments.len() != 1 || segments[0].ident != "Vec" {
+        return false;
+    }
+    let syn::PathArguments::AngleBracketed(args) = &segments[0].arguments else {
+        return false;
+    };
+    if args.args.len() != 1 {
+        return false;
+    }
+    let syn::GenericArgument::Type(Type::Path(inner)) = &args.args[0] else {
+        return false;
+    };
+    let inner_segments: Vec<_> = inner.path.segments.iter().collect();
+    inner_segments.len() == 1 && inner_segments[0].ident == "Pin"
 }
 
 /// Parse `#[component(...)]` attributes, resolving the symbol library at
@@ -254,24 +483,17 @@ fn parse_component_attrs(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Symbol reference helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Split a symbol reference like `"MCU_RaspberryPi:RP2354A"` into
-/// `("MCU_RaspberryPi", "RP2354A")`. If there is no colon, the whole string
-/// is treated as both library name and symbol name.
-fn split_symbol_ref(symbol: &str) -> (&str, &str) {
-    if let Some((lib, sym)) = symbol.split_once(':') {
-        (lib, sym)
+/// Resolve a potentially-relative path against `CARGO_MANIFEST_DIR`.
+fn resolve_path(path: &str) -> PathBuf {
+    let p = Path::new(path);
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
+        Path::new(&manifest).join(p)
     } else {
-        (symbol, symbol)
+        p.to_path_buf()
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Compile-time .kicad_sym resolution
-// ─────────────────────────────────────────────────────────────────────────────
 
 /// Try to locate and parse the `.kicad_sym` file for the given library/symbol
 /// pair at compile time.
@@ -299,263 +521,13 @@ fn resolve_symbol_at_compile_time(
     (Some(file_path), footprint)
 }
 
-/// Search for a `.kicad_sym` file matching `lib_name` in various locations.
-///
-/// Search order:
-/// 1. Explicit `symbol_lib_path` attribute (resolved relative to CARGO_MANIFEST_DIR).
-/// 2. `KICAD_SYMBOL_DIR` environment variable.
-/// 3. `CARGO_MANIFEST_DIR` (project root).
-/// 4. Platform-specific standard KiCad installation paths.
-fn find_sym_file(
-    lib_name: &str,
-    explicit_path: Option<&str>,
-    component_name: &Ident,
-    errors: &mut Vec<String>,
-) -> Option<String> {
-    let file_name = format!("{}.kicad_sym", lib_name);
-
-    // 1. Explicit path from attribute.
-    if let Some(path) = explicit_path {
-        let p = resolve_path(path);
-        if p.is_file() {
-            return Some(p.to_string_lossy().to_string());
-        }
-        errors.push(format!(
-            "symbol_lib_path \"{}\" not found for component `{}` (resolved to `{}`)",
-            path,
-            component_name,
-            p.display(),
-        ));
-        return None;
-    }
-
-    // 2. KICAD_SYMBOL_DIR environment variable.
-    if let Ok(dirs) = env::var("KICAD_SYMBOL_DIR") {
-        for dir in env::split_paths(&dirs) {
-            let candidate = dir.join(&file_name);
-            if candidate.is_file() {
-                return Some(candidate.to_string_lossy().to_string());
-            }
-        }
-    }
-
-    // 3. CARGO_MANIFEST_DIR (project root).
-    if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
-        let candidate = Path::new(&manifest).join(&file_name);
-        if candidate.is_file() {
-            return Some(candidate.to_string_lossy().to_string());
-        }
-    }
-
-    // 4. Platform-specific standard KiCad paths.
-    for dir in default_kicad_sym_dirs() {
-        let candidate = dir.join(&file_name);
-        if candidate.is_file() {
-            return Some(candidate.to_string_lossy().to_string());
-        }
-    }
-
-    // Not found anywhere. When no explicit `symbol_lib_path` was provided,
-    // this is a soft failure — we warn and continue without auto-resolution.
-    // The runtime `resolve_symbols` may still pick it up via `--symbol-lib`.
-    eprintln!(
-        "warning: symbol library `{}.kicad_sym` not found for component `{}`.\n\
-         Pin positions and footprint will not be auto-resolved at compile time.\n\
-         Either place the file in the project root, set `KICAD_SYMBOL_DIR`, \
-         or add `symbol_lib_path` to the `#[component(...)]` attribute.",
-        lib_name, component_name,
-    );
-    None
-}
-
-/// Return a list of well-known KiCad symbol directories for the current platform.
-fn default_kicad_sym_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-
-    // macOS (KiCad app bundle)
-    if cfg!(target_os = "macos") {
-        dirs.push(PathBuf::from(
-            "/Applications/KiCad.app/Contents/SharedSupport/symbols",
-        ));
-        dirs.push(PathBuf::from(
-            "/opt/homebrew/Caskroom/kicad/10.0.4/KiCad/KiCad.app/Contents/SharedSupport/symbols",
-        ));
-        if let Ok(home) = env::var("HOME") {
-            dirs.push(
-                Path::new(&home)
-                    .join("Library")
-                    .join("Application Support")
-                    .join("kicad")
-                    .join("symbols"),
-            );
-        }
-    }
-
-    // Linux
-    if cfg!(target_os = "linux") {
-        dirs.push(PathBuf::from("/usr/share/kicad/symbols"));
-        dirs.push(PathBuf::from("/usr/local/share/kicad/symbols"));
-        if let Ok(home) = env::var("HOME") {
-            for ver in ["8.0", "7.0"] {
-                dirs.push(
-                    Path::new(&home)
-                        .join(".local")
-                        .join("share")
-                        .join("kicad")
-                        .join(ver)
-                        .join("symbols"),
-                );
-            }
-        }
-    }
-
-    // Windows
-    if cfg!(target_os = "windows") {
-        dirs.push(PathBuf::from(r"C:\Program Files\KiCad\share\kicad\symbols"));
-        if let Ok(program_files) = env::var("ProgramFiles") {
-            dirs.push(
-                Path::new(&program_files)
-                    .join("KiCad")
-                    .join("share")
-                    .join("kicad")
-                    .join("symbols"),
-            );
-        }
-        if let Ok(appdata) = env::var("APPDATA") {
-            dirs.push(Path::new(&appdata).join("kicad").join("symbols"));
-        }
-    }
-
-    dirs
-}
-
-/// Resolve a potentially-relative path against `CARGO_MANIFEST_DIR`.
-fn resolve_path(path: &str) -> PathBuf {
-    let p = Path::new(path);
-    if p.is_absolute() {
-        p.to_path_buf()
-    } else if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
-        Path::new(&manifest).join(p)
+/// Split a symbol reference like `"MCU_RaspberryPi:RP2354A"` into
+/// `("MCU_RaspberryPi", "RP2354A")`. If there is no colon, the whole string
+/// is treated as both library name and symbol name.
+fn split_symbol_ref(symbol: &str) -> (&str, &str) {
+    if let Some((lib, sym)) = symbol.split_once(':') {
+        (lib, sym)
     } else {
-        p.to_path_buf()
+        (symbol, symbol)
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// .kicad_sym footprint extraction
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Extract the `Footprint` property value for a symbol named `sym_name` from
-/// the given `.kicad_sym` file.
-///
-/// Uses simple paren-matching to find the symbol definition, then searches for
-/// `(property "Footprint" "VALUE" ...)` inside it.
-///
-/// Emits a compile warning (via eprintln) if the symbol is found but has no
-/// Footprint property.
-fn extract_footprint_from_file(
-    file_path: &str,
-    sym_name: &str,
-    component_name: &Ident,
-    errors: &mut Vec<String>,
-) -> Option<String> {
-    let content = match fs::read_to_string(file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            errors.push(format!("cannot read symbol library `{}`: {}", file_path, e,));
-            return None;
-        }
-    };
-
-    // Find the opening of `(symbol "sym_name" ...)`.
-    let search_for = format!("(symbol \"{}\"", sym_name);
-    let Some(start) = content.find(&search_for) else {
-        errors.push(format!(
-            "symbol `{}` not found in library `{}`",
-            sym_name, file_path,
-        ));
-        return None;
-    };
-
-    // Track paren nesting to find the matching closing paren.
-    let mut depth = 0u32;
-    let mut in_string = false;
-    let mut end = content.len();
-    for (i, ch) in content[start..].char_indices() {
-        let abs_i = start + i;
-        if ch == '"' {
-            in_string = !in_string;
-        }
-        if !in_string {
-            match ch {
-                '(' => depth += 1,
-                ')' => {
-                    depth = depth.saturating_sub(1);
-                    if depth == 0 {
-                        end = abs_i + 1; // include the )
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    let symbol_body = &content[start..end];
-
-    // Search for (property "Footprint" "VALUE") inside the symbol body.
-    let fp_search = r#"(property "Footprint" ""#;
-    if let Some(fp_start) = symbol_body.find(fp_search) {
-        let after_key = &symbol_body[fp_start + fp_search.len()..];
-        if let Some(fp_end) = after_key.find('"') {
-            let value = &after_key[..fp_end];
-            if !value.is_empty() {
-                return Some(value.to_string());
-            }
-        }
-    }
-
-    // Symbol found but no Footprint property.
-    eprintln!(
-        "warning: symbol `{}` in `{}` (component `{}`) has no `Footprint` property.\n\
-         Consider adding one or specifying `footprint` explicitly in `#[component(...)]`.",
-        sym_name, file_path, component_name,
-    );
-    None
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Type-checking helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-fn is_vec_pin(ty: &Type) -> bool {
-    let Type::Path(type_path) = ty else {
-        return false;
-    };
-    let segments: Vec<_> = type_path.path.segments.iter().collect();
-    if segments.len() != 1 || segments[0].ident != "Vec" {
-        return false;
-    }
-    let syn::PathArguments::AngleBracketed(args) = &segments[0].arguments else {
-        return false;
-    };
-    if args.args.len() != 1 {
-        return false;
-    }
-    let syn::GenericArgument::Type(Type::Path(inner)) = &args.args[0] else {
-        return false;
-    };
-    let inner_segments: Vec<_> = inner.path.segments.iter().collect();
-    inner_segments.len() == 1 && inner_segments[0].ident == "Pin"
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Error helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-fn compile_error(msg: &str) -> TokenStream {
-    let msg = format!("derive(Component): {}", msg);
-    TokenStream::from(quote! {
-        compile_error!(#msg);
-    })
 }

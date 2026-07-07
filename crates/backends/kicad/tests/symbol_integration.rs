@@ -9,15 +9,6 @@ struct Rp2354a {
     pins: Vec<Pin>,
 }
 
-impl Block for Rp2354a {
-    fn pins(&self) -> &[Pin] {
-        &self.pins
-    }
-    fn kicad_symbol(&self) -> Option<&str> {
-        Some("RP2040:RP2354a")
-    }
-}
-
 impl Rp2354a {
     fn new() -> Self {
         Self {
@@ -42,6 +33,15 @@ impl Rp2354a {
                 ),
             ],
         }
+    }
+}
+
+impl Block for Rp2354a {
+    fn pins(&self) -> &[Pin] {
+        &self.pins
+    }
+    fn kicad_symbol(&self) -> Option<&str> {
+        Some("RP2040:RP2354a")
     }
 }
 

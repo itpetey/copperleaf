@@ -5,14 +5,6 @@ use std::fs;
 use copperleaf_core::{Diagnostic, Severity};
 use copperleaf_ir::Design;
 
-pub mod common;
-pub mod netlist;
-pub mod pcb;
-pub mod project;
-pub mod schematic;
-pub mod sexpr;
-pub mod sym_parser;
-
 pub use common::{build_net_codes, fmt_mm, format_float, refdes_prefix};
 pub use netlist::emit_netlist;
 pub use pcb::emit_pcb;
@@ -20,6 +12,14 @@ pub use project::emit_project;
 pub use schematic::emit_schematic;
 pub use sexpr::{Sexpr, deterministic_uuid, kv};
 pub use sym_parser::{PinDef, SymbolDef, find_symbol, parse_symbol_lib};
+
+pub mod common;
+pub mod netlist;
+pub mod pcb;
+pub mod project;
+pub mod schematic;
+pub mod sexpr;
+pub mod sym_parser;
 
 /// Resolve KiCad symbol pin positions for components that declare a
 /// `kicad_symbol` but do not yet have per-pin positions set.
@@ -33,7 +33,8 @@ pub use sym_parser::{PinDef, SymbolDef, find_symbol, parse_symbol_lib};
 /// diagnostics attached to `design`.
 pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
     // Cache: path -> parsed symbols
-    let mut lib_cache: std::collections::HashMap<String, Vec<SymbolDef>> = std::collections::HashMap::new();
+    let mut lib_cache: std::collections::HashMap<String, Vec<SymbolDef>> =
+        std::collections::HashMap::new();
 
     for comp in &mut design.components {
         let Some(sym_id) = &comp.kicad_symbol else {
@@ -44,10 +45,7 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
         }
 
         // Determine which library path to use for this component.
-        let lib_path = comp
-            .kicad_symbol_lib_path
-            .as_deref()
-            .or(fallback_lib_path);
+        let lib_path = comp.kicad_symbol_lib_path.as_deref().or(fallback_lib_path);
 
         let Some(lib_path) = lib_path else {
             // No library path available — skip silently; the component
@@ -64,7 +62,10 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
                         design.diagnostics.push(Diagnostic {
                             code: "SYM:PARSE".into(),
                             severity: Severity::Warning,
-                            message: format!("Failed to parse symbol library '{}': {}", lib_path, e),
+                            message: format!(
+                                "Failed to parse symbol library '{}': {}",
+                                lib_path, e
+                            ),
                             entities: vec![lib_path.into()],
                             hint: Some("Check the file is a valid .kicad_sym file".into()),
                         });
@@ -384,10 +385,7 @@ mod tests {
         resolve_symbols(&mut d, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
-        assert_eq!(
-            u1.kicad_footprint,
-            Some("User:ChosenFootprint".to_string())
-        );
+        assert_eq!(u1.kicad_footprint, Some("User:ChosenFootprint".to_string()));
 
         std::fs::remove_file(&path).ok();
     }

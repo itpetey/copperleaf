@@ -1,15 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-
 use copperleaf::{Design, Role, backend_kicad, erc_voltage_pin_to_net, synthesize_decoupling};
-
-#[derive(Parser)]
-#[command(name = "cl", version, about = "Copperleaf circuit design CLI")]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
 
 #[derive(Subcommand)]
 enum Commands {
@@ -41,6 +33,13 @@ enum Commands {
     },
 }
 
+#[derive(Parser)]
+#[command(name = "cl", version, about = "Copperleaf circuit design CLI")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -53,6 +52,28 @@ fn main() {
         } => cmd_export(&design, &output, symbol_lib.as_ref()),
         Commands::Decouple { design } => cmd_decouple(&design),
         Commands::Report { design } => cmd_report(&design),
+    }
+}
+
+fn cmd_decouple(design: &PathBuf) {
+    let d = load_design(design);
+    let result = synthesize_decoupling(&d);
+    if result.caps.is_empty() {
+        println!("[Info] DECOUPLE: no capacitors placed");
+    } else {
+        for cap in &result.caps {
+            println!(
+                "  {}: {} F on {} (from {}.{})",
+                cap.refdes,
+                cap.value.as_base(),
+                cap.net,
+                cap.source_component,
+                cap.source_pin,
+            );
+        }
+    }
+    for diag in &result.diagnostics {
+        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
     }
 }
 
@@ -87,28 +108,6 @@ fn cmd_export(design: &PathBuf, out_dir: &PathBuf, symbol_lib: Option<&PathBuf>)
     write_file("kicad_sch", &backend_kicad::emit_schematic(&d));
     write_file("kicad_pcb", &backend_kicad::emit_pcb(&d));
     write_file("kicad_pro", &backend_kicad::emit_project(&base));
-}
-
-fn cmd_decouple(design: &PathBuf) {
-    let d = load_design(design);
-    let result = synthesize_decoupling(&d);
-    if result.caps.is_empty() {
-        println!("[Info] DECOUPLE: no capacitors placed");
-    } else {
-        for cap in &result.caps {
-            println!(
-                "  {}: {} F on {} (from {}.{})",
-                cap.refdes,
-                cap.value.as_base(),
-                cap.net,
-                cap.source_component,
-                cap.source_pin,
-            );
-        }
-    }
-    for diag in &result.diagnostics {
-        println!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
-    }
 }
 
 fn cmd_report(design: &PathBuf) {

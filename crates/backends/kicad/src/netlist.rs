@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use copperleaf_ir::{Design, Role};
 
-use crate::common::{build_net_codes, refdes_prefix};
-use crate::sexpr::{Sexpr, kv};
+use crate::{
+    common::{build_net_codes, refdes_prefix},
+    sexpr::{Sexpr, kv},
+};
 
 /// Emit a KiCad S-expression netlist for the given design.
 pub fn emit_netlist(design: &Design) -> String {
@@ -18,6 +20,29 @@ pub fn emit_netlist(design: &Design) -> String {
 
     let export = Sexpr::list(std::iter::once(Sexpr::atom("export")).chain(children));
     format!("{}\n", export)
+}
+
+fn components_node(design: &Design) -> Sexpr {
+    let comps: Vec<_> = design
+        .components
+        .iter()
+        .map(|c| {
+            Sexpr::list([
+                Sexpr::atom("comp"),
+                kv("ref", &c.refdes),
+                kv("value", refdes_prefix(&c.refdes)),
+            ])
+        })
+        .collect();
+    Sexpr::list(std::iter::once(Sexpr::atom("components")).chain(comps))
+}
+
+fn connections_by_net(design: &Design) -> HashMap<&str, Vec<&copperleaf_ir::Connection>> {
+    let mut map: HashMap<&str, Vec<&copperleaf_ir::Connection>> = HashMap::new();
+    for conn in &design.connections {
+        map.entry(&conn.net).or_default().push(conn);
+    }
+    map
 }
 
 fn design_node() -> Sexpr {
@@ -40,19 +65,10 @@ fn design_node() -> Sexpr {
     ])
 }
 
-fn components_node(design: &Design) -> Sexpr {
-    let comps: Vec<_> = design
-        .components
-        .iter()
-        .map(|c| {
-            Sexpr::list([
-                Sexpr::atom("comp"),
-                kv("ref", &c.refdes),
-                kv("value", refdes_prefix(&c.refdes)),
-            ])
-        })
-        .collect();
-    Sexpr::list(std::iter::once(Sexpr::atom("components")).chain(comps))
+fn find_pin<'d>(design: &'d Design, refdes: &str, pin: &str) -> Option<&'d copperleaf_ir::Pin> {
+    design
+        .component_by_refdes(refdes)
+        .and_then(|c| c.pins.iter().find(|p| p.name == pin))
 }
 
 fn nets_node(design: &Design, net_codes: &[(String, usize)]) -> Sexpr {
@@ -93,12 +109,6 @@ fn node_sexpr(design: &Design, conn: &copperleaf_ir::Connection) -> Sexpr {
     Sexpr::list(children)
 }
 
-fn find_pin<'d>(design: &'d Design, refdes: &str, pin: &str) -> Option<&'d copperleaf_ir::Pin> {
-    design
-        .component_by_refdes(refdes)
-        .and_then(|c| c.pins.iter().find(|p| p.name == pin))
-}
-
 fn role_to_pintype(role: Role) -> Option<&'static str> {
     match role {
         Role::PowerIn | Role::Gnd => Some("power_in"),
@@ -107,14 +117,6 @@ fn role_to_pintype(role: Role) -> Option<&'static str> {
         Role::AnalogOut => Some("output"),
         Role::DigitalIO | Role::DiffPos | Role::DiffNeg => Some("bidirectional"),
     }
-}
-
-fn connections_by_net(design: &Design) -> HashMap<&str, Vec<&copperleaf_ir::Connection>> {
-    let mut map: HashMap<&str, Vec<&copperleaf_ir::Connection>> = HashMap::new();
-    for conn in &design.connections {
-        map.entry(&conn.net).or_default().push(conn);
-    }
-    map
 }
 
 #[cfg(test)]

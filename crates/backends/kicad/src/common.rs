@@ -4,17 +4,6 @@ use std::collections::BTreeSet;
 
 use copperleaf_ir::Design;
 
-/// Extract the leading alphabetic prefix of a refdes (e.g. `U1` → `U`).
-/// Returns `?` when the refdes has no alphabetic prefix.
-pub fn refdes_prefix(refdes: &str) -> String {
-    let alpha: String = refdes.chars().take_while(|c| c.is_alphabetic()).collect();
-    if alpha.is_empty() {
-        "?".to_string()
-    } else {
-        alpha
-    }
-}
-
 /// Build a deterministic 1-based net code table for a design.
 /// Codes are assigned in `design.nets` order, then any net name appearing only
 /// in `design.connections` is appended in sorted order.
@@ -39,6 +28,11 @@ pub fn build_net_codes(design: &Design) -> Vec<(String, usize)> {
     codes
 }
 
+/// Convert a length in metres to a millimetre string.
+pub fn fmt_mm(meters: f64) -> String {
+    format_float(meters * 1000.0, 6)
+}
+
 /// Format a floating-point value with the given number of decimal places,
 /// trimming trailing zeros and the trailing decimal point.
 pub fn format_float(v: f64, decimals: usize) -> String {
@@ -49,9 +43,15 @@ pub fn format_float(v: f64, decimals: usize) -> String {
     s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
-/// Convert a length in metres to a millimetre string.
-pub fn fmt_mm(meters: f64) -> String {
-    format_float(meters * 1000.0, 6)
+/// Extract the leading alphabetic prefix of a refdes (e.g. `U1` → `U`).
+/// Returns `?` when the refdes has no alphabetic prefix.
+pub fn refdes_prefix(refdes: &str) -> String {
+    let alpha: String = refdes.chars().take_while(|c| c.is_alphabetic()).collect();
+    if alpha.is_empty() {
+        "?".to_string()
+    } else {
+        alpha
+    }
 }
 
 #[cfg(test)]

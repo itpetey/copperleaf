@@ -93,20 +93,6 @@ pub struct Pin {
     pub length: Option<f64>,
 }
 
-impl Default for Pin {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            role: Role::PowerIn,
-            limits: Limits::new(0.0.volt(), 0.0.volt(), 0.0.amp()),
-            sig: None,
-            pos: None,
-            rotation: None,
-            length: None,
-        }
-    }
-}
-
 /// Different classes of nets supported by the IR.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum NetKind {
@@ -333,6 +319,20 @@ impl Pin {
         let mut dupe = self.clone();
         dupe.name = name.into();
         dupe
+    }
+}
+
+impl Default for Pin {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            role: Role::PowerIn,
+            limits: Limits::new(0.0.volt(), 0.0.volt(), 0.0.amp()),
+            sig: None,
+            pos: None,
+            rotation: None,
+            length: None,
+        }
     }
 }
 

@@ -205,7 +205,10 @@ mod tests {
     fn bom_fmt_settings_is_object_not_array() {
         let v: Value = serde_json::from_str(&emit_project("x")).unwrap();
         let bfs = &v["schematic"]["bom_fmt_settings"];
-        assert!(bfs.is_object(), "bom_fmt_settings must be an object, got {bfs}");
+        assert!(
+            bfs.is_object(),
+            "bom_fmt_settings must be an object, got {bfs}"
+        );
         assert_eq!(bfs["name"], "CSV");
         assert_eq!(bfs["field_delimiter"], ",");
     }
