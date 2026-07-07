@@ -72,12 +72,11 @@ fn collect_pins_and_footprint(
             pins.push(pin);
             continue;
         }
-        if footprint.is_none() {
-            if let Some(fp) = parse_footprint_property(node) {
+        if footprint.is_none()
+            && let Some(fp) = parse_footprint_property(node) {
                 *footprint = Some(fp);
                 continue;
             }
-        }
         // Recurse into nested `(symbol ...)` sub-nodes.
         if let Sexpr::List(children) = node
             && let Some(Sexpr::Atom(head)) = children.first()

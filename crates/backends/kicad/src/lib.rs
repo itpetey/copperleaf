@@ -69,7 +69,7 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
                             entities: vec![lib_path.into()],
                             hint: Some("Check the file is a valid .kicad_sym file".into()),
                         });
-                        return Vec::new();
+                        Vec::new()
                     }
                 },
                 Err(e) => {
@@ -80,7 +80,7 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
                         entities: vec![lib_path.into()],
                         hint: Some("Verify the symbol library path is correct".into()),
                     });
-                    return Vec::new();
+                    Vec::new()
                 }
             }
         });
@@ -102,11 +102,10 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
         };
 
         // Populate footprint from the symbol library if not already set.
-        if comp.kicad_footprint.is_none() {
-            if let Some(fp) = &sym.footprint {
+        if comp.kicad_footprint.is_none()
+            && let Some(fp) = &sym.footprint {
                 comp.kicad_footprint = Some(fp.clone());
             }
-        }
 
         for pin in &mut comp.pins {
             if pin.pos.is_some() {
