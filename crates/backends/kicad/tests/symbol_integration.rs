@@ -58,7 +58,7 @@ fn end_to_end_resolve_and_emit_uses_symbol_positions() {
 
     let lib_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rp2354a.kicad_sym");
-    resolve_symbols(&mut d, Some(lib_path.to_str().unwrap()));
+    resolve_symbols(&mut d, None, Some(lib_path.to_str().unwrap()));
 
     assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
 
@@ -74,10 +74,14 @@ fn end_to_end_resolve_and_emit_uses_symbol_positions() {
     assert!(sch.contains("(at -15.24 -5.08 0)"));
     assert!(sch.contains("(at 10.16 0 180)"));
 
-    // U1 is at symbol_position(0) = (25.4, 25.4). Wire endpoints are absolute.
-    // VDD tip: (25.4 + (-15.24) + 2.54, 25.4 + 5.08) = (12.7, 30.48).
-    assert!(sch.contains("(xy 12.7 30.48)"));
-    // GPIO0 tip: rotation 180, length 2.54:
-    // (25.4 + 10.16 - 2.54, 25.4 + 0.0) = (33.02, 25.4).
-    assert!(sch.contains("(xy 33.02 25.4)"));
+    // U1 is at symbol_position(0) = (25.4, 25.4).
+    // KiCad pin (at) is the electrical connection point (tip), not the body end.
+    // VDD is a power net: the pin points right (into the body), so the stub
+    // extends left away from the body. VDD tip: (25.4 + (-15.24), 25.4 + 5.08)
+    // = (10.16, 30.48); stub end = (7.62, 30.48).
+    assert!(sch.contains("(at 7.62 30.48 0)"));
+    // LED is also declared as a power net in this test, so GPIO0 gets a stub.
+    // GPIO0 pin points left (rotation 180, into the body), so the stub extends
+    // right away from the body: (25.4 + 10.16 + 2.54, 25.4 + 0.0) = (38.1, 25.4).
+    assert!(sch.contains("(at 38.1 25.4 0)"));
 }

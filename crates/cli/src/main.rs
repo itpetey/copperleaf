@@ -98,8 +98,17 @@ fn cmd_export(design: &PathBuf, out_dir: &PathBuf, symbol_lib: Option<&PathBuf>)
 
     // Resolve symbols using component-level library paths, falling back to
     // --symbol-lib if provided (which may be None if not specified).
+    // Component-level relative paths are resolved against the design file's
+    // parent directory.
+    let base_dir = design.parent();
     let fallback = symbol_lib.and_then(|p| p.to_str());
-    backend_kicad::resolve_symbols(&mut d, fallback);
+    backend_kicad::resolve_symbols(&mut d, base_dir, fallback);
+
+    // Validate that every connection references a pin that exists on its
+    // component. Mismatches produce floating wires and missing labels in
+    // the emitted schematic.
+    backend_kicad::validate_connections(&mut d);
+
     for diag in &d.diagnostics {
         eprintln!("[{:?}] {} — {}", diag.severity, diag.code, diag.message);
     }

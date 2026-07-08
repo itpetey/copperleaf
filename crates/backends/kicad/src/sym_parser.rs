@@ -388,7 +388,83 @@ pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
         }
     }
 
+    // Merge multiple conversions of the same unit into a single conversion.
+    // Some KiCad symbols (e.g. RP2350A/RP2354A) split pins across body styles
+    // named like `<base>_<unit>_<convert>`. A single schematic instance can only
+    // show one conversion, so pins in other conversions become invisible and
+    // appear unconnected. Flatten them so one `(unit N)` instance shows all pins.
+    children = merge_conversions(children, &child_prefix);
+
     Sexpr::List(children)
+}
+
+/// Merge sub-symbols that share the same unit but have different conversions
+/// (e.g. `RP2354A_1_0` and `RP2354A_1_1`) into a single sub-symbol named
+/// `<prefix><unit>_1`.
+fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
+    let mut result = Vec::with_capacity(children.len());
+    let mut unit_groups: std::collections::HashMap<i64, Vec<(i64, Vec<Sexpr>)>> =
+        std::collections::HashMap::new();
+
+    for child in children {
+        if let Sexpr::List(parts) = &child {
+            if parts.len() >= 2 && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") {
+                if let Sexpr::Atom(name) = &parts[1] {
+                    let name_unquoted = name.trim_matches('"');
+                    if let Some(rest) = name_unquoted.strip_prefix(child_prefix) {
+                        // Parse "<unit>_<convert>" from the end of the name.
+                        let mut split = rest.rsplitn(3, '_');
+                        let convert_str = split.next();
+                        let unit_str = split.next();
+                        if let (Some(c), Some(u)) = (convert_str, unit_str) {
+                            if let (Ok(unit), Ok(convert)) = (u.parse::<i64>(), c.parse::<i64>()) {
+                                if unit > 0 {
+                                    let inner = parts[2..].to_vec();
+                                    unit_groups
+                                        .entry(unit)
+                                        .or_default()
+                                        .push((convert, inner));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        result.push(child);
+    }
+
+    for (unit, mut conversions) in unit_groups {
+        if conversions.len() <= 1 {
+            // Re-create the original sub-symbol unchanged.
+            let (convert, inner) = conversions.into_iter().next().unwrap();
+            let name = format!("{}{}_{}", child_prefix, unit, convert);
+            let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
+            parts.extend(inner);
+            result.push(Sexpr::List(parts));
+            continue;
+        }
+
+        // Sort by conversion number so the order is deterministic.
+        conversions.sort_by_key(|(c, _)| *c);
+
+        let mut merged_inner: Vec<Sexpr> = Vec::new();
+        for (_convert, inner) in conversions {
+            for item in inner {
+                if !merged_inner.contains(&item) {
+                    merged_inner.push(item);
+                }
+            }
+        }
+
+        let name = format!("{}{}_1", child_prefix, unit);
+        let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
+        parts.extend(merged_inner);
+        result.push(Sexpr::List(parts));
+    }
+
+    result
 }
 
 fn string_value(expr: &Sexpr) -> String {
@@ -536,5 +612,43 @@ mod tests {
         );
         assert_eq!(symbols[0].pins.len(), 1);
         assert_eq!(symbols[0].pins[0].name, "IN+");
+    }
+
+    #[test]
+    fn flatten_extends_merges_split_conversions() {
+        // RP2350A/RP2354A style: pins are split across `_1_0` (power) and
+        // `_1_1` (signals). A single `(unit 1)` instance can only show one
+        // conversion, so flattening must merge them so all pins are visible.
+        let lib = r#"(kicad_symbol_lib
+  (symbol "Parent"
+    (symbol "Parent_0_1"
+      (rectangle (start -5.08 -5.08) (end 5.08 5.08))
+    )
+    (symbol "Parent_1_0"
+      (pin power_in line (at -2.54 -5.08 90) (length 2.54) (name "VREG_PGND") (number "1"))
+    )
+    (symbol "Parent_1_1"
+      (pin power_in line (at 0 -5.08 90) (length 2.54) (name "GND") (number "2"))
+      (pin bidirectional line (at 5.08 0 180) (length 2.54) (name "GPIO0") (number "3"))
+    )
+  )
+  (symbol "Child" (extends "Parent")
+    (property "Reference" "U" (at 0 0 0))
+  )
+)"#;
+        let symbols = parse_symbol_lib(lib).unwrap();
+        let child = symbols.iter().find(|s| s.lib_id == "Child").unwrap();
+        let flat = flatten_extends(child, &symbols);
+        let flat_str = format!("{}", flat);
+        // Only the merged conversion should remain for unit 1.
+        assert!(flat_str.contains("\"Child_1_1\""));
+        assert!(!flat_str.contains("\"Child_1_0\""));
+        // Both power and signal pins must be present in the merged unit.
+        assert!(flat_str.contains("(name \"VREG_PGND\")"));
+        assert!(flat_str.contains("(name \"GND\")"));
+        assert!(flat_str.contains("(name \"GPIO0\")"));
+        // Common graphics must still be present.
+        assert!(flat_str.contains("\"Child_0_1\""));
+        assert!(flat_str.contains("rectangle"));
     }
 }

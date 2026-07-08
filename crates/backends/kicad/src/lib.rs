@@ -26,12 +26,17 @@ pub mod sym_parser;
 ///
 /// For each component, the symbol library is resolved in this order:
 /// 1. The component's own `kicad_symbol_lib_path` (if set).
+///    Relative paths are resolved against `base_dir` when provided.
 /// 2. The `fallback_lib_path` (if provided, typically from `--symbol-lib`).
 ///
 /// Libraries are cached by path so multiple components sharing the same file
 /// only read it once. Missing symbols or unmatched pins produce warning
 /// diagnostics attached to `design`.
-pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
+pub fn resolve_symbols(
+    design: &mut Design,
+    base_dir: Option<&std::path::Path>,
+    fallback_lib_path: Option<&str>,
+) {
     // Cache: path -> parsed symbols
     let mut lib_cache: std::collections::HashMap<String, Vec<SymbolDef>> =
         std::collections::HashMap::new();
@@ -45,7 +50,18 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
         }
 
         // Determine which library path to use for this component.
-        let lib_path = comp.kicad_symbol_lib_path.as_deref().or(fallback_lib_path);
+        // Resolve component-level relative paths against the design file's
+        // directory so CLI invocations from other directories still work.
+        let component_lib = comp.kicad_symbol_lib_path.as_deref().map(|p| {
+            let path = std::path::Path::new(p);
+            if path.is_relative() {
+                base_dir.map_or_else(|| path.to_path_buf(), |base| base.join(path))
+            } else {
+                path.to_path_buf()
+            }
+        });
+        let component_lib_str = component_lib.as_deref().and_then(|p| p.to_str());
+        let lib_path = component_lib_str.or(fallback_lib_path);
 
         let Some(lib_path) = lib_path else {
             // No library path available — skip silently; the component
@@ -147,11 +163,55 @@ pub fn resolve_symbols(design: &mut Design, fallback_lib_path: Option<&str>) {
     }
 }
 
+/// Check that every connection in the design references a pin that actually
+/// exists on the named component. Connections with mismatched pin names
+/// (e.g. `U1.GND` when the component has `GND_1`…`GND_8`) are silently
+/// skipped during schematic emission, producing floating wires and missing
+/// net labels. This function surfaces those mismatches as warning
+/// diagnostics so they can be fixed before export.
+pub fn validate_connections(design: &mut Design) {
+    for conn in &design.connections {
+        let Some(comp) = design.components.iter().find(|c| c.refdes == conn.refdes) else {
+            design.diagnostics.push(Diagnostic {
+                code: "SCH:UNKNOWN_REFDES".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Connection {}.{} → '{}' references unknown component '{}'",
+                    conn.refdes, conn.pin, conn.net, conn.refdes
+                ),
+                entities: vec![conn.refdes.clone(), conn.pin.clone()],
+                hint: Some("Check the reference designator in the connection".into()),
+            });
+            continue;
+        };
+
+        if !comp.pins.iter().any(|p| p.name == conn.pin) {
+            design.diagnostics.push(Diagnostic {
+                code: "SCH:PIN_NOT_FOUND".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Connection {}.{} → '{}' references pin '{}' not found on component '{}'",
+                    conn.refdes, conn.pin, conn.net, conn.pin, conn.refdes
+                ),
+                entities: vec![format!("{}.{}", conn.refdes, conn.pin), conn.net.clone()],
+                hint: Some(format!(
+                    "Available pins: {}",
+                    comp.pins
+                        .iter()
+                        .map(|p| p.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )),
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use copperleaf_core::UnitExt;
-    use copperleaf_ir::{ComponentInst, Design, Limits, Pin, Role};
+    use copperleaf_ir::{ComponentInst, Design, Limits, Net, Pin, Role};
     use std::io::Write;
 
     fn sample_sym_lib() -> &'static str {
@@ -218,7 +278,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, Some((-15.24, 5.08)));
@@ -248,7 +308,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         assert!(
             d.diagnostics
@@ -277,7 +337,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         assert!(
             d.diagnostics
@@ -309,7 +369,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, Some((1.0, 2.0)));
@@ -335,7 +395,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.pins[0].pos, None);
@@ -360,7 +420,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(
@@ -393,7 +453,7 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.kicad_footprint, Some("User:ChosenFootprint".to_string()));
@@ -422,11 +482,89 @@ mod tests {
         };
         d.add_component(ComponentInst::new("U1", block));
 
-        resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
 
         let u1 = d.component_by_refdes("U1").unwrap();
         assert_eq!(u1.kicad_footprint, None);
 
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn validate_connections_warns_on_pin_name_mismatch() {
+        let mut d = Design::default();
+        d.add_net(Net::ground());
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "GND_1",
+                Role::Gnd,
+                Limits::new(0.0.volt(), 0.0.volt(), 0.1.amp()),
+                None,
+            )],
+            symbol: None,
+            footprint: None,
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        // Connect to "GND" but the component only has "GND_1"
+        d.connect("U1", "GND", "GND");
+
+        validate_connections(&mut d);
+
+        assert!(
+            d.diagnostics
+                .iter()
+                .any(|diag| diag.code == "SCH:PIN_NOT_FOUND"
+                    && diag.message.contains("U1.GND"))
+        );
+    }
+
+    #[test]
+    fn validate_connections_warns_on_unknown_refdes() {
+        let mut d = Design::default();
+        d.add_net(Net::ground());
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "GND",
+                Role::Gnd,
+                Limits::new(0.0.volt(), 0.0.volt(), 0.1.amp()),
+                None,
+            )],
+            symbol: None,
+            footprint: None,
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        // Connect to nonexistent component "U99"
+        d.connect("U99", "GND", "GND");
+
+        validate_connections(&mut d);
+
+        assert!(
+            d.diagnostics
+                .iter()
+                .any(|diag| diag.code == "SCH:UNKNOWN_REFDES"
+                    && diag.message.contains("U99"))
+        );
+    }
+
+    #[test]
+    fn validate_connections_passes_for_valid_connections() {
+        let mut d = Design::default();
+        d.add_net(Net::ground());
+        let block = SymBlock {
+            pins: vec![Pin::new(
+                "GND",
+                Role::Gnd,
+                Limits::new(0.0.volt(), 0.0.volt(), 0.1.amp()),
+                None,
+            )],
+            symbol: None,
+            footprint: None,
+        };
+        d.add_component(ComponentInst::new("U1", block));
+        d.connect("U1", "GND", "GND");
+
+        validate_connections(&mut d);
+
+        assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
     }
 }

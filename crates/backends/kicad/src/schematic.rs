@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use copperleaf_ir::{Design, Role};
 
@@ -26,35 +26,84 @@ pub fn emit_schematic(design: &Design) -> String {
         children.push(symbol_instance_node(idx, comp));
     }
 
-    // Group connections by net and emit wires in a daisy-chain per net
-    // with a single label at the midpoint, rather than one label per pin.
-    // This avoids hundreds of floating labels that don't move with components.
+    // Group connections by net.  Routing strategy depends on net kind:
+    //
+    // - **Power/GND nets** (VBAT, VDD_IO, GND, …): each pin gets a short
+    //   wire stub + net label.  KiCad resolves connectivity by label name,
+    //   so no long daisy-chain wires snake across the schematic.
+    //
+    // - **Signal nets** (SPI, control, JTAG, …): pins are wired together
+    //   with Manhattan (L-shaped) daisy-chain wires and a single net label
+    //   at the first pin tip.  This keeps visual continuity for signals
+    //   that a designer wants to trace between components.
     let mut net_conns: HashMap<&str, Vec<&copperleaf_ir::Connection>> = HashMap::new();
     for conn in &design.connections {
         net_conns.entry(conn.net.as_str()).or_default().push(conn);
     }
 
     for (net_name, conns) in &net_conns {
-        // Collect pin tip positions for all pins on this net.
-        let mut tips: Vec<(f64, f64)> = Vec::with_capacity(conns.len());
+        // Collect pin tip positions and rotations for all pins on this net.
+        let mut tips: Vec<((f64, f64), f64)> = Vec::with_capacity(conns.len());
         for conn in conns {
-            if let Some((tip, _)) = pin_tip_and_label(design, conn) {
-                tips.push(tip);
+            if let Some((tip, _, rotation)) = pin_tip_and_label(design, conn) {
+                tips.push((tip, rotation));
             }
         }
         if tips.is_empty() {
             continue;
         }
 
-        // Daisy-chain: wire tip0 → tip1, tip1 → tip2, …
-        for pair in tips.windows(2) {
-            children.push(wire_between(pair[0], pair[1], net_name));
+        if is_power_net(design, net_name) {
+            // Per-pin stub following the pin direction, then a net label at the
+            // free end. We use labels (not power symbols) for all power nets,
+            // including GND, because KiCad's global `power` library symbol can
+            // conflict with embedded or referenced copies and break ERC
+            // connectivity.
+            //
+            // Deduplicate by stub end position: when multiple pins (e.g. GND_1
+            // through GND_8) share the same (tip, rotation), they produce the
+            // same stub end.  Emit only one wire + label per unique end point
+            // to avoid KiCad's `label_multiple_wires` warning.
+            let mut seen_stubs: HashSet<String> = HashSet::new();
+            for ((tip_x, tip_y), rotation) in &tips {
+                let end = stub_end((*tip_x, *tip_y), *rotation);
+                let key = format!("{:.2}:{:.2}", end.0, end.1);
+                if !seen_stubs.insert(key) {
+                    continue;
+                }
+                children.push(wire_seg((*tip_x, *tip_y), end, net_name));
+                children.push(label_at(net_name, end.0, end.1));
+            }
+        } else {
+            let tip_positions: Vec<(f64, f64)> = tips.iter().map(|(p, _)| *p).collect();
+            // Manhattan daisy-chain + single label at first tip.
+            for pair in tip_positions.windows(2) {
+                for wire in manhattan_wires(pair[0], pair[1], net_name) {
+                    children.push(wire);
+                }
+            }
+            // Single label at the first pin tip (on a wire endpoint).
+            // For single-pin signal nets, the label sits directly on the tip.
+            children.push(label_at(net_name, tip_positions[0].0, tip_positions[0].1));
         }
+    }
 
-        // Single label for the net, placed at the average of all pin tips.
-        let avg_x = tips.iter().map(|(x, _)| x).sum::<f64>() / tips.len() as f64;
-        let avg_y = tips.iter().map(|(_, y)| y).sum::<f64>() / tips.len() as f64;
-        children.push(label_at(net_name, avg_x, avg_y));
+    // --- No‑connect markers for unconnected pins ---
+    let connected_pins: HashSet<(String, String)> = design
+        .connections
+        .iter()
+        .map(|c| (c.refdes.clone(), c.pin.clone()))
+        .collect();
+    for comp in &design.components {
+        for pin in &comp.pins {
+            let key = (comp.refdes.clone(), pin.name.clone());
+            if connected_pins.contains(&key) {
+                continue;
+            }
+            if let Some((tx, ty, _rot)) = pin_tip_for_pin(design, &comp.refdes, &pin.name) {
+                children.push(no_connect_node(tx, ty));
+            }
+        }
     }
 
     children.push(sheet_instances_node());
@@ -95,7 +144,10 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
         ]),
         Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!("sch:label:{}", name))),
+            Sexpr::str(deterministic_uuid(&format!(
+                "sch:label:{}:{:.2}:{:.2}",
+                name, x, y
+            ))),
         ]),
     ])
 }
@@ -261,53 +313,200 @@ fn lib_symbol_for_component(comp: &copperleaf_ir::ComponentRecord) -> Sexpr {
     Sexpr::list(body)
 }
 
+/// Build a `<symbol>` definition for the special PWR_FLAG symbol used to tell
+/// KiCad ERC that a power net has a defined source.
+fn pwr_flag_symbol_node() -> Sexpr {
+    // Define a minimal but valid PWR_FLAG: one power_out pin at origin with
+    // length 0, no graphics beyond the pin, and hidden Reference/Footprint
+    // properties so the symbol is invisible in the schematic.
+    Sexpr::list([
+        Sexpr::atom("symbol"),
+        Sexpr::str("PWR_FLAG"),
+        Sexpr::list([
+            Sexpr::atom("power"),
+            Sexpr::atom("global"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("pin_numbers"),
+            Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("pin_names"),
+            Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
+            Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]),
+        ]),
+        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        lib_property_node("Reference", "#FLG", true),
+        lib_property_node("Value", "PWR_FLAG", false),
+        lib_property_node("Footprint", "", true),
+        lib_property_node("Datasheet", "", true),
+        Sexpr::list([
+            Sexpr::atom("symbol"),
+            Sexpr::str("PWR_FLAG_0_0"),
+            Sexpr::list([
+                Sexpr::atom("pin"),
+                Sexpr::atom("power_out"),
+                Sexpr::atom("line"),
+                Sexpr::list([
+                    Sexpr::atom("at"),
+                    Sexpr::atom("0"),
+                    Sexpr::atom("0"),
+                    Sexpr::atom("90"),
+                ]),
+                Sexpr::list([Sexpr::atom("length"), Sexpr::atom("0")]),
+                Sexpr::list([
+                    Sexpr::atom("name"),
+                    Sexpr::str(""),
+                    Sexpr::list([
+                        Sexpr::atom("effects"),
+                        Sexpr::list([
+                            Sexpr::atom("font"),
+                            Sexpr::list([
+                                Sexpr::atom("size"),
+                                Sexpr::atom("1.27"),
+                                Sexpr::atom("1.27"),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("number"),
+                    Sexpr::str("1"),
+                    Sexpr::list([
+                        Sexpr::atom("effects"),
+                        Sexpr::list([
+                            Sexpr::atom("font"),
+                            Sexpr::list([
+                                Sexpr::atom("size"),
+                                Sexpr::atom("1.27"),
+                                Sexpr::atom("1.27"),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ])
+}
+
 /// Generate a `<symbol>` definition for each component in the design, embedded
 /// inside `<lib_symbols>`.  Every symbol gets a rectangular body and a `(pin
 /// ...)` entry for each of the component's pins, placed on the right edge of
 /// the body.
 fn lib_symbols_node(design: &Design) -> Sexpr {
-    let symbols: Vec<Sexpr> = design
+    let mut symbols: Vec<Sexpr> = design
         .components
         .iter()
         .map(lib_symbol_for_component)
         .collect();
 
+    // Include the PWR_FLAG symbol so that our generated instances can
+    // reference it without requiring the system `power` library.
+    symbols.push(pwr_flag_symbol_node());
+
     Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
+}
+
+/// Emit a `<no_connect>` S‑expression at the given coordinate.
+fn no_connect_node(x: f64, y: f64) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("no_connect"),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(&format!("sch:nc:{:.2}:{:.2}", x, y))),
+        ]),
+    ])
 }
 
 fn pin_index_by_name(pins: &[copperleaf_ir::Pin], pin_name: &str) -> Option<usize> {
     pins.iter().position(|p| p.name == pin_name)
 }
 
+/// Return the free end of a short stub extending from a pin tip *away* from
+/// the symbol body. KiCad pin rotation points from the tip toward the body,
+/// so the stub direction is the opposite: 0 → right becomes left, 90 → up
+/// becomes down, etc.
+fn stub_end((tip_x, tip_y): (f64, f64), rotation: f64) -> (f64, f64) {
+    let len = 2.54;
+    // KiCad pin rotation points FROM the tip TOWARD the body.  The stub must
+    // extend in the opposite direction, away from the body.  In the schematic
+    // file positive Y points down the page.
+    match rotation.round() as i32 {
+        0 => (tip_x - len, tip_y),   // body right -> stub left
+        90 => (tip_x, tip_y + len),  // body up -> stub down
+        180 => (tip_x + len, tip_y), // body left -> stub right
+        _ => (tip_x, tip_y - len),   // body down -> stub up
+    }
+}
+
 /// Compute the schematic coordinates for a pin tip and the label placed just
 /// past it. Returns `None` when the component or pin cannot be found.
+///
+/// The returned tuple is `((tip_x, tip_y), (label_x, label_y), rotation_deg)`.
+/// Rotation follows KiCad's convention: 0 = right, 90 = up, 180 = left,
+/// 270 = down.
+/// Compute the pin tip position for a component pin identified by refdes and
+/// pin name, without requiring a `Connection`.  Returns `(tip_x, tip_y, rotation)`
+/// or `None` when the component or pin is not found.
+fn pin_tip_for_pin(design: &Design, refdes: &str, pin_name: &str) -> Option<(f64, f64, f64)> {
+    let comp_idx = component_index_by_refdes(design, refdes);
+    let comp = design.components.get(comp_idx)?;
+    let pin_idx = pin_index_by_name(&comp.pins, pin_name)?;
+    let pin = &comp.pins[pin_idx];
+    let (sym_x, sym_y) = symbol_position(comp_idx);
+    let (tip_x, tip_y) = match pin.pos {
+        Some((px, py)) => (sym_x + px, sym_y - py),
+        None => {
+            let y_off = pin_y_offset(pin_idx, comp.pins.len());
+            (sym_x + 7.62, sym_y + y_off)
+        }
+    };
+    let rotation = pin.rotation.unwrap_or(180.0);
+    Some((tip_x, tip_y, rotation))
+}
+
 fn pin_tip_and_label(
     design: &Design,
     conn: &copperleaf_ir::Connection,
-) -> Option<((f64, f64), (f64, f64))> {
+) -> Option<((f64, f64), (f64, f64), f64)> {
     let comp_idx = component_index_by_refdes(design, &conn.refdes);
     let comp = design.components.get(comp_idx)?;
     let pin_idx = pin_index_by_name(&comp.pins, &conn.pin)?;
     let pin = &comp.pins[pin_idx];
     let (sym_x, sym_y) = symbol_position(comp_idx);
 
+    // In KiCad, a pin's `(at X Y R)` is the electrical connection point
+    // (the tip, away from the body). The pin line extends from that point
+    // in direction R for `length` toward the symbol body. Wires must
+    // connect to the `(at)` position, NOT to `at + length * direction`
+    // (which would be the body end, inside the symbol outline).
+    // KiCad's schematic coordinate system has the positive Y axis pointing
+    // downward on the page, while symbol pin Y offsets in .kicad_sym libraries
+    // are defined with positive Y pointing upward.  Subtract the library pin
+    // offset so the rendered pin tip lines up with the routed wire endpoints.
+    // Placeholder pins generated by `lib_pin_node` already use file-down Y,
+    // so they keep the additive offset.
     let (tip_x, tip_y) = match pin.pos {
-        Some((px, py)) => {
-            let rot = pin.rotation.unwrap_or(180.0);
-            let rad = rot.to_radians();
-            let length = pin.length.unwrap_or(2.54);
-            (
-                sym_x + px + length * rad.cos(),
-                sym_y + py + length * rad.sin(),
-            )
-        }
+        Some((px, py)) => (sym_x + px, sym_y - py),
         None => {
             let y_off = pin_y_offset(pin_idx, comp.pins.len());
             (sym_x + 7.62, sym_y + y_off)
         }
     };
 
-    Some(((tip_x, tip_y), (tip_x + 2.54, tip_y)))
+    // Default rotation matches the placeholder symbol pins generated by
+    // `lib_pin_node`, which point left (180°) when no library position is set.
+    let rotation = pin.rotation.unwrap_or(180.0);
+    let stub_end = stub_end((tip_x, tip_y), rotation);
+
+    Some(((tip_x, tip_y), stub_end, rotation))
 }
 
 /// Y-offset for pin *index* out of *total_pins*, centred vertically.
@@ -436,6 +635,93 @@ fn symbol_instance_node(idx: usize, comp: &copperleaf_ir::ComponentRecord) -> Se
     )
 }
 
+/// Create a PWR_FLAG symbol instance at (x, y) connected to `net_name`.
+/// Multiple flags use distinct UUIDs via `idx`.
+fn pwr_flag_instance_node(net_name: &str, x: f64, y: f64, idx: u32) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("symbol"),
+        Sexpr::list([Sexpr::atom("lib_id"), Sexpr::str("PWR_FLAG")]),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("0"),
+        ]),
+        Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("dnp"), Sexpr::atom("no")]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(&format!(
+                "sch:pwr_flag:{}:{}", net_name, idx
+            ))),
+        ]),
+        // Minimal properties: Reference hidden, Value visible.
+        Sexpr::list([
+            Sexpr::atom("property"),
+            Sexpr::str("Reference"),
+            Sexpr::str("#FLG"),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_float(x, 2)),
+                Sexpr::atom(format_float(y - 2.54, 2)),
+                Sexpr::atom("0"),
+            ]),
+            Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]),
+            Sexpr::list([
+                Sexpr::atom("effects"),
+                Sexpr::list([
+                    Sexpr::atom("font"),
+                    Sexpr::list([
+                        Sexpr::atom("size"),
+                        Sexpr::atom("1.27"),
+                        Sexpr::atom("1.27"),
+                    ]),
+                ]),
+            ]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("property"),
+            Sexpr::str("Value"),
+            Sexpr::str("PWR_FLAG"),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_float(x, 2)),
+                Sexpr::atom(format_float(y + 2.54, 2)),
+                Sexpr::atom("0"),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("effects"),
+                Sexpr::list([
+                    Sexpr::atom("font"),
+                    Sexpr::list([
+                        Sexpr::atom("size"),
+                        Sexpr::atom("1.27"),
+                        Sexpr::atom("1.27"),
+                    ]),
+                ]),
+            ]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("instances"),
+            Sexpr::list([
+                Sexpr::atom("project"),
+                Sexpr::str(""),
+                Sexpr::list([
+                    Sexpr::atom("path"),
+                    Sexpr::str(format!("/{}", deterministic_uuid("sch:root"))),
+                    Sexpr::list([
+                        Sexpr::atom("reference"),
+                        Sexpr::str(format!("#FLG{}", idx + 1)),
+                    ]),
+                    Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
+                ]),
+            ]),
+        ]),
+    ])
+}
+
 fn symbol_position(idx: usize) -> (f64, f64) {
     const GRID: f64 = 25.4;
     let x = GRID + (idx as f64 % 10.0) * GRID;
@@ -453,8 +739,37 @@ fn title_block_node() -> Sexpr {
     ])
 }
 
-/// Emit a `<wire>` S‑expression between two arbitrary points.
-fn wire_between(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
+/// Return true if the net is a power or ground net (has `NetKind::Power`).
+fn is_power_net(design: &Design, net_name: &str) -> bool {
+    design
+        .nets
+        .iter()
+        .any(|n| n.name == net_name && matches!(n.kind, copperleaf_ir::NetKind::Power { .. }))
+}
+
+/// Emit one or two orthogonal `<wire>` S-expressions between two points
+/// using Manhattan (L-shaped) routing. If the points share an x or y
+/// coordinate, a single wire is produced. Otherwise two wires are
+/// produced: a horizontal segment followed by a vertical segment.
+fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexpr> {
+    if (from.0 - to.0).abs() < 0.01 {
+        // Pure vertical
+        vec![wire_seg(from, to, net_name)]
+    } else if (from.1 - to.1).abs() < 0.01 {
+        // Pure horizontal
+        vec![wire_seg(from, to, net_name)]
+    } else {
+        // L-shaped: horizontal then vertical
+        let corner = (to.0, from.1);
+        vec![
+            wire_seg(from, corner, net_name),
+            wire_seg(corner, to, net_name),
+        ]
+    }
+}
+
+/// Emit a single `<wire>` S-expression between two points.
+fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
     Sexpr::list([
         Sexpr::atom("wire"),
         Sexpr::list([
@@ -477,8 +792,8 @@ fn wire_between(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_uuid(&format!(
-                "sch:wire:{}:{:.2}:{:.2}",
-                net_name, from.0, from.1
+                "sch:wire:{}:{:.2}:{:.2}:{:.2}:{:.2}",
+                net_name, from.0, from.1, to.0, to.1
             ))),
         ]),
     ])
@@ -583,21 +898,27 @@ mod tests {
     fn wires_connect_pins_to_labels() {
         let d = make_design();
         let out = emit_schematic(&d);
-        // U1 at (25.4, 25.4), pin tip at (33.02, 25.4), label at (35.56, 25.4)
-        // Coordinates appear on separate lines in the formatted output.
-        assert!(out.contains("(xy 33.02 25.4)"));
-        assert!(out.contains("(xy 35.56 25.4)"));
-        // U2 at (50.8, 25.4), pin tip at (58.42, 25.4), label at (60.96, 25.4)
-        assert!(out.contains("(xy 58.42 25.4)"));
-        assert!(out.contains("(xy 60.96 25.4)"));
+        // U1 at (25.4, 25.4), pin tip at (33.02, 25.4)
+        // U2 at (50.8, 25.4), pin tip at (58.42, 25.4)
+        // Each pin gets a short horizontal stub + net label.
+        // U1: stub from (33.02, 25.4) to (35.56, 25.4), label at (35.56, 25.4)
+        // U2: stub from (58.42, 25.4) to (60.96, 25.4), label at (60.96, 25.4)
+        assert!(out.contains("(xy 33.02 25.4)"));   // U1 wire start
+        assert!(out.contains("(xy 35.56 25.4)"));   // U1 wire end
+        assert!(out.contains("(xy 58.42 25.4)"));   // U2 wire start
+        assert!(out.contains("(xy 60.96 25.4)"));   // U2 wire end
+        // Labels at the end of each stub.
+        assert!(out.contains("(at 35.56 25.4 0)"));
+        assert!(out.contains("(at 60.96 25.4 0)"));
     }
 
     #[test]
     fn labels_placed_at_end_of_wire() {
         let d = make_design();
         let out = emit_schematic(&d);
-        // U2 label should be at (60.96, 25.4) — 2.54 mm right of its pin tip.
-        assert!(out.contains("(at 60.96 25.4 0)"));
+        // Labels at the end of each wire stub, NOT at the pin tip.
+        // U1: end of stub at (35.56, 25.4)
+        assert!(out.contains("(at 35.56 25.4 0)"));
         // Ensure no float imprecision artifacts.
         assert!(!out.contains("99999999999"));
     }
@@ -669,22 +990,59 @@ mod tests {
         assert!(out.contains("(at 7.62 0 180)"));
         assert!(out.contains("(at 7.62 2.54 180)"));
 
-        // Wires should go from each pin tip to a label 2.54 mm to the right.
-        // Coordinates appear on separate lines in the formatted output.
-        assert!(out.contains("(xy 33.02 22.86)"));
-        assert!(out.contains("(xy 35.56 22.86)"));
-        assert!(out.contains("(xy 33.02 25.4)"));
-        assert!(out.contains("(xy 35.56 25.4)"));
-        assert!(out.contains("(xy 33.02 27.94)"));
-        assert!(out.contains("(xy 35.56 27.94)"));
-
-        // Labels at the end of each wire (multi-line formatted).
+        // Each pin is on its own net (single pin). Each gets a short stub
+        // from the pin tip to a net label.
+        // U1 at (25.4, 25.4): tips at (33.02, 22.86), (33.02, 25.4), (33.02, 27.94).
+        // Stubs end at +2.54 on x: (35.56, 22.86), (35.56, 25.4), (35.56, 27.94).
         assert!(out.contains("\"VIN\""));
         assert!(out.contains("\"GND\""));
         assert!(out.contains("\"VOUT\""));
+        assert!(out.contains("(xy 33.02 22.86)"));
+        assert!(out.contains("(xy 33.02 25.4)"));
+        assert!(out.contains("(xy 33.02 27.94)"));
         assert!(out.contains("(at 35.56 22.86 0)"));
         assert!(out.contains("(at 35.56 25.4 0)"));
         assert!(out.contains("(at 35.56 27.94 0)"));
+    }
+
+    #[test]
+    fn gnd_net_uses_power_symbol_and_stub_follows_pin_rotation() {
+        let mut pin = Pin::new(
+            "GND",
+            Role::Gnd,
+            Limits::new(0.0_f64.volt(), 0.0_f64.volt(), 1.0_f64.amp()),
+            None,
+        );
+        // Pin points up, like U2.GND on the RP2354A symbol (pin at the bottom
+        // of the body pointing toward the centre).
+        pin.pos = Some((0.0, -45.72));
+        pin.rotation = Some(90.0);
+        pin.length = Some(2.54);
+
+        let u1 = ComponentInst::new(
+            "U1",
+            TestBlock {
+                pins: vec![pin],
+            },
+        );
+
+        let mut d = Design::default();
+        d.add_net(Net::ground());
+        d.add_component(u1);
+        d.connect("U1", "GND", "GND");
+
+        let out = emit_schematic(&d);
+
+        // GND is a power net, so it gets a short stub + net label at the free
+        // end (we intentionally avoid power symbols because they depend on the
+        // system `power` library and can break ERC connectivity).
+        assert!(out.contains("(label \"GND\""));
+        // U1 is at (25.4, 25.4). Library pin Y is up-relative, so the rendered
+        // tip is at (25.4, 25.4 - (-45.72)) = (25.4, 71.12).  The pin points up
+        // (toward the body), so the stub extends down to (25.4, 73.66).
+        assert!(out.contains("(xy 25.4 71.12)"));
+        assert!(out.contains("(xy 25.4 73.66)"));
+        assert!(out.contains("(at 25.4 73.66 0)"));
     }
 
     #[derive(Clone, Debug)]
@@ -765,14 +1123,18 @@ mod tests {
         d.add_component(u1);
         d.connect("U1", "VDD", "V3V3");
 
-        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        crate::resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // U1 is the first component, so symbol_position(0) = (25.4, 25.4).
-        // Pin tip for VDD at local (-15.24, 5.08) with rotation 0 and length 2.54
-        // is at absolute (25.4 + (-15.24) + 2.54, 25.4 + 5.08) = (12.7, 30.48).
+        // The pin's (at -15.24 5.08 0) IS the connection point (KiCad pin
+        // coordinates specify the electrical end, not the body end).
+        // Library pin Y is up-relative, so the rendered tip is at
+        // (25.4 + (-15.24), 25.4 - 5.08) = (10.16, 20.32).
+        // The pin points right (into the body), so the stub extends left away
+        // from the body to (7.62, 20.32); the V3V3 label sits there.
         assert!(out.contains("(at -15.24 5.08 0)"));
-        assert!(out.contains("(xy 12.7 30.48)"));
+        assert!(out.contains("(at 7.62 20.32 0)"));
 
         std::fs::remove_file(&path).ok();
     }
@@ -809,14 +1171,17 @@ mod tests {
         d.add_component(u1);
         d.connect("U1", "VDD", "V3V3");
 
-        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        crate::resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // lib_symbol pin should use the library length.
         assert!(out.contains("(length 3.81)"));
-        // Pin tip uses 3.81 instead of the default 2.54:
-        // absolute x = 25.4 + (-15.24) + 3.81 = 13.97, y = 25.4 + 5.08 = 30.48.
-        assert!(out.contains("(xy 13.97 30.48)"));
+        // The wire connects to the pin's (at) position (the electrical end),
+        // not at + length * direction (the body end). Library pin Y is
+        // up-relative, so the rendered tip is at
+        // (25.4 + (-15.24), 25.4 - 5.08) = (10.16, 20.32) regardless of length.
+        // The pin points right, so the stub extends left to (7.62, 20.32).
+        assert!(out.contains("(at 7.62 20.32 0)"));
 
         std::fs::remove_file(&path).ok();
     }
@@ -875,7 +1240,7 @@ mod tests {
         d.connect("U1", "VDD", "V3V3");
         d.connect("U1", "GND", "GND");
 
-        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        crate::resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // The lib_symbol should use the library-prefixed name.
@@ -931,7 +1296,7 @@ mod tests {
         d.add_component(u1);
         d.connect("U1", "VDD", "V3V3");
 
-        crate::resolve_symbols(&mut d, Some(path.to_str().unwrap()));
+        crate::resolve_symbols(&mut d, None, Some(path.to_str().unwrap()));
         let out = emit_schematic(&d);
 
         // The symbol instance's Footprint property should carry (hide yes).
