@@ -22,8 +22,9 @@ pub fn emit_pcb(design: &Design) -> String {
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
-        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20211014")]),
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260206")]),
         kv("generator", "copperleaf"),
+        kv("generator_version", "10.0"),
         general_node(),
         kv("paper", "A4"),
         layers_node(),
@@ -222,7 +223,7 @@ fn general_node() -> Sexpr {
 }
 
 fn layers_node() -> Sexpr {
-    // Standard KiCad 6 layer table.  Footprints reference F.SilkS / F.Fab and
+    // Standard KiCad 10 layer table.  Footprints reference F.SilkS / F.Fab and
     // the board outline uses Edge.Cuts, so all of these must be declared or
     // KiCad refuses to load the board.
     Sexpr::list([

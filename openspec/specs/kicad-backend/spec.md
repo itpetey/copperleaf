@@ -37,7 +37,7 @@ Each `(node ...)` in the netlist SHALL include a `(pintype "<type>")` derived fr
 - **THEN** the netlist node contains a `pintype` of `bidirectional`
 
 ### Requirement: Schematic emitter produces a valid kicad_sch
-The crate SHALL provide `pub fn emit_schematic(design: &Design) -> String` that returns a KiCad 6 schematic. The output SHALL begin with `(kicad_sch` and contain `version`, `generator`, `uuid`, `lib_symbols`, and `sheet_instances` nodes. The output SHALL be deterministic.
+The crate SHALL provide `pub fn emit_schematic(design: &Design) -> String` that returns a KiCad 10 schematic. The output SHALL begin with `(kicad_sch` and contain `version`, `generator`, `generator_version`, `uuid`, `lib_symbols`, and `sheet_instances` nodes. The output SHALL be deterministic.
 
 #### Scenario: Schematic with placed components and net labels
 - **WHEN** `emit_schematic` is called on a design with component `U1` and connection `U1.VDD→V3V3`
@@ -49,7 +49,7 @@ The crate SHALL provide `pub fn emit_schematic(design: &Design) -> String` that 
 - **THEN** the output begins with `(kicad_sch` and contains a `sheet_instances` node with no `symbol` instances
 
 ### Requirement: PCB emitter produces a valid kicad_pcb with net classes
-The crate SHALL provide `pub fn emit_pcb(design: &Design) -> String` that returns a KiCad 6 PCB file. The output SHALL begin with `(kicad_pcb` and contain `version`, `generator`, a `net` table, at least one `net_class` (always `Default`), and a `footprint` per component. The output SHALL be deterministic.
+The crate SHALL provide `pub fn emit_pcb(design: &Design) -> String` that returns a KiCad 10 PCB file. The output SHALL begin with `(kicad_pcb` and contain `version`, `generator`, `generator_version`, a `net` table, at least one `net_class` (always `Default`), and a `footprint` per component. The output SHALL be deterministic.
 
 #### Scenario: Net classes derived from NetClass constraints
 - **WHEN** `emit_pcb` is called on a design where a net has `NetClass { min_width: Some(0.3.mm()), clearance: Some(0.2.mm()) }`

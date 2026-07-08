@@ -1,6 +1,6 @@
 //! KiCad `.kicad_pro` project file emitter.
 //!
-//! Emits a minimal but valid JSON project file that KiCad 6+ will open without
+//! Emits a minimal but valid JSON project file that KiCad 10+ will open without
 //! prompting the user to repair.  Empty arrays / default settings are acceptable
 //! — KiCad fills in robust defaults on load — so we keep the footprint of this
 //! structure small and maintainable.
@@ -62,7 +62,7 @@ pub fn emit_project(name: &str) -> String {
         "cvpcb": { "equivalence_files": [] },
         "erc": {
             "erc_exclusions": [],
-            "meta": { "version": 1 },
+            "meta": { "version": 0 },
             "pin_map": [],
             "rule_severities": {
                 "conflicting_pins": "error",
@@ -93,7 +93,7 @@ pub fn emit_project(name: &str) -> String {
                     "wire_width": 6.0
                 }
             ],
-            "meta": { "version": 5 },
+            "meta": { "version": 4 },
             "net_colors": null,
             "netclass_assignments": null,
             "netclass_patterns": []
@@ -177,12 +177,12 @@ mod tests {
     }
 
     #[test]
-    fn project_meta_version_matches_kicad6() {
+    fn project_meta_version_matches_kicad10() {
         let v: Value = serde_json::from_str(&emit_project("foo")).unwrap();
         assert_eq!(v["meta"]["version"], 3);
-        assert_eq!(v["net_settings"]["meta"]["version"], 5);
+        assert_eq!(v["net_settings"]["meta"]["version"], 4);
         assert_eq!(v["board"]["design_settings"]["meta"]["version"], 2);
-        assert_eq!(v["erc"]["meta"]["version"], 1);
+        assert_eq!(v["erc"]["meta"]["version"], 0);
         assert_eq!(v["schematic"]["meta"]["version"], 1);
     }
 

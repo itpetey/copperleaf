@@ -1,4 +1,4 @@
-//! Minimal deterministic S-expression builder for KiCad 6+ file formats.
+//! Minimal deterministic S-expression builder for KiCad 10+ file formats.
 
 use std::{error, fmt};
 

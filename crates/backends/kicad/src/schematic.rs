@@ -7,11 +7,12 @@ use crate::{
     sexpr::{Sexpr, deterministic_uuid, kv, parse},
 };
 
-/// Emit a minimal structurally-valid KiCad 6 schematic for the given design.
+/// Emit a minimal structurally-valid KiCad 10 schematic for the given design.
 pub fn emit_schematic(design: &Design) -> String {
     let mut children: Vec<Sexpr> = vec![
-        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20211123")]),
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260306")]),
         kv("generator", "copperleaf"),
+        kv("generator_version", "10.0"),
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_uuid("sch:root")),
