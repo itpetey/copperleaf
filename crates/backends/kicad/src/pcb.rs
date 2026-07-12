@@ -1,10 +1,12 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
+use std::path::PathBuf;
 
 use copperleaf_ir::{Design, NetClass};
 
 use crate::{
     common::{build_net_codes, fmt_mm, format_float, refdes_prefix},
-    sexpr::{Sexpr, kv},
+    sexpr::{Sexpr, deterministic_uuid, kv, parse},
 };
 
 /// Emit a KiCad S-expression PCB file for the given design.
@@ -22,7 +24,7 @@ pub fn emit_pcb(design: &Design) -> String {
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
-        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260206")]),
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20241229")]),
         kv("generator", "copperleaf"),
         kv("generator_version", "10.0"),
         general_node(),
@@ -52,13 +54,13 @@ pub fn emit_pcb(design: &Design) -> String {
 
 fn board_outline() -> Vec<Sexpr> {
     let rect = [
-        ((0.0, 0.0), (100.0, 0.0)),
-        ((100.0, 0.0), (100.0, 80.0)),
-        ((100.0, 80.0), (0.0, 80.0)),
-        ((0.0, 80.0), (0.0, 0.0)),
+        ((0.0, 0.0), (100.0, 0.0), "top"),
+        ((100.0, 0.0), (100.0, 80.0), "right"),
+        ((100.0, 80.0), (0.0, 80.0), "bottom"),
+        ((0.0, 80.0), (0.0, 0.0), "left"),
     ];
     rect.iter()
-        .map(|((x1, y1), (x2, y2))| {
+        .map(|((x1, y1), (x2, y2), side)| {
             Sexpr::list([
                 Sexpr::atom("gr_line"),
                 Sexpr::list([
@@ -71,8 +73,16 @@ fn board_outline() -> Vec<Sexpr> {
                     Sexpr::atom(format_float(*x2, 2)),
                     Sexpr::atom(format_float(*y2, 2)),
                 ]),
+                Sexpr::list([
+                    Sexpr::atom("stroke"),
+                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.05")]),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
+                ]),
                 Sexpr::list([Sexpr::atom("layer"), Sexpr::str("Edge.Cuts")]),
-                Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.05")]),
+                Sexpr::list([
+                    Sexpr::atom("uuid"),
+                    Sexpr::str(deterministic_uuid(&format!("pcb:outline:{}", side))),
+                ]),
             ])
         })
         .collect()
@@ -102,118 +112,403 @@ fn footprint_node(
     // Centre the box on the pad row's midpoint.
     let body_cx = pad_span / 2.0;
 
+    let fp_uuid = deterministic_uuid(&format!("pcb:{}", comp.refdes));
+
+    let fp_name = comp
+        .kicad_footprint
+        .as_deref()
+        .unwrap_or("copperleaf:Generic");
     let mut children = vec![
         Sexpr::atom("footprint"),
-        Sexpr::str("copperleaf:Generic"),
+        Sexpr::str(fp_name),
+        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
         Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.Cu")]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(&fp_uuid),
+        ]),
         Sexpr::list([
             Sexpr::atom("at"),
             Sexpr::atom(format_float(x, 2)),
             Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("0"),
         ]),
+        // KiCad 9/10 stores Reference/Value as hidden metadata properties,
+        // with visible text rendered via fp_text elements using ${REFERENCE} / ${VALUE} variables.
+        property_node("Reference", &comp.refdes, body_cx, -body_h / 2.0 - 1.0, "F.SilkS", true),
+        property_node("Value", &refdes_prefix(&comp.refdes), body_cx, body_h / 2.0 + 1.0, "F.Fab", true),
+        // Visible reference designator text on F.SilkS.
+        fp_text_node("user", "${REFERENCE}", body_cx, -body_h / 2.0 - 1.0, 0.0, "F.SilkS", &format!("{}:ref", fp_uuid)),
+        // Visible value text on F.Fab.
+        fp_text_node("user", "${VALUE}", body_cx, body_h / 2.0 + 1.0, 0.0, "F.Fab", &format!("{}:val", fp_uuid)),
+        // Path linking this footprint to the schematic symbol instance.
+        // Use the same UUID for the path as the footprint itself (root path /).
         Sexpr::list([
-            Sexpr::atom("fp_text"),
-            Sexpr::atom("reference"),
-            Sexpr::str(&comp.refdes),
-            Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom(format_float(body_cx, 2)),
-                Sexpr::atom(format_float(-body_h / 2.0 - 1.0, 2)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("effects"),
-                Sexpr::list([
-                    Sexpr::atom("font"),
-                    Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
-                    Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
-                ]),
-                Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
-            ]),
-            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.SilkS")]),
+            Sexpr::atom("path"),
+            Sexpr::str(&format!("/{}", fp_uuid)),
         ]),
-        Sexpr::list([
-            Sexpr::atom("fp_text"),
-            Sexpr::atom("value"),
-            Sexpr::str(refdes_prefix(&comp.refdes).as_str()),
-            Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom(format_float(body_cx, 2)),
-                Sexpr::atom(format_float(body_h / 2.0 + 1.0, 2)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("effects"),
-                Sexpr::list([
-                    Sexpr::atom("font"),
-                    Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
-                    Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
-                ]),
-                Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
-            ]),
-            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.Fab")]),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("fp_rect"),
-            Sexpr::list([
-                Sexpr::atom("start"),
-                Sexpr::atom(format_float(body_cx - half_w, 2)),
-                Sexpr::atom(format_float(-body_h / 2.0, 2)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("end"),
-                Sexpr::atom(format_float(body_cx + half_w, 2)),
-                Sexpr::atom(format_float(body_h / 2.0, 2)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("stroke"),
-                Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
-                Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
-            ]),
-            Sexpr::list([Sexpr::atom("fill"), Sexpr::atom("none")]),
-            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.SilkS")]),
-        ]),
+        Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
+        Sexpr::list([Sexpr::atom("sheetfile"), Sexpr::str("halow-sta.kicad_sch")]),
     ];
 
-    for (i, pin) in comp.pins.iter().enumerate() {
-        let pad_x = i as f64 * 2.54;
-        let pad_y = 0.0;
-        let pad_num = (i + 1).to_string();
-        let mut pad_children = vec![
-            Sexpr::atom("pad"),
-            Sexpr::str(&pad_num),
-            Sexpr::atom("thru_hole"),
-            Sexpr::atom("circle"),
-            Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom(format_float(pad_x, 2)),
-                Sexpr::atom(format_float(pad_y, 2)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.524"),
-                Sexpr::atom("1.524"),
-            ]),
-            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom("0.762")]),
-            Sexpr::list([
-                Sexpr::atom("layers"),
-                Sexpr::str("*.Cu"),
-                Sexpr::str("*.Mask"),
-            ]),
-        ];
-        if let Some(&net_name) = pin_to_net.get(&(comp.refdes.as_str(), pin.name.as_str()))
-            && let Some(&code) = net_to_code.get(net_name)
-        {
-            pad_children.push(Sexpr::list([
-                Sexpr::atom("net"),
-                Sexpr::atom(code.to_string()),
-                Sexpr::str(net_name),
-            ]));
+    // Try to load the actual footprint from a KiCad library file for
+    // components with a resolved library:footprint name.
+    let lib_children = comp
+        .kicad_footprint
+        .as_ref()
+        .and_then(|fp_link| fp_link.split_once(':'))
+        .and_then(|(lib, name)| load_library_footprint(lib, name));
+
+    if let Some(mut lib_children) = lib_children {
+        // Use the library's actual footprint data.
+        // Filter out property elements from the library (we have our own).
+        lib_children.retain(|c| match c {
+            Sexpr::List(kids) if kids.len() >= 2 => match &kids[0] {
+                Sexpr::Atom(a) => {
+                    // Keep graphics, pads, text, attr, descr, tags, etc.
+                    // Remove property (we have our own), version, generator
+                    // (library-only metadata that doesn't belong in PCB footprints).
+                    a != "property" && a != "version" && a != "generator"
+                        && a != "duplicate_pad_numbers_are_jumpers"
+                        && a != "embedded_fonts"
+                }
+                _ => true,
+            },
+            _ => true,
+        });
+        // Add deterministic UUIDs to library elements that lack them.
+        ensure_footprint_uuids(&mut lib_children, &fp_uuid);
+        // Assign net connections to library pads.
+        assign_pad_nets(&mut lib_children, comp, pin_to_net, net_to_code);
+        children.extend(lib_children);
+    } else {
+        // Fallback: generate a generic rectangular footprint.
+        children.push(Sexpr::list([Sexpr::atom("attr"), Sexpr::atom("through_hole")]));
+        let outline_uuid_seed = format!("pcb:{}:outline", comp.refdes);
+        let x1 = body_cx - half_w;
+        let y1 = -body_h / 2.0;
+        let x2 = body_cx + half_w;
+        let y2 = body_h / 2.0;
+        children.push(fp_line((x1, y1), (x2, y1), "F.SilkS", &format!("{}_top", outline_uuid_seed)));
+        children.push(fp_line((x2, y1), (x2, y2), "F.SilkS", &format!("{}_right", outline_uuid_seed)));
+        children.push(fp_line((x2, y2), (x1, y2), "F.SilkS", &format!("{}_bot", outline_uuid_seed)));
+        children.push(fp_line((x1, y2), (x1, y1), "F.SilkS", &format!("{}_left", outline_uuid_seed)));
+
+        for (i, pin) in comp.pins.iter().enumerate() {
+            let pad_x = i as f64 * 2.54;
+            let pad_y = 0.0;
+            let pad_num = (i + 1).to_string();
+            let pad_uuid = deterministic_uuid(&format!("pcb:{}:pad{}", comp.refdes, pad_num));
+            let mut pad_children = vec![
+                Sexpr::atom("pad"),
+                Sexpr::str(&pad_num),
+                Sexpr::atom("thru_hole"),
+                Sexpr::atom("circle"),
+                Sexpr::list([
+                    Sexpr::atom("at"),
+                    Sexpr::atom(format_float(pad_x, 2)),
+                    Sexpr::atom(format_float(pad_y, 2)),
+                    Sexpr::atom("0"),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.524"),
+                    Sexpr::atom("1.524"),
+                ]),
+                Sexpr::list([Sexpr::atom("drill"), Sexpr::atom("0.762")]),
+                Sexpr::list([
+                    Sexpr::atom("layers"),
+                    Sexpr::str("*.Cu"),
+                    Sexpr::str("*.Mask"),
+                ]),
+                Sexpr::list([Sexpr::atom("remove_unused_layers"), Sexpr::atom("no")]),
+                Sexpr::list([
+                    Sexpr::atom("uuid"),
+                    Sexpr::str(&pad_uuid),
+                ]),
+            ];
+            if let Some(&net_name) = pin_to_net.get(&(comp.refdes.as_str(), pin.name.as_str()))
+                && let Some(&code) = net_to_code.get(net_name)
+            {
+                pad_children.push(Sexpr::list([
+                    Sexpr::atom("net"),
+                    Sexpr::atom(code.to_string()),
+                    Sexpr::str(net_name),
+                ]));
+            }
+            children.push(Sexpr::list(pad_children));
         }
-        children.push(Sexpr::list(pad_children));
     }
 
     Sexpr::list(children)
 }
 
+/// KiCad 9/10 footprint property node (stores metadata; visible text
+/// should use fp_text instead).
+fn property_node(name: &str, value: &str, x: f64, y: f64, layer: &str, hide: bool) -> Sexpr {
+    let uuid = deterministic_uuid(&format!("pcb:prop:{}:{}", name, value));
+    let mut children = vec![
+        Sexpr::atom("property"),
+        Sexpr::str(name),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("0"),
+        ]),
+    ];
+    if hide {
+        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    children.extend([
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(&uuid),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("effects"),
+            Sexpr::list([
+                Sexpr::atom("font"),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.0"),
+                    Sexpr::atom("1.0"),
+                ]),
+                Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+            ]),
+            Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+        ]),
+    ]);
+    Sexpr::list(children)
+}
+
+/// KiCad 9/10 footprint text element (fp_text) for visible text like
+/// reference designator and value.
+fn fp_text_node(
+    text_type: &str,
+    text: &str,
+    x: f64,
+    y: f64,
+    rotation: f64,
+    layer: &str,
+    uuid_seed: &str,
+) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_text"),
+        Sexpr::atom(text_type),
+        Sexpr::str(text),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom(format_float(rotation, 1)),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([
+            Sexpr::atom("effects"),
+            Sexpr::list([
+                Sexpr::atom("font"),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.0"),
+                    Sexpr::atom("1.0"),
+                ]),
+                Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+            ]),
+            Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(uuid_seed)),
+        ]),
+    ])
+}
+
+/// KiCad 9/10 footprint line graphic (fp_line).
+fn fp_line(from: (f64, f64), to: (f64, f64), layer: &str, uuid_seed: &str) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_line"),
+        Sexpr::list([
+            Sexpr::atom("start"),
+            Sexpr::atom(format_float(from.0, 2)),
+            Sexpr::atom(format_float(from.1, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("end"),
+            Sexpr::atom(format_float(to.0, 2)),
+            Sexpr::atom(format_float(to.1, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("stroke"),
+            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
+            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(uuid_seed)),
+        ]),
+    ])
+}
+
+/// Known KiCad footprint library search paths (in priority order).
+const FOOTPRINT_LIB_PATHS: &[&str] = &[
+    // macOS KiCad bundle
+    "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+];
+
+/// Try to load a library footprint (.kicad_mod) and return its child nodes
+/// (fp_line, pad, fp_text, fp_poly, attr, etc.).
+///
+/// `lib_name` is the library nickname (e.g. "Package_QFP").
+/// `fp_name` is the footprint entry (e.g. "LQFP-48_7x7mm_P0.5mm").
+///
+/// Returns `None` if the file isn't found or cannot be parsed.
+fn load_library_footprint(lib_name: &str, fp_name: &str) -> Option<Vec<Sexpr>> {
+    for base in FOOTPRINT_LIB_PATHS {
+        let mut path = PathBuf::from(base);
+        path.push(format!("{}.pretty/{}.kicad_mod", lib_name, fp_name));
+        if !path.exists() {
+            continue;
+        }
+        let content = fs::read_to_string(&path).ok()?;
+        let parsed = parse(&content).ok()?;
+        // Expect a (footprint ...) list. Skip the "footprint" atom AND any
+        // leading string atoms (the footprint name) — keep only sub-lists
+        // (version, layer, property, fp_line, pad, etc.).
+        let children = match &parsed {
+            Sexpr::List(children) if children.len() >= 2 => {
+                children
+                    .iter()
+                    .skip(1) // skip the "footprint" atom
+                    .filter(|c| matches!(c, Sexpr::List(_))) // skip string atoms (footprint name)
+                    .cloned()
+                    .collect()
+            }
+            _ => return None,
+        };
+        return Some(children);
+    }
+    None
+}
+
+/// Add a deterministic UUID to elements in a footprint's child list that
+/// require one but don't have it (library-provided elements lack UUIDs).
+///
+/// Elements that need UUIDs: fp_line, fp_poly, fp_circle, fp_arc, fp_text,
+/// pad, zone.
+fn ensure_footprint_uuids(children: &mut Vec<Sexpr>, fp_uuid: &str) {
+    for (i, child) in children.iter_mut().enumerate() {
+        let type_name = match child {
+            Sexpr::List(items) if !items.is_empty() => match &items[0] {
+                Sexpr::Atom(t) => t.clone(),
+                _ => continue,
+            },
+            _ => continue,
+        };
+        let needs_uuid = matches!(
+            type_name.as_str(),
+            "fp_line" | "fp_poly" | "fp_circle" | "fp_arc" | "fp_text" | "pad"
+        );
+        if !needs_uuid {
+            continue;
+        }
+        let items = match child {
+            Sexpr::List(items) => items,
+            _ => continue,
+        };
+        // Check if it already has a uuid child
+        let has_uuid = items.iter().any(|c| match c {
+            Sexpr::List(kids) if kids.len() == 2 => match &kids[0] {
+                Sexpr::Atom(a) => a == "uuid",
+                _ => false,
+            },
+            _ => false,
+        });
+        if has_uuid {
+            continue;
+        }
+        // Look for a pad number in the first string child for deterministic seed
+        let pad_num = items.iter().find_map(|c| match c {
+            Sexpr::Atom(s) if s.starts_with('"') && s.len() > 2 => {
+                Some(s[1..s.len() - 1].to_string())
+            }
+            _ => None,
+        });
+        let seed = if let Some(ref pn) = pad_num {
+            format!("{}:lib:{}:{}", fp_uuid, type_name, pn)
+        } else {
+            format!("{}:lib:{}:{}", fp_uuid, type_name, i)
+        };
+        let uuid_str = deterministic_uuid(&seed);
+        items.push(Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(&uuid_str),
+        ]));
+    }
+}
+
+/// Assign net connections to library-provided pads by matching pad numbers
+/// to the component's pin list.
+fn assign_pad_nets(
+    children: &mut Vec<Sexpr>,
+    comp: &copperleaf_ir::ComponentRecord,
+    pin_to_net: &HashMap<(&str, &str), &str>,
+    net_to_code: &HashMap<&str, usize>,
+) {
+    for child in children.iter_mut() {
+        let items = match child {
+            Sexpr::List(items) if !items.is_empty() => items,
+            _ => continue,
+        };
+        let is_pad = match &items[0] {
+            Sexpr::Atom(a) => a == "pad",
+            _ => false,
+        };
+        if !is_pad || items.len() < 2 {
+            continue;
+        }
+        // Extract pad number from the first string child
+        let pad_num = match &items[1] {
+            Sexpr::Atom(s) if s.starts_with('"') && s.len() > 2 => {
+                s[1..s.len() - 1].to_string()
+            }
+            _ => continue,
+        };
+        // Find matching pin by pad number (1-indexed)
+        let pin_idx = match pad_num.parse::<usize>() {
+            Ok(n) if n >= 1 && n <= comp.pins.len() => n - 1,
+            _ => continue,
+        };
+        let pin_name = &comp.pins[pin_idx].name;
+        // Look up net
+        let net_name = match pin_to_net.get(&(comp.refdes.as_str(), pin_name.as_str())) {
+            Some(n) => *n,
+            None => continue,
+        };
+        let code = match net_to_code.get(net_name) {
+            Some(c) => *c,
+            None => continue,
+        };
+        // Remove any existing (net ...) child and add the correct one
+        items.retain(|c| match c {
+            Sexpr::List(kids) if kids.len() == 3 => match &kids[0] {
+                Sexpr::Atom(a) => a != "net",
+                _ => true,
+            },
+            _ => true,
+        });
+        items.push(Sexpr::list([
+            Sexpr::atom("net"),
+            Sexpr::atom(code.to_string()),
+            Sexpr::str(net_name),
+        ]));
+    }
+}
+
+/// Known KiCad footprint library directories to search.
 fn general_node() -> Sexpr {
     Sexpr::list([
         Sexpr::atom("general"),
@@ -440,7 +735,7 @@ mod tests {
         let out = emit_pcb(&d);
         // Ensure no float imprecision artifacts like 19.049999999999997
         assert!(!out.contains("99999999999"));
-        assert!(out.contains("(at 10 10)"));
+        assert!(out.contains("(at 10 10 0)"));
     }
 
     #[test]
