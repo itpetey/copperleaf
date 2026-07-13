@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use serde::{Deserialize, Serialize};
 
+use thiserror::Error;
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
@@ -282,15 +283,17 @@ pub struct CompileReport {
     pub summary: CompileSummary,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Error)]
 pub struct CompileError {
     pub errors: Vec<Diagnostic>,
 }
 
 /// Common backend errors.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BackendError {
-    IoError(std::io::Error),
+    #[error("backend I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("backend emit error: {0}")]
     EmitError(String),
 }
 
@@ -1004,32 +1007,6 @@ impl fmt::Display for CompileError {
             }
         }
         Ok(())
-    }
-}
-
-impl std::error::Error for CompileError {}
-
-impl fmt::Display for BackendError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IoError(e) => write!(f, "backend I/O error: {}", e),
-            Self::EmitError(msg) => write!(f, "backend emit error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for BackendError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::IoError(e) => Some(e),
-            Self::EmitError(_) => None,
-        }
-    }
-}
-
-impl From<std::io::Error> for BackendError {
-    fn from(e: std::io::Error) -> Self {
-        Self::IoError(e)
     }
 }
 

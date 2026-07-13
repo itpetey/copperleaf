@@ -1,6 +1,8 @@
 //! Minimal deterministic S-expression builder for KiCad 10+ file formats.
 
-use std::{error, fmt};
+use std::fmt;
+
+use thiserror::Error;
 
 /// A single S-expression node.
 #[derive(Clone, Debug, PartialEq)]
@@ -14,15 +16,19 @@ pub enum Sexpr {
 }
 
 /// Error returned when an S-expression cannot be parsed.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     /// Input ended while a string or list was still open.
+    #[error("unexpected end of input")]
     UnexpectedEof,
     /// A closing `)` had no matching opening `(`.
+    #[error("unmatched ')' at position {pos}")]
     UnmatchedParen { pos: usize },
     /// An invalid escape sequence was encountered inside a quoted string.
+    #[error("bad escape sequence at position {pos}")]
     BadEscape { pos: usize },
     /// An unexpected character was found at the given byte position.
+    #[error("unexpected character {ch:?} at position {pos}")]
     UnexpectedChar { ch: char, pos: usize },
 }
 
@@ -115,21 +121,6 @@ impl fmt::Display for Sexpr {
         self.write(f, 0)
     }
 }
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnexpectedEof => write!(f, "unexpected end of input"),
-            Self::UnmatchedParen { pos } => write!(f, "unmatched ')' at position {}", pos),
-            Self::BadEscape { pos } => write!(f, "bad escape sequence at position {}", pos),
-            Self::UnexpectedChar { ch, pos } => {
-                write!(f, "unexpected character {:?} at position {}", ch, pos)
-            }
-        }
-    }
-}
-
-impl error::Error for ParseError {}
 
 impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<Sexpr, ParseError> {
