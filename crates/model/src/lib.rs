@@ -180,4 +180,46 @@ mod tests {
         assert_eq!(report.board.components.len(), 0);
         assert_eq!(report.board.nets.len(), 0);
     }
+
+    #[test]
+    fn component_with_pins_has_constants_and_roles() {
+        struct PinPart {
+            pins: Vec<Pin>,
+        }
+
+        #[allow(dead_code)]
+        impl PinPart {
+            pub const VDD: PinRef = PinRef("VDD");
+            pub const GND: PinRef = PinRef("GND");
+            pub const IO: PinRef = PinRef("IO");
+
+            pub fn new() -> Self {
+                Self {
+                    pins: vec![
+                        Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                        Pin::build("GND").gnd(),
+                        Pin::build("IO").dio(),
+                        Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                    ],
+                }
+            }
+        }
+
+        impl Component for PinPart {
+            fn pins(&self) -> &[Pin] {
+                &self.pins
+            }
+        }
+
+        let part = PinPart::new();
+        assert_eq!(part.pins().len(), 4);
+        assert_eq!(PinPart::VDD.0, "VDD");
+        assert_eq!(PinPart::GND.0, "GND");
+        assert_eq!(PinPart::IO.0, "IO");
+        assert!(matches!(part.pins()[0].role(), Role::PowerIn));
+        assert!(matches!(part.pins()[1].role(), Role::Gnd));
+        assert!(matches!(part.pins()[2].role(), Role::DigitalIO));
+        assert!(matches!(part.pins()[3].role(), Role::PowerIn));
+        assert_eq!(part.pins()[3].name(), "VDD");
+    }
 }

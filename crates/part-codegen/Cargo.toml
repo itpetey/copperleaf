@@ -1,0 +1,16 @@
+[package]
+name = "copperleaf-part-codegen"
+version.workspace = true
+edition.workspace = true
+description = "TOML-to-Rust generator for Copperleaf component definitions"
+license.workspace = true
+
+[dependencies]
+mustache.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+toml = { workspace = true, features = ["parse"] }
+
+[[bin]]
+name = "copperleaf-part-codegen"
+path = "src/main.rs"

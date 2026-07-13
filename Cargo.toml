@@ -4,6 +4,8 @@ members = [
   "crates/analysis",
   "crates/backend-kicad",
   "crates/model",
+  "crates/part-codegen",
+  "crates/part-macro",
   "parts/passives",
 ]
 
@@ -16,8 +18,14 @@ license = "MPL-2.0"
 clap = { version = "4.6", default-features = false }
 copperleaf-analysis = { path = "crates/analysis", default-features = false }
 copperleaf-model = { path = "crates/model", default-features = false }
-copperleaf-parts = { path = "crates/parts", default-features = false }
+copperleaf-part-codegen = { path = "crates/part-codegen", default-features = false }
+copperleaf-part-macro = { path = "crates/part-macro", default-features = false }
 petgraph = { version = "0.8", default-features = false }
+proc-macro2 = { version = "1.0", default-features = false }
+mustache = { version = "0.9", default-features = false }
+serde = { version = "1.0", default-features = false }
+syn = { version = "2.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-thiserror = { version = "2.0", default-features = false }
+thiserror = { version = "2.0" }
+toml = { version = "0.8", default-features = false }
 uom = { version = "0.38", default-features = false }

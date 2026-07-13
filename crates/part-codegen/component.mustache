@@ -1,0 +1,51 @@
+pub mod {{{module_name}}} {
+    //! {{{title}}}
+    {{#description}}
+    //!
+    //! {{{.}}}
+    {{/description}}
+    //!
+    //! # Pinout
+    //!
+    //! | Pin | Name     | Purpose     | Notes                 |
+    //! |-----|----------|-------------|-----------------------|
+    {{#pins}}
+    //! | {{{row}}} |
+    {{/pins}}
+
+    use copperleaf_model::{Component, Pin, PinRef, Role, units::UnitExt};
+
+    /// {{{struct_doc}}}
+    pub struct {{{struct_name}}} {
+        pins: Vec<Pin>,
+    }
+
+    #[allow(dead_code)]
+    impl {{{struct_name}}} {
+        {{#constants}}
+        pub const {{{name}}}: PinRef = PinRef("{{{pin_name}}}");
+        {{/constants}}
+
+        pub fn new() -> Self {
+            Self {
+                pins: vec![
+                    {{#builders}}
+                    {{{.}}},
+                    {{/builders}}
+                ],
+            }
+        }
+    }
+
+    impl Component for {{{struct_name}}} {
+        fn pins(&self) -> &[Pin] {
+            &self.pins
+        }
+    }
+
+    impl Default for {{{struct_name}}} {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+}
