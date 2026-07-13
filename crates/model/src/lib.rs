@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
+use std::{collections::HashMap, fmt};
 
 use thiserror::Error;
 pub use units::{
@@ -194,17 +194,16 @@ pub struct PinHandle {
 }
 
 /// Handle to an emerging net, returned by [`Board::connect`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct NetHandle {
     edge: usize,
-    overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
 }
 
 /// Top level structure representing the PCB being designed.
 pub struct Board {
     components: Vec<ComponentEntry>,
     connections: Vec<RawConnection>,
-    net_overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
+    net_overrides: Vec<NetOverride>,
     next_edge: usize,
 }
 
@@ -602,23 +601,19 @@ impl ComponentHandle {
     }
 }
 
-impl NetHandle {
-    /// Set an explicit voltage override for this net.
-    pub fn set_voltage(&self, v: Qty<Volt>) {
-        self.overrides
-            .borrow_mut()
-            .entry(self.edge)
-            .or_default()
-            .voltage = Some(v);
+impl Board {
+    /// Set an explicit voltage override for a net returned by [`Board::connect`].
+    pub fn set_net_voltage(&mut self, handle: NetHandle, v: Qty<Volt>) {
+        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+            ov.voltage = Some(v);
+        }
     }
 
-    /// Set an explicit name override for this net.
-    pub fn set_name(&self, name: &str) {
-        self.overrides
-            .borrow_mut()
-            .entry(self.edge)
-            .or_default()
-            .name = Some(name.to_owned());
+    /// Set an explicit name override for a net returned by [`Board::connect`].
+    pub fn set_net_name(&mut self, handle: NetHandle, name: &str) {
+        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+            ov.name = Some(name.to_owned());
+        }
     }
 }
 
@@ -628,7 +623,7 @@ impl Board {
         Self {
             components: Vec::new(),
             connections: Vec::new(),
-            net_overrides: Rc::new(RefCell::new(HashMap::new())),
+            net_overrides: Vec::new(),
             next_edge: 0,
         }
     }
@@ -656,10 +651,8 @@ impl Board {
         let edge = self.next_edge;
         self.next_edge += 1;
         self.connections.push(RawConnection { from, to });
-        Ok(NetHandle {
-            edge,
-            overrides: self.net_overrides.clone(),
-        })
+        self.net_overrides.push(NetOverride::default());
+        Ok(NetHandle { edge })
     }
 
     fn validate_pin(&self, handle: &PinHandle) -> Option<Diagnostic> {
@@ -749,7 +742,7 @@ impl Board {
         }
 
         // Map each representative node to a net name and collect overrides.
-        let overrides = self.net_overrides.borrow();
+        let overrides = &self.net_overrides;
         let mut net_names: HashMap<usize, String> = HashMap::new();
         let mut net_voltages: HashMap<usize, Option<Qty<Volt>>> = HashMap::new();
         let mut errors: Vec<Diagnostic> = Vec::new();
@@ -775,7 +768,7 @@ impl Board {
             let mut explicit_voltage: Option<Qty<Volt>> = None;
             let mut explicit_name: Option<String> = None;
             for eid in &edge_ids {
-                if let Some(ov) = overrides.get(eid) {
+                if let Some(ov) = overrides.get(*eid) {
                     if let Some(v) = ov.voltage {
                         if let Some(existing) = explicit_voltage {
                             if (existing.as_base() - v.as_base()).abs() > 1e-9 {
@@ -876,11 +869,11 @@ impl Board {
                             code: "NET:NO_VOLTAGE_SOURCE".into(),
                             severity: Severity::Error,
                             message: format!(
-                                "power net '{}' has no voltage source; use set_voltage()",
+                                "power net '{}' has no voltage source; use Board::set_net_voltage()",
                                 name
                             ),
                             entities: vec![name.clone()],
-                            hint: Some("call NetHandle::set_voltage()".into()),
+                            hint: Some("call Board::set_net_voltage()".into()),
                         });
                         NetKind::Power {
                             v_nom: 0.0.volt(),
