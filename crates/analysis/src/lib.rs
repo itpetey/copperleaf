@@ -238,7 +238,7 @@ fn connected_pins(board: &CompiledBoard) -> Vec<(&str, &str)> {
 }
 
 fn make_capacitor_component(refdes: &str) -> CompiledComponent {
-    use copperleaf_model::{deterministic_id, PinId, UnitExt};
+    use copperleaf_model::{PinId, UnitExt, deterministic_id};
     let pin1_id = PinId(deterministic_id(&format!("{}:1", refdes)));
     let pin2_id = PinId(deterministic_id(&format!("{}:2", refdes)));
     CompiledComponent {

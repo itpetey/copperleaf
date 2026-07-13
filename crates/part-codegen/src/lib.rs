@@ -34,11 +34,15 @@
 //! | `pwr`       | `v_min`, `v_max`, `i_max`      | `.pwr(v_min.volt(), v_max.volt(), i_max.amp()).pin()` |
 //! | `pwr_fixed` | `v`, `i`                       | `.pwr_fixed(v.volt(), i.amp()).pin()`      |
 
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::HashSet;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use serde::{Deserialize, Serialize};
+
+const DEFAULT_TEMPLATE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/component.mustache");
 
 #[derive(Debug, thiserror::Error)]
 pub enum CodegenError {
@@ -62,15 +66,6 @@ pub enum CodegenError {
     UnknownKind { name: String, kind: String },
     #[error("Template error: {0}")]
     Mustache(#[from] mustache::Error),
-}
-
-const DEFAULT_TEMPLATE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/component.mustache");
-
-#[derive(Debug, Deserialize)]
-struct Manifest {
-    component: ComponentMeta,
-    #[serde(rename = "pin")]
-    pins: Vec<PinDef>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,16 +112,11 @@ struct PinDef {
     i_max: Option<f64>,
 }
 
-#[derive(Serialize)]
-struct TemplateData {
-    title: String,
-    description: Option<String>,
-    struct_doc: String,
-    struct_name: String,
-    module_name: String,
-    pins: Vec<PinRow>,
-    constants: Vec<ConstantRow>,
-    builders: Vec<String>,
+#[derive(Debug, Deserialize)]
+struct Manifest {
+    component: ComponentMeta,
+    #[serde(rename = "pin")]
+    pins: Vec<PinDef>,
 }
 
 #[derive(Serialize)]
@@ -142,6 +132,18 @@ struct PinRow {
 struct ConstantRow {
     name: String,
     pin_name: String,
+}
+
+#[derive(Serialize)]
+struct TemplateData {
+    title: String,
+    description: Option<String>,
+    struct_doc: String,
+    struct_name: String,
+    module_name: String,
+    pins: Vec<PinRow>,
+    constants: Vec<ConstantRow>,
+    builders: Vec<String>,
 }
 
 /// Generate a Rust source file from all `*.toml` files in `definitions_dir`.
@@ -177,112 +179,6 @@ pub fn generate(
 pub fn generate_component_to_string(toml_path: impl AsRef<Path>) -> Result<String, CodegenError> {
     let template = load_template(DEFAULT_TEMPLATE)?;
     render_component_file(toml_path.as_ref(), &template)
-}
-
-fn load_template(path: &str) -> Result<mustache::Template, CodegenError> {
-    let source = fs::read_to_string(path)?;
-    Ok(mustache::compile_str(&source)?)
-}
-
-fn render_component_file(
-    path: &Path,
-    template: &mustache::Template,
-) -> Result<String, CodegenError> {
-    let module_name = module_name(path)?;
-    let source = fs::read_to_string(path)?;
-    let manifest: Manifest = toml::from_str(&source).map_err(|e| CodegenError::Toml {
-        path: path.display().to_string(),
-        source: e,
-    })?;
-    render_component(&module_name, &manifest, template)
-}
-
-fn render_component(
-    module_name: &str,
-    manifest: &Manifest,
-    template: &mustache::Template,
-) -> Result<String, CodegenError> {
-    let struct_name = &manifest.component.name;
-    let title = &manifest.component.title;
-
-    let mut seen: HashSet<&str> = HashSet::new();
-    let mut constants = Vec::new();
-    let mut builders = Vec::new();
-    let mut pin_rows = Vec::new();
-
-    for pin in &manifest.pins {
-        if seen.insert(&pin.name) {
-            constants.push(ConstantRow {
-                name: const_name(&pin.name),
-                pin_name: pin.name.clone(),
-            });
-        }
-        builders.push(builder_expr(pin)?);
-        pin_rows.push(PinRow {
-            num: pin.num,
-            name: pin.name.clone(),
-            purpose: pin.purpose.clone(),
-            notes: pin.notes.clone(),
-            row: format!(
-                "{:<3} | {:<8} | {:<11} | {:<21}",
-                pin.num, pin.name, pin.purpose, pin.notes
-            ),
-        });
-    }
-
-    let data = TemplateData {
-        title: title.clone(),
-        description: manifest.component.description.clone(),
-        struct_doc: manifest
-            .component
-            .description
-            .as_deref()
-            .unwrap_or(title)
-            .to_string(),
-        struct_name: struct_name.clone(),
-        module_name: module_name.to_string(),
-        pins: pin_rows,
-        constants,
-        builders,
-    };
-
-    let mut rendered = Vec::new();
-    template.render(&mut rendered, &data)?;
-    Ok(String::from_utf8(rendered).expect("template produced invalid UTF-8"))
-}
-
-fn module_name(path: &Path) -> Result<String, CodegenError> {
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| CodegenError::InvalidFileName(path.display().to_string()))?;
-    if stem.is_empty() || !stem.chars().next().unwrap().is_ascii_alphabetic() {
-        return Err(CodegenError::InvalidFileName(stem.to_string()));
-    }
-    if !stem.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-        return Err(CodegenError::InvalidFileName(stem.to_string()));
-    }
-    Ok(stem.to_string())
-}
-
-fn const_name(pin_name: &str) -> String {
-    let mut out = String::new();
-    let mut first = true;
-    for ch in pin_name.chars() {
-        if first && ch.is_ascii_digit() {
-            out.push_str("PIN_");
-        }
-        first = false;
-        if ch.is_ascii_alphanumeric() || ch == '_' {
-            out.push(ch);
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        out.push_str("PIN");
-    }
-    out
 }
 
 fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
@@ -350,6 +246,112 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
     }
 }
 
+fn const_name(pin_name: &str) -> String {
+    let mut out = String::new();
+    let mut first = true;
+    for ch in pin_name.chars() {
+        if first && ch.is_ascii_digit() {
+            out.push_str("PIN_");
+        }
+        first = false;
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        out.push_str("PIN");
+    }
+    out
+}
+
 fn fmt_f64(v: f64) -> String {
     format!("{:?}", v)
+}
+
+fn load_template(path: &str) -> Result<mustache::Template, CodegenError> {
+    let source = fs::read_to_string(path)?;
+    Ok(mustache::compile_str(&source)?)
+}
+
+fn module_name(path: &Path) -> Result<String, CodegenError> {
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| CodegenError::InvalidFileName(path.display().to_string()))?;
+    if stem.is_empty() || !stem.chars().next().unwrap().is_ascii_alphabetic() {
+        return Err(CodegenError::InvalidFileName(stem.to_string()));
+    }
+    if !stem.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(CodegenError::InvalidFileName(stem.to_string()));
+    }
+    Ok(stem.to_string())
+}
+
+fn render_component(
+    module_name: &str,
+    manifest: &Manifest,
+    template: &mustache::Template,
+) -> Result<String, CodegenError> {
+    let struct_name = &manifest.component.name;
+    let title = &manifest.component.title;
+
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut constants = Vec::new();
+    let mut builders = Vec::new();
+    let mut pin_rows = Vec::new();
+
+    for pin in &manifest.pins {
+        if seen.insert(&pin.name) {
+            constants.push(ConstantRow {
+                name: const_name(&pin.name),
+                pin_name: pin.name.clone(),
+            });
+        }
+        builders.push(builder_expr(pin)?);
+        pin_rows.push(PinRow {
+            num: pin.num,
+            name: pin.name.clone(),
+            purpose: pin.purpose.clone(),
+            notes: pin.notes.clone(),
+            row: format!(
+                "{:<3} | {:<8} | {:<11} | {:<21}",
+                pin.num, pin.name, pin.purpose, pin.notes
+            ),
+        });
+    }
+
+    let data = TemplateData {
+        title: title.clone(),
+        description: manifest.component.description.clone(),
+        struct_doc: manifest
+            .component
+            .description
+            .as_deref()
+            .unwrap_or(title)
+            .to_string(),
+        struct_name: struct_name.clone(),
+        module_name: module_name.to_string(),
+        pins: pin_rows,
+        constants,
+        builders,
+    };
+
+    let mut rendered = Vec::new();
+    template.render(&mut rendered, &data)?;
+    Ok(String::from_utf8(rendered).expect("template produced invalid UTF-8"))
+}
+
+fn render_component_file(
+    path: &Path,
+    template: &mustache::Template,
+) -> Result<String, CodegenError> {
+    let module_name = module_name(path)?;
+    let source = fs::read_to_string(path)?;
+    let manifest: Manifest = toml::from_str(&source).map_err(|e| CodegenError::Toml {
+        path: path.display().to_string(),
+        source: e,
+    })?;
+    render_component(&module_name, &manifest, template)
 }

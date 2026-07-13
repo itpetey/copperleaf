@@ -3,9 +3,10 @@
 //! `build_component!("definitions/part.toml")` reads a TOML definition at
 //! compile time and expands into a documented Rust module for that component.
 
+use std::{path::PathBuf, str::FromStr};
+
+use copperleaf_part_codegen::generate_component_to_string;
 use proc_macro::TokenStream;
-use std::path::PathBuf;
-use std::str::FromStr as _;
 
 /// Read a component TOML file and emit its generated Rust module.
 ///
@@ -21,7 +22,7 @@ pub fn build_component(input: TokenStream) -> TokenStream {
         .unwrap_or_else(|| std::env::current_dir().expect("failed to get current directory"));
     let path = base.join(lit.value());
 
-    let generated = copperleaf_part_codegen::generate_component_to_string(&path)
+    let generated = generate_component_to_string(&path)
         .unwrap_or_else(|e| panic!("failed to generate component from {}: {e}", path.display()));
 
     proc_macro2::TokenStream::from_str(&generated)
