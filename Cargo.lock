@@ -31,6 +31,7 @@ dependencies = [
 name = "copperleaf-backend-kicad"
 version = "0.1.0"
 dependencies = [
+ "copperleaf-analysis",
  "copperleaf-model",
  "serde_json",
  "tempfile",

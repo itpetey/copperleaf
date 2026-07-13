@@ -1,12 +1,64 @@
 //! Analysis passes for Copperleaf.
 //!
 //! Contains ERC (electrical rule check) helpers and a deterministic
-//! decoupling-capacitor synthesis pass.
+//! decoupling-capacitor synthesis pass, plus the [`analyse`] entry point that
+//! turns a lowered [`CompiledBoard`] into a full [`CompileReport`].
+//!
+//! [`CompiledBoard`]: copperleaf_model::CompiledBoard
+//! [`CompileReport`]: copperleaf_model::CompileReport
 
 use copperleaf_model::{
-    CompiledBoard, CompiledComponent, Constraint, Diagnostic, NetKind, Pin, Role, Severity,
-    SynthCap,
+    CompileError, CompileReport, CompileSummary, CompiledBoard, CompiledComponent, Constraint,
+    Diagnostic, NetInfo, NetKind, Pin, Role, Severity, SynthCap,
 };
+
+/// Run every analysis pass against a lowered [`CompiledBoard`] and assemble
+/// the final [`CompileReport`].
+///
+/// Electrical-rule checks are run first: warnings are always collected, errors
+/// are fatal and short-circuit the pipeline.  Decoupling synthesis only runs
+/// once the board is electrically valid.
+pub fn analyse(board: CompiledBoard) -> Result<CompileReport, CompileError> {
+    let mut warnings: Vec<Diagnostic> = Vec::new();
+    let mut errors: Vec<Diagnostic> = Vec::new();
+
+    warnings.extend(erc_floating_inputs(&board));
+    warnings.extend(erc_floating_power_inputs(&board));
+    errors.extend(erc_overvoltage(&board));
+    errors.extend(erc_nc_pin_connected(&board));
+
+    if !errors.is_empty() {
+        return Err(CompileError::new(errors));
+    }
+
+    // Synthesis only runs when the board is electrically valid.
+    let (synth_components, synth_caps, synth_diags) = synthesise_decoupling(&board);
+    warnings.extend(synth_diags);
+
+    let CompiledBoard {
+        components,
+        nets,
+        connections,
+        constraints,
+    } = board;
+    let mut final_components = components;
+    final_components.extend(synth_components);
+
+    let final_board = CompiledBoard {
+        components: final_components,
+        nets,
+        connections,
+        constraints,
+    };
+
+    let summary = build_summary(&final_board, synth_caps);
+
+    Ok(CompileReport {
+        board: final_board,
+        warnings,
+        summary,
+    })
+}
 
 /// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
 pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
@@ -127,7 +179,7 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
 }
 
 /// Synthesise decoupling capacitors from part-level [`Constraint::Decoupling`] rules.
-pub fn synthesize_decoupling(
+pub fn synthesise_decoupling(
     board: &CompiledBoard,
 ) -> (Vec<CompiledComponent>, Vec<SynthCap>, Vec<Diagnostic>) {
     let mut components = Vec::new();
@@ -257,6 +309,29 @@ fn make_capacitor_component(refdes: &str) -> CompiledComponent {
     }
 }
 
+/// Build the [`CompileSummary`] from the final [`CompiledBoard`] and the
+/// decoupling capacitors synthesised during the pipeline.
+fn build_summary(board: &CompiledBoard, synth_caps: Vec<SynthCap>) -> CompileSummary {
+    CompileSummary {
+        nets: board
+            .nets
+            .iter()
+            .map(|n| NetInfo {
+                name: n.name.clone(),
+                kind: n.kind.clone(),
+                pin_count: board
+                    .connections
+                    .iter()
+                    .filter(|c| c.net.0 == n.name)
+                    .count(),
+            })
+            .collect(),
+        caps_synthesised: synth_caps,
+        pin_count: board.components.iter().map(|c| c.pins.len()).sum(),
+        component_count: board.components.len(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn synthesizes_decoupling_caps() {
+    fn synthesises_decoupling_caps() {
         let board = CompiledBoard {
             components: vec![make_comp(
                 "U1",
@@ -332,7 +407,7 @@ mod tests {
             }],
             constraints: vec![],
         };
-        let (comps, caps, diags) = synthesize_decoupling(&board);
+        let (comps, caps, diags) = synthesise_decoupling(&board);
         assert_eq!(caps.len(), 2);
         assert_eq!(caps[0].refdes, "C1");
         assert_eq!(caps[0].net, "V3V3");

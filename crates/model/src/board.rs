@@ -2,14 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     Component,
-    compiled::{
-        CompileError, CompileReport, CompileSummary, CompiledBoard, CompiledComponent, Connection,
-        NetInfo,
-    },
-    erc::{erc_floating_inputs, erc_floating_power_inputs, erc_nc_pin_connected, erc_overvoltage},
+    compiled::{CompileError, CompiledBoard, CompiledComponent, Connection},
     net::{Constraint, Net, NetHandle, NetId, NetKind},
     pin::{Pin, PinHandle, PinId, PinRef, RawConnection, Role, SigSpec},
-    synthesis::synthesize_decoupling,
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
     util::{UnionFind, deterministic_id},
 };
@@ -134,9 +129,14 @@ impl Board {
         None
     }
 
-    /// Compiles this board design into an electronically correct model for export via
-    /// any [`Backend`](crate::Backend).
-    pub fn compile(self) -> Result<CompileReport, CompileError> {
+    /// Lowers this board design into a validated [`CompiledBoard`] ready for
+    /// export via any [`Backend`](crate::Backend).
+    ///
+    /// This performs net grouping, name/voltage resolution and net
+    /// classification only.  Electrical-rule checks and synthesis passes live
+    /// in [`copperleaf_analysis::analyse`] and must be run separately to obtain
+    /// a full [`CompileReport`](crate::CompileReport).
+    pub fn compile(self) -> Result<CompiledBoard, CompileError> {
         self.validate_connections()?;
 
         let compiled = compile_components(&self.components);
@@ -166,41 +166,15 @@ impl Board {
             .flat_map(|c| c.constraints.clone())
             .collect();
 
-        let board = CompiledBoard {
-            components: compiled,
-            nets,
-            connections,
-            constraints,
-        };
-
-        // Run ERC checks (warnings are always collected; errors are fatal).
-        let (mut warnings, erc_errors) = run_erc(&board, &self.connections);
-        errors.extend(erc_errors);
-
         if !errors.is_empty() {
             return Err(CompileError::new(errors));
         }
 
-        // Synthesis only runs when the board is electrically valid.
-        let (synth_components, synth_caps, synth_diags) = synthesize_decoupling(&board);
-        warnings.extend(synth_diags);
-
-        let mut final_components = board.components;
-        final_components.extend(synth_components);
-
-        let final_board = CompiledBoard {
-            components: final_components,
-            nets: board.nets,
-            connections: board.connections,
-            constraints: board.constraints,
-        };
-
-        let summary = build_summary(&final_board, synth_caps);
-
-        Ok(CompileReport {
-            board: final_board,
-            warnings,
-            summary,
+        Ok(CompiledBoard {
+            components: compiled,
+            nets,
+            connections,
+            constraints,
         })
     }
 
@@ -328,30 +302,6 @@ fn build_nets_and_connections(
     }
 
     (nets, connections)
-}
-
-fn build_summary(
-    board: &CompiledBoard,
-    synth_caps: Vec<crate::compiled::SynthCap>,
-) -> CompileSummary {
-    CompileSummary {
-        nets: board
-            .nets
-            .iter()
-            .map(|n| NetInfo {
-                name: n.name.clone(),
-                kind: n.kind.clone(),
-                pin_count: board
-                    .connections
-                    .iter()
-                    .filter(|c| c.net.0 == n.name)
-                    .count(),
-            })
-            .collect(),
-        caps_synthesised: synth_caps,
-        pin_count: board.components.iter().map(|c| c.pins.len()).sum(),
-        component_count: board.components.len(),
-    }
 }
 
 /// Determine whether a net is power or signal and assign its [`NetKind`].
@@ -558,20 +508,4 @@ fn resolve_net_overrides(
     }
 
     (net_names, net_voltages)
-}
-
-/// Run all electrical-rule checks.  Returns `(warnings, errors)`.
-fn run_erc(
-    board: &CompiledBoard,
-    connections: &[RawConnection],
-) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-
-    warnings.extend(erc_floating_inputs(board, connections));
-    warnings.extend(erc_floating_power_inputs(board, connections));
-    errors.extend(erc_overvoltage(board));
-    errors.extend(erc_nc_pin_connected(board, connections));
-
-    (warnings, errors)
 }

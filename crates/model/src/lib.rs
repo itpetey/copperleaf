@@ -13,10 +13,8 @@ pub use util::deterministic_id;
 
 pub mod board;
 pub mod compiled;
-pub(crate) mod erc;
 pub mod net;
 pub mod pin;
-pub mod synthesis;
 pub mod units;
 pub(crate) mod util;
 
@@ -169,16 +167,16 @@ mod tests {
         let mut board = Board::new();
         let u1 = board.add("U1", TwoPins);
         let _ = board.connect(u1.pin(TwoPins::A), u1.pin(TwoPins::B));
-        let report = board.compile().unwrap();
-        assert_eq!(report.board.nets.len(), 1);
+        let compiled = board.compile().unwrap();
+        assert_eq!(compiled.nets.len(), 1);
     }
 
     #[test]
     fn empty_board_compiles() {
         let board = Board::new();
-        let report = board.compile().unwrap();
-        assert_eq!(report.board.components.len(), 0);
-        assert_eq!(report.board.nets.len(), 0);
+        let compiled = board.compile().unwrap();
+        assert_eq!(compiled.components.len(), 0);
+        assert_eq!(compiled.nets.len(), 0);
     }
 
     #[test]

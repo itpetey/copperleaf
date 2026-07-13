@@ -11,4 +11,5 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+copperleaf-analysis.workspace = true
 tempfile = "3.10"
