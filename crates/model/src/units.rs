@@ -1,12 +1,7 @@
-//! Core types for Copperleaf.
-//!
-//! This crate exposes strongly-typed quantities backed by `uom`, basic
-//! diagnostic types, and simple identifier newtypes. These building blocks are
-//! re-exported by the `copperleaf` facade crate for downstream use.
+//! Measurement units for Copperleaf.
 
 use std::marker::PhantomData;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use uom::{
     si::electric_potential::volt, si::electrical_resistance::ohm, si::f64 as uq,
     si::inductance::henry, si::length::meter, si::thermodynamic_temperature::degree_celsius,
@@ -37,8 +32,12 @@ pub trait UnitExt {
     fn sec(self) -> Qty<Second>;
     /// Construct a temperature in degrees Celsius.
     fn celsius(self) -> Qty<Celsius>;
-    /// Construct a period from a frequency in megahertz (returns seconds per cycle).
-    fn mhz(self) -> Qty<Second>;
+    /// Construct a period from a frequency in hertz.
+    fn hz(self) -> Qty<Hertz>;
+    /// Construct a period from a frequency in kilohertz.
+    fn khz(self) -> Qty<Hertz>;
+    /// Construct a period from a frequency in megahertz.
+    fn mhz(self) -> Qty<Hertz>;
     /// Construct a capacitance in nanofarads.
     fn nf(self) -> Qty<Farad>;
     /// Construct a capacitance in microfarads.
@@ -71,6 +70,10 @@ pub struct Amp;
 #[derive(Clone, Copy, Debug)]
 pub struct Ohm;
 
+/// Cycles per second (hertz)
+#[derive(Clone, Copy, Debug)]
+pub struct Hertz;
+
 /// Capacitance (farads)
 #[derive(Clone, Copy, Debug)]
 pub struct Farad;
@@ -98,7 +101,7 @@ pub struct Celsius;
 pub struct Qty<U: UnitMarker>(pub U::Q, pub PhantomData<U>);
 
 /// Diagnostic severity for analysis and verification messages.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
     Info,
     Warning,
@@ -106,7 +109,7 @@ pub enum Severity {
 }
 
 /// A structured diagnostic produced by analysis or backends.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Diagnostic {
     /// Short stable code, e.g. `ERC:OVERVOLT`.
     pub code: String,
@@ -119,23 +122,6 @@ pub struct Diagnostic {
     /// Optional hint with a suggested fix.
     pub hint: Option<String>,
 }
-
-// Stable IDs (string newtypes for now)
-/// Identifier for a component instance (e.g., `U1`).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ComponentId(pub String);
-
-/// Identifier for a net name.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct NetId(pub String);
-
-/// Identifier for a specific pin on a component.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PinId(pub String);
-
-/// Identifier for a constraint instance.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ConstraintId(pub String);
 
 impl UnitMarker for Volt {
     type Q = uq::ElectricPotential;
@@ -167,6 +153,17 @@ impl UnitMarker for Ohm {
     }
     fn from_base(v: f64) -> Self::Q {
         uq::ElectricalResistance::new::<ohm>(v)
+    }
+}
+
+impl UnitMarker for Hertz {
+    type Q = uq::Frequency;
+    const LABEL: &'static str = "Hz";
+    fn to_base(q: &Self::Q) -> f64 {
+        q.value
+    }
+    fn from_base(v: f64) -> Self::Q {
+        uq::Frequency::new::<uom::si::frequency::hertz>(v)
     }
 }
 
@@ -239,33 +236,33 @@ impl Qty<Second> {
     }
 }
 
-impl<U: UnitMarker> Serialize for Qty<U> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        #[derive(Serialize)]
-        struct Helper<'a> {
-            value: f64,
-            unit: &'a str,
-        }
-        let h = Helper {
-            value: self.as_base(),
-            unit: U::LABEL,
-        };
-        h.serialize(serializer)
-    }
-}
+// impl<U: UnitMarker> Serialize for Qty<U> {
+//     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+//         #[derive(Serialize)]
+//         struct Helper<'a> {
+//             value: f64,
+//             unit: &'a str,
+//         }
+//         let h = Helper {
+//             value: self.as_base(),
+//             unit: U::LABEL,
+//         };
+//         h.serialize(serializer)
+//     }
+// }
 
-impl<'de, U: UnitMarker> Deserialize<'de> for Qty<U> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Helper {
-            value: f64,
-            _unit: Option<String>,
-        }
-        let h = Helper::deserialize(deserializer)?;
-        let q = U::from_base(h.value);
-        Ok(Qty(q, PhantomData))
-    }
-}
+// impl<'de, U: UnitMarker> Deserialize<'de> for Qty<U> {
+//     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+//         #[derive(Deserialize)]
+//         struct Helper {
+//             value: f64,
+//             _unit: Option<String>,
+//         }
+//         let h = Helper::deserialize(deserializer)?;
+//         let q = U::from_base(h.value);
+//         Ok(Qty(q, PhantomData))
+//     }
+// }
 
 impl UnitExt for f64 {
     fn volt(self) -> Qty<Volt> {
@@ -301,10 +298,14 @@ impl UnitExt for f64 {
     fn celsius(self) -> Qty<Celsius> {
         Qty(Celsius::from_base(self), PhantomData)
     }
-    fn mhz(self) -> Qty<Second> {
-        // period in seconds
-        let hz = self * 1.0e6;
-        Qty(Second::from_base(1.0 / hz), PhantomData)
+    fn hz(self) -> Qty<Hertz> {
+        Qty(Hertz::from_base(self), PhantomData)
+    }
+    fn khz(self) -> Qty<Hertz> {
+        Qty(Hertz::from_base(self * 1.0e3), PhantomData)
+    }
+    fn mhz(self) -> Qty<Hertz> {
+        Qty(Hertz::from_base(self * 1.0e6), PhantomData)
     }
     fn nf(self) -> Qty<Farad> {
         Qty(Farad::from_base(self * 1.0e-9), PhantomData)
@@ -317,15 +318,5 @@ impl UnitExt for f64 {
     }
     fn henry(self) -> Qty<Henry> {
         Qty(Henry::from_base(self), PhantomData)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn as_mhz_converts_period_to_frequency() {
-        assert!((50.0.mhz().as_mhz() - 50.0).abs() < 1e-9);
     }
 }

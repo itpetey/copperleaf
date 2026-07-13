@@ -2,9 +2,8 @@
 name = "copperleaf-parts"
 version.workspace = true
 edition.workspace = true
-description = "Parts library (initial Buck/MCU)"
+description = "Generic electronics components"
 license.workspace = true
 
 [dependencies]
-copperleaf-core.workspace = true
-copperleaf-ir.workspace = true
+copperleaf-model.workspace = true

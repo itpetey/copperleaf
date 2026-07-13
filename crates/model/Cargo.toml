@@ -1,0 +1,11 @@
+[package]
+name = "copperleaf-model"
+version.workspace = true
+edition.workspace = true
+description = "Domain model for electronics components"
+license.workspace = true
+
+[dependencies]
+petgraph.workspace = true
+uom = { workspace = true, features = ["f64", "si"] }
+uuid = { workspace = true, features = ["v4"] }
