@@ -29,6 +29,9 @@ pub struct Board {
     connections: UnGraph<PinId, ()>,
 }
 
+/// An immutable structure representing a finished [`Board`] that is ready for export
+pub struct CompiledBoard;
+
 #[derive(Clone, Debug)]
 pub struct Pin {
     id: PinId,
@@ -108,6 +111,16 @@ impl Board {
         let from = from.into();
         let to = to.into();
 
+        todo!()
+    }
+
+    /// Compiles this board design into an electronically correct model for export via
+    /// any [`Backend`]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the board fails ERC validation.
+    pub fn compile(self) -> Result<CompiledBoard, ()> {
         todo!()
     }
 }
