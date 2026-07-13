@@ -89,8 +89,6 @@ pub(crate) struct RawConnection {
     pub(crate) to: PinHandle,
 }
 
-// --- SigSpec impl ---
-
 impl SigSpec {
     pub fn new(
         kind: SigKind,
@@ -147,8 +145,6 @@ impl SigSpec {
     }
 }
 
-// --- Pin impl ---
-
 impl Pin {
     /// Start building a new [`Pin`].
     pub fn build(name: &str) -> PinBuilder {
@@ -188,8 +184,6 @@ impl Pin {
         self.length
     }
 }
-
-// --- PinBuilder impl ---
 
 impl PinBuilder {
     fn new(name: &str) -> Self {

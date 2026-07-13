@@ -1,8 +1,10 @@
-use crate::compiled::{CompiledBoard, CompiledComponent, SynthCap};
-use crate::net::Constraint;
-use crate::pin::{Pin, PinId, Role};
-use crate::units::{Diagnostic, Severity, UnitExt};
-use crate::util::deterministic_id;
+use crate::{
+    compiled::{CompiledBoard, CompiledComponent, SynthCap},
+    net::Constraint,
+    pin::{Pin, PinId, Role},
+    units::{Diagnostic, Severity, UnitExt},
+    util::deterministic_id,
+};
 
 pub(crate) fn synthesize_decoupling(
     board: &CompiledBoard,

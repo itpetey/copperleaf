@@ -1,6 +1,8 @@
-use crate::compiled::CompiledBoard;
-use crate::pin::{RawConnection, Role};
-use crate::units::{Diagnostic, Severity};
+use crate::{
+    compiled::CompiledBoard,
+    pin::{RawConnection, Role},
+    units::{Diagnostic, Severity},
+};
 
 pub(crate) fn erc_floating_inputs(
     board: &CompiledBoard,
@@ -44,7 +46,8 @@ pub(crate) fn erc_floating_power_inputs(
                     severity: Severity::Warning,
                     message: format!(
                         "Power input pin {}.{} is unconnected",
-                        comp.refdes, pin.name()
+                        comp.refdes,
+                        pin.name()
                     ),
                     entities: vec![format!("{}.{}", comp.refdes, pin.name())],
                     hint: Some("Connect the pin to a power net".into()),
@@ -107,10 +110,7 @@ pub(crate) fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
                             v_nom.as_base(),
                             net.name
                         ),
-                        entities: vec![
-                            format!("{}.{}", comp.refdes, pin.name()),
-                            net.name.clone()
-                        ],
+                        entities: vec![format!("{}.{}", comp.refdes, pin.name()), net.name.clone()],
                         hint: Some("Use a level shifter or different pin".into()),
                     });
                 }

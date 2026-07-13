@@ -2,9 +2,12 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::net::{Constraint, Net, NetKind};
-use crate::pin::Pin;
-use crate::units::Diagnostic;
+use crate::{
+    net::NetId,
+    net::{Constraint, Net, NetKind},
+    pin::Pin,
+    units::Diagnostic,
+};
 
 #[derive(Clone, Debug)]
 pub struct CompiledComponent {
@@ -21,8 +24,6 @@ pub struct Connection {
     pub pin: String,
     pub net: NetId,
 }
-
-use crate::net::NetId;
 
 /// An immutable structure representing a finished [`Board`](crate::Board) that is ready for export.
 #[derive(Clone, Debug)]

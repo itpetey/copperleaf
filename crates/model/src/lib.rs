@@ -1,16 +1,3 @@
-pub use units::{
-    Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
-};
-
-pub mod board;
-pub mod compiled;
-pub mod net;
-pub mod pin;
-pub mod synthesis;
-pub mod units;
-pub(crate) mod erc;
-pub(crate) mod util;
-
 // Re-export all public types at crate root for backward compatibility.
 pub use board::{Board, ComponentHandle};
 pub use compiled::{
@@ -19,7 +6,19 @@ pub use compiled::{
 };
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
 pub use pin::{Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec};
+pub use units::{
+    Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
+};
 pub use util::deterministic_id;
+
+pub mod board;
+pub mod compiled;
+pub(crate) mod erc;
+pub mod net;
+pub mod pin;
+pub mod synthesis;
+pub mod units;
+pub(crate) mod util;
 
 /// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
 pub trait Backend {

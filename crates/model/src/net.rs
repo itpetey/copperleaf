@@ -1,5 +1,8 @@
-use crate::pin::SigSpec;
-use crate::units::{Farad, Meter, Ohm, Qty, UnitExt, Volt};
+use crate::{
+    pin::SigSpec,
+    units::Celsius,
+    units::{Farad, Meter, Ohm, Qty, UnitExt, Volt},
+};
 
 /// Identifier for a net name.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -54,8 +57,6 @@ pub enum Constraint {
         temp: Qty<Celsius>,
     },
 }
-
-use crate::units::Celsius;
 
 #[derive(Clone, Debug)]
 pub struct Net {
