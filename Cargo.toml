@@ -4,7 +4,7 @@ members = [
   "crates/analysis",
   "crates/backend-kicad",
   "crates/model",
-  "crates/parts",
+  "parts/passives",
 ]
 
 [workspace.package]

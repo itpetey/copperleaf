@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "copperleaf-parts"
+name = "copperleaf-part-passives"
 version = "0.1.0"
 dependencies = [
  "copperleaf-model",

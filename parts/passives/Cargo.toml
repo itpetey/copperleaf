@@ -1,8 +1,8 @@
 [package]
-name = "copperleaf-parts"
+name = "copperleaf-part-passives"
 version.workspace = true
 edition.workspace = true
-description = "Generic electronics components"
+description = "Passive electronics components"
 license.workspace = true
 
 [dependencies]
