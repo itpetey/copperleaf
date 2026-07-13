@@ -1,12 +1,11 @@
 [package]
-name = "copperleaf-model"
+name = "copperleaf-analysis"
 version.workspace = true
 edition.workspace = true
-description = "Domain model for electronics components"
+description = "ERC and synthesis analysis passes"
 license.workspace = true
 
 [dependencies]
-petgraph.workspace = true
+copperleaf-model.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-uom = { workspace = true, features = ["f64", "si"] }

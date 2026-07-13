@@ -1,8 +1,11 @@
 [workspace]
-members = [
-  "crates/model","crates/parts"
-]
 resolver = "2"
+members = [
+  "crates/analysis",
+  "crates/backend-kicad",
+  "crates/model",
+  "crates/parts",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,7 +14,10 @@ license = "MPL-2.0"
 
 [workspace.dependencies]
 clap = { version = "4.6", default-features = false }
-petgraph = { version = "0.8", default-features = false }
-uom = { version = "0.38", default-features = false }
-uuid = { version = "1.23", default-features = false }
+copperleaf-analysis = { path = "crates/analysis", default-features = false }
 copperleaf-model = { path = "crates/model", default-features = false }
+copperleaf-parts = { path = "crates/parts", default-features = false }
+petgraph = { version = "0.8", default-features = false }
+serde = { version = "1.0", default-features = false }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+uom = { version = "0.38", default-features = false }
