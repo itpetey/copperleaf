@@ -25,11 +25,7 @@ The `Board` struct SHALL be the mutable, in-progress design. It SHALL store comp
 - **AND** the original `Board` is no longer usable (consumed by `compile()`)
 
 ### Requirement: CompiledBoard is the immutable verified artifact
-The `CompiledBoard` struct SHALL be immutable and contain all resolved data: components (original + synthesised) with deterministic refdes, inferred nets with properties, resolved connections, and all constraints. It SHALL implement `Serialize` and `Deserialize` for derived inspection views.
-
-#### Scenario: CompiledBoard is serialisable
-- **WHEN** a `CompiledBoard` is serialised to JSON via `serde_json::to_string()`
-- **THEN** the JSON contains all components, nets, connections, and constraints
+The `CompiledBoard` struct SHALL be immutable and contain all resolved data: components (original + synthesised) with deterministic refdes, inferred nets with properties, resolved connections, and all constraints.
 
 #### Scenario: CompiledBoard carries synthesised components
 - **WHEN** a board with a component requiring decoupling is compiled

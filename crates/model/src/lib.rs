@@ -1,7 +1,5 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use serde::{Deserialize, Serialize};
-
 use thiserror::Error;
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
@@ -47,15 +45,15 @@ pub trait Component {
 }
 
 /// Identifier for a specific pin on a component.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PinId(pub String);
 
 /// Identifier for a net name.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NetId(pub String);
 
 /// Electrical role of a pin used to infer ERC rules and routing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
     PowerIn,
     PowerOut,
@@ -68,7 +66,7 @@ pub enum Role {
 }
 
 /// Absolute electrical limits and nominal voltage for a pin.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug)]
 pub struct PowerSpec {
     pub v_min: Qty<Volt>,
     pub v_max: Qty<Volt>,
@@ -77,7 +75,7 @@ pub struct PowerSpec {
 }
 
 /// Classifies a signal family and integrity expectations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SigKind {
     Generic,
     Usb2Hs,
@@ -89,7 +87,7 @@ pub enum SigKind {
 }
 
 /// Signal integrity specification for a net or pin.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug)]
 pub struct SigSpec {
     pub kind: SigKind,
     pub bandwidth: Option<Qty<Hertz>>,
@@ -98,7 +96,7 @@ pub struct SigSpec {
 }
 
 /// A logical pin on a component footprint.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Pin {
     id: PinId,
     name: String,
@@ -122,7 +120,7 @@ pub struct PinBuilder {
     length: Option<f64>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum NetKind {
     Power {
         v_nom: Qty<Volt>,
@@ -133,13 +131,13 @@ pub enum NetKind {
     },
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub struct NetClass {
     pub min_width: Option<Qty<Meter>>,
     pub clearance: Option<Qty<Meter>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum Constraint {
     Impedance {
         target: Qty<Ohm>,
@@ -172,7 +170,7 @@ pub enum Constraint {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Net {
     pub name: String,
     pub kind: NetKind,
@@ -227,7 +225,7 @@ struct RawConnection {
     to: PinHandle,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CompiledComponent {
     pub refdes: String,
     pub pins: Vec<Pin>,
@@ -236,7 +234,7 @@ pub struct CompiledComponent {
     pub footprint: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Connection {
     pub component: usize,
     pub pin: String,
@@ -244,7 +242,7 @@ pub struct Connection {
 }
 
 /// An immutable structure representing a finished [`Board`] that is ready for export.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CompiledBoard {
     pub components: Vec<CompiledComponent>,
     pub nets: Vec<Net>,
@@ -252,14 +250,14 @@ pub struct CompiledBoard {
     pub constraints: Vec<Constraint>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct NetInfo {
     pub name: String,
     pub kind: NetKind,
     pub pin_count: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct SynthCap {
     pub refdes: String,
     pub value: Qty<Farad>,
@@ -268,7 +266,7 @@ pub struct SynthCap {
     pub source_pin: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CompileSummary {
     pub nets: Vec<NetInfo>,
     pub caps_synthesised: Vec<SynthCap>,
@@ -276,14 +274,14 @@ pub struct CompileSummary {
     pub component_count: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CompileReport {
     pub board: CompiledBoard,
     pub warnings: Vec<Diagnostic>,
     pub summary: CompileSummary,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Error)]
+#[derive(Clone, Debug, Error)]
 pub struct CompileError {
     pub errors: Vec<Diagnostic>,
 }

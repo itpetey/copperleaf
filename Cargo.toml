@@ -18,7 +18,6 @@ copperleaf-analysis = { path = "crates/analysis", default-features = false }
 copperleaf-model = { path = "crates/model", default-features = false }
 copperleaf-parts = { path = "crates/parts", default-features = false }
 petgraph = { version = "0.8", default-features = false }
-serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 thiserror = { version = "2.0", default-features = false }
 uom = { version = "0.38", default-features = false }
