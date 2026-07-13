@@ -4,8 +4,10 @@ use std::collections::HashMap;
 
 use copperleaf_model::{CompiledBoard, CompiledComponent, NetKind, Pin};
 
-use crate::common::{format_float, refdes_prefix, role_to_pin_type};
-use crate::sexpr::{Sexpr, deterministic_uuid, kv};
+use crate::{
+    common::{format_float, refdes_prefix, role_to_pin_type},
+    sexpr::{Sexpr, deterministic_uuid, kv},
+};
 
 /// Emit a minimal structurally-valid KiCad 10 schematic.
 pub fn emit_schematic(board: &CompiledBoard) -> String {
@@ -68,72 +70,42 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
     format!("{}\n", sch)
 }
 
-fn title_block_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("title_block"),
-        kv("title", ""),
-        kv("company", ""),
-        kv("rev", ""),
-        kv("date", ""),
-    ])
-}
-
-fn lib_symbols_node(board: &CompiledBoard) -> Sexpr {
-    let symbols: Vec<_> = board
-        .components
+fn is_power_net(board: &CompiledBoard, net_name: &str) -> bool {
+    board
+        .nets
         .iter()
-        .map(lib_symbol_for_component)
-        .collect();
-    Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
+        .any(|n| n.name == net_name && matches!(n.kind, NetKind::Power { .. }))
 }
 
-fn lib_symbol_for_component(comp: &CompiledComponent) -> Sexpr {
-    let fallback = format!("copperleaf:{}", comp.refdes);
-    let symbol_name = comp.symbol.as_deref().unwrap_or(&fallback);
-    let fp_default = comp.footprint.as_deref().unwrap_or("");
-    let mut body = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(symbol_name),
+fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("label"),
+        Sexpr::str(name),
         Sexpr::list([
-            Sexpr::atom("pin_names"),
-            Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("0"),
         ]),
-        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        lib_property_node("Reference", "U", false),
-        lib_property_node("Value", "Box", false),
-        lib_property_node("Footprint", fp_default, true),
-        lib_property_node("Datasheet", "", true),
         Sexpr::list([
-            Sexpr::atom("symbol"),
-            Sexpr::str(format!("{}_0_1", comp.refdes)),
+            Sexpr::atom("effects"),
             Sexpr::list([
-                Sexpr::atom("rectangle"),
+                Sexpr::atom("font"),
                 Sexpr::list([
-                    Sexpr::atom("start"),
-                    Sexpr::atom("-5.08"),
-                    Sexpr::atom("-5.08"),
-                ]),
-                Sexpr::list([Sexpr::atom("end"), Sexpr::atom("5.08"), Sexpr::atom("5.08")]),
-                Sexpr::list([
-                    Sexpr::atom("stroke"),
-                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("fill"),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("none")]),
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.27"),
+                    Sexpr::atom("1.27"),
                 ]),
             ]),
         ]),
-    ];
-
-    for (i, pin) in comp.pins.iter().enumerate() {
-        body.push(lib_pin_node(pin, i, comp.pins.len()));
-    }
-
-    Sexpr::list(body)
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(&format!(
+                "sch:label:{}:{:.2}:{:.2}",
+                name, x, y
+            ))),
+        ]),
+    ])
 }
 
 fn lib_pin_node(pin: &Pin, index: usize, total_pins: usize) -> Sexpr {
@@ -216,6 +188,162 @@ fn lib_property_node(key: &str, value: &str, hide: bool) -> Sexpr {
     ])
 }
 
+fn lib_symbol_for_component(comp: &CompiledComponent) -> Sexpr {
+    let fallback = format!("copperleaf:{}", comp.refdes);
+    let symbol_name = comp.symbol.as_deref().unwrap_or(&fallback);
+    let fp_default = comp.footprint.as_deref().unwrap_or("");
+    let mut body = vec![
+        Sexpr::atom("symbol"),
+        Sexpr::str(symbol_name),
+        Sexpr::list([
+            Sexpr::atom("pin_names"),
+            Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
+        ]),
+        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        lib_property_node("Reference", "U", false),
+        lib_property_node("Value", "Box", false),
+        lib_property_node("Footprint", fp_default, true),
+        lib_property_node("Datasheet", "", true),
+        Sexpr::list([
+            Sexpr::atom("symbol"),
+            Sexpr::str(format!("{}_0_1", comp.refdes)),
+            Sexpr::list([
+                Sexpr::atom("rectangle"),
+                Sexpr::list([
+                    Sexpr::atom("start"),
+                    Sexpr::atom("-5.08"),
+                    Sexpr::atom("-5.08"),
+                ]),
+                Sexpr::list([Sexpr::atom("end"), Sexpr::atom("5.08"), Sexpr::atom("5.08")]),
+                Sexpr::list([
+                    Sexpr::atom("stroke"),
+                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("fill"),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("none")]),
+                ]),
+            ]),
+        ]),
+    ];
+
+    for (i, pin) in comp.pins.iter().enumerate() {
+        body.push(lib_pin_node(pin, i, comp.pins.len()));
+    }
+
+    Sexpr::list(body)
+}
+
+fn lib_symbols_node(board: &CompiledBoard) -> Sexpr {
+    let symbols: Vec<_> = board
+        .components
+        .iter()
+        .map(lib_symbol_for_component)
+        .collect();
+    Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
+}
+
+fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexpr> {
+    if (from.0 - to.0).abs() < 0.01 {
+        vec![wire_seg(from, to, net_name)]
+    } else if (from.1 - to.1).abs() < 0.01 {
+        vec![wire_seg(from, to, net_name)]
+    } else {
+        let corner = (to.0, from.1);
+        vec![
+            wire_seg(from, corner, net_name),
+            wire_seg(corner, to, net_name),
+        ]
+    }
+}
+
+fn pin_tip_and_label(
+    board: &CompiledBoard,
+    conn: &copperleaf_model::Connection,
+) -> Option<((f64, f64), f64)> {
+    let comp = board.components.get(conn.component)?;
+    let pin = comp.pins.iter().find(|p| p.name() == conn.pin)?;
+    let (sym_x, sym_y) = symbol_position(conn.component);
+    let (tip_x, tip_y) = match pin.pos() {
+        Some((px, py)) => (sym_x + px, sym_y - py),
+        None => {
+            let y_off = pin_y_offset(
+                comp.pins
+                    .iter()
+                    .position(|p| p.name() == pin.name())
+                    .unwrap_or(0),
+                comp.pins.len(),
+            );
+            (sym_x + 7.62, sym_y + y_off)
+        }
+    };
+    let rotation = pin.rotation().unwrap_or(180.0);
+    Some(((tip_x, tip_y), rotation))
+}
+
+fn pin_y_offset(index: usize, total_pins: usize) -> f64 {
+    if total_pins <= 1 {
+        0.0
+    } else {
+        let spacing = 2.54;
+        let total_height = (total_pins as f64 - 1.0) * spacing;
+        -total_height / 2.0 + index as f64 * spacing
+    }
+}
+
+fn property_node(key: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
+    let mut children = vec![
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(x, 2)),
+            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom("0"),
+        ]),
+    ];
+    if hide {
+        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    children.push(Sexpr::list([
+        Sexpr::atom("effects"),
+        Sexpr::list([
+            Sexpr::atom("font"),
+            Sexpr::list([
+                Sexpr::atom("size"),
+                Sexpr::atom("1.27"),
+                Sexpr::atom("1.27"),
+            ]),
+        ]),
+    ]));
+    Sexpr::list(children)
+}
+
+fn sheet_instances_node() -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("sheet_instances"),
+        Sexpr::list([
+            Sexpr::atom("path"),
+            Sexpr::str("/"),
+            Sexpr::list([Sexpr::atom("page"), Sexpr::str("1")]),
+        ]),
+    ])
+}
+
+fn stub_end((tip_x, tip_y): (f64, f64), rotation: f64) -> (f64, f64) {
+    let len = 2.54;
+    match rotation.round() as i32 {
+        0 => (tip_x - len, tip_y),
+        90 => (tip_x, tip_y + len),
+        180 => (tip_x + len, tip_y),
+        _ => (tip_x, tip_y - len),
+    }
+}
+
 fn symbol_instance_node(idx: usize, comp: &CompiledComponent) -> Sexpr {
     let (x, y) = symbol_position(idx);
     let fallback = format!("copperleaf:{}", comp.refdes);
@@ -278,45 +406,6 @@ fn symbol_instance_node(idx: usize, comp: &CompiledComponent) -> Sexpr {
     )
 }
 
-fn property_node(key: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
-    let mut children = vec![
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom("0"),
-        ]),
-    ];
-    if hide {
-        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    children.push(Sexpr::list([
-        Sexpr::atom("effects"),
-        Sexpr::list([
-            Sexpr::atom("font"),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.27"),
-                Sexpr::atom("1.27"),
-            ]),
-        ]),
-    ]));
-    Sexpr::list(children)
-}
-
-fn pin_y_offset(index: usize, total_pins: usize) -> f64 {
-    if total_pins <= 1 {
-        0.0
-    } else {
-        let spacing = 2.54;
-        let total_height = (total_pins as f64 - 1.0) * spacing;
-        -total_height / 2.0 + index as f64 * spacing
-    }
-}
-
 fn symbol_position(idx: usize) -> (f64, f64) {
     const GRID: f64 = 25.4;
     let x = GRID + (idx as f64 % 10.0) * GRID;
@@ -324,101 +413,14 @@ fn symbol_position(idx: usize) -> (f64, f64) {
     (x, y)
 }
 
-fn sheet_instances_node() -> Sexpr {
+fn title_block_node() -> Sexpr {
     Sexpr::list([
-        Sexpr::atom("sheet_instances"),
-        Sexpr::list([
-            Sexpr::atom("path"),
-            Sexpr::str("/"),
-            Sexpr::list([Sexpr::atom("page"), Sexpr::str("1")]),
-        ]),
+        Sexpr::atom("title_block"),
+        kv("title", ""),
+        kv("company", ""),
+        kv("rev", ""),
+        kv("date", ""),
     ])
-}
-
-fn pin_tip_and_label(
-    board: &CompiledBoard,
-    conn: &copperleaf_model::Connection,
-) -> Option<((f64, f64), f64)> {
-    let comp = board.components.get(conn.component)?;
-    let pin = comp.pins.iter().find(|p| p.name() == conn.pin)?;
-    let (sym_x, sym_y) = symbol_position(conn.component);
-    let (tip_x, tip_y) = match pin.pos() {
-        Some((px, py)) => (sym_x + px, sym_y - py),
-        None => {
-            let y_off = pin_y_offset(
-                comp.pins
-                    .iter()
-                    .position(|p| p.name() == pin.name())
-                    .unwrap_or(0),
-                comp.pins.len(),
-            );
-            (sym_x + 7.62, sym_y + y_off)
-        }
-    };
-    let rotation = pin.rotation().unwrap_or(180.0);
-    Some(((tip_x, tip_y), rotation))
-}
-
-fn stub_end((tip_x, tip_y): (f64, f64), rotation: f64) -> (f64, f64) {
-    let len = 2.54;
-    match rotation.round() as i32 {
-        0 => (tip_x - len, tip_y),
-        90 => (tip_x, tip_y + len),
-        180 => (tip_x + len, tip_y),
-        _ => (tip_x, tip_y - len),
-    }
-}
-
-fn is_power_net(board: &CompiledBoard, net_name: &str) -> bool {
-    board
-        .nets
-        .iter()
-        .any(|n| n.name == net_name && matches!(n.kind, NetKind::Power { .. }))
-}
-
-fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("label"),
-        Sexpr::str(name),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("effects"),
-            Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("1.27"),
-                    Sexpr::atom("1.27"),
-                ]),
-            ]),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!(
-                "sch:label:{}:{:.2}:{:.2}",
-                name, x, y
-            ))),
-        ]),
-    ])
-}
-
-fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexpr> {
-    if (from.0 - to.0).abs() < 0.01 {
-        vec![wire_seg(from, to, net_name)]
-    } else if (from.1 - to.1).abs() < 0.01 {
-        vec![wire_seg(from, to, net_name)]
-    } else {
-        let corner = (to.0, from.1);
-        vec![
-            wire_seg(from, corner, net_name),
-            wire_seg(corner, to, net_name),
-        ]
-    }
 }
 
 fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {

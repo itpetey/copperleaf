@@ -61,6 +61,32 @@ pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
     diags
 }
 
+/// ERC rule: flag NC pins that are connected to a net.
+pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
+    let connected = connected_pins(board);
+    let mut diags = Vec::new();
+    for comp in &board.components {
+        for pin in &comp.pins {
+            if pin.name() == "NC" || pin.name().starts_with("NC_") {
+                if connected.contains(&(comp.refdes.as_str(), pin.name())) {
+                    diags.push(Diagnostic {
+                        code: "ERC:NC_CONNECTED".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "NC pin {}.{} is connected to a net",
+                            comp.refdes,
+                            pin.name()
+                        ),
+                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+                        hint: Some("Leave no-connect pins unconnected".into()),
+                    });
+                }
+            }
+        }
+    }
+    diags
+}
+
 /// ERC rule: flag PowerIn pins connected to a net with voltage exceeding v_max.
 pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
@@ -95,32 +121,6 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-    diags
-}
-
-/// ERC rule: flag NC pins that are connected to a net.
-pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
-    let connected = connected_pins(board);
-    let mut diags = Vec::new();
-    for comp in &board.components {
-        for pin in &comp.pins {
-            if pin.name() == "NC" || pin.name().starts_with("NC_") {
-                if connected.contains(&(comp.refdes.as_str(), pin.name())) {
-                    diags.push(Diagnostic {
-                        code: "ERC:NC_CONNECTED".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "NC pin {}.{} is connected to a net",
-                            comp.refdes,
-                            pin.name()
-                        ),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-                        hint: Some("Leave no-connect pins unconnected".into()),
-                    });
                 }
             }
         }
@@ -220,6 +220,25 @@ pub fn synthesize_decoupling(
     (components, caps, diagnostics)
 }
 
+fn component_index(refdes: &str, board: &CompiledBoard) -> usize {
+    board
+        .components
+        .iter()
+        .position(|c| c.refdes == refdes)
+        .unwrap_or(usize::MAX)
+}
+
+fn connected_pins(board: &CompiledBoard) -> Vec<(&str, &str)> {
+    board
+        .connections
+        .iter()
+        .map(|c| {
+            let comp = &board.components[c.component];
+            (comp.refdes.as_str(), c.pin.as_str())
+        })
+        .collect()
+}
+
 fn make_capacitor_component(refdes: &str) -> CompiledComponent {
     use copperleaf_model::{PinId, UnitExt, deterministic_id};
     let pin1_id = PinId(deterministic_id(&format!("{}:1", refdes)));
@@ -238,25 +257,6 @@ fn make_capacitor_component(refdes: &str) -> CompiledComponent {
         symbol: None,
         footprint: None,
     }
-}
-
-fn connected_pins(board: &CompiledBoard) -> Vec<(&str, &str)> {
-    board
-        .connections
-        .iter()
-        .map(|c| {
-            let comp = &board.components[c.component];
-            (comp.refdes.as_str(), c.pin.as_str())
-        })
-        .collect()
-}
-
-fn component_index(refdes: &str, board: &CompiledBoard) -> usize {
-    board
-        .components
-        .iter()
-        .position(|c| c.refdes == refdes)
-        .unwrap_or(usize::MAX)
 }
 
 #[cfg(test)]

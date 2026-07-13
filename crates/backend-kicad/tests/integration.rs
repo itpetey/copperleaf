@@ -9,6 +9,14 @@ struct PwrSource {
     pins: Vec<Pin>,
 }
 
+struct Load {
+    pins: Vec<Pin>,
+}
+
+struct DecoupledPart {
+    pins: Vec<Pin>,
+}
+
 impl PwrSource {
     const VCC: PinRef = PinRef("VCC");
     fn new(v: f64) -> Self {
@@ -22,10 +30,6 @@ impl Component for PwrSource {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
-}
-
-struct Load {
-    pins: Vec<Pin>,
 }
 
 impl Load {
@@ -45,10 +49,6 @@ impl Component for Load {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
-}
-
-struct DecoupledPart {
-    pins: Vec<Pin>,
 }
 
 impl DecoupledPart {
@@ -86,39 +86,20 @@ fn build_two_component_board(
 }
 
 #[test]
-fn valid_board_compiles_and_emits() {
-    let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = board.compile().expect("valid board should compile");
-
-    let dir = tempfile::tempdir().unwrap();
-    let backend = KiCad::new().with_project_name("test");
-    backend
-        .emit(dir.path().to_str().unwrap(), &report.board)
+fn decoupling_caps_appear_in_summary() {
+    let mut board = Board::new();
+    let src = board.add("SRC", PwrSource::new(3.3));
+    let part = board.add("U1", DecoupledPart::new());
+    board
+        .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
         .unwrap();
 
-    let names: Vec<_> = fs::read_dir(dir.path())
-        .unwrap()
-        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
-        .collect();
-    assert!(names.contains(&"test.kicad_sch".to_string()));
-    assert!(names.contains(&"test.net".to_string()));
-}
-
-#[test]
-fn emitted_schematic_contains_lib_id_and_pin_positions() {
-    let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = board.compile().unwrap();
-
-    let dir = tempfile::tempdir().unwrap();
-    KiCad::new()
-        .with_project_name("test")
-        .emit(dir.path().to_str().unwrap(), &report.board)
-        .unwrap();
-
-    let sch = fs::read_to_string(dir.path().join("test.kicad_sch")).unwrap();
-    assert!(sch.contains("(lib_id \"copperleaf:SRC\")"));
-    assert!(sch.contains("(lib_id \"copperleaf:U1\")"));
-    assert!(sch.contains("(pin power_in line"));
+    let report = board.compile().expect("decoupling board should compile");
+    assert_eq!(report.summary.caps_synthesised.len(), 1);
+    assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
+    assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-18);
+    assert_eq!(report.summary.caps_synthesised[0].source_component, "U1");
+    assert_eq!(report.summary.caps_synthesised[0].source_pin, "VDD");
 }
 
 #[test]
@@ -141,6 +122,23 @@ fn emitted_netlist_contains_components_and_nets() {
 }
 
 #[test]
+fn emitted_schematic_contains_lib_id_and_pin_positions() {
+    let (board, _, _) = build_two_component_board(3.3, 3.6);
+    let report = board.compile().unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    KiCad::new()
+        .with_project_name("test")
+        .emit(dir.path().to_str().unwrap(), &report.board)
+        .unwrap();
+
+    let sch = fs::read_to_string(dir.path().join("test.kicad_sch")).unwrap();
+    assert!(sch.contains("(lib_id \"copperleaf:SRC\")"));
+    assert!(sch.contains("(lib_id \"copperleaf:U1\")"));
+    assert!(sch.contains("(pin power_in line"));
+}
+
+#[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
     let err = board.compile().expect_err("overvoltage should fail");
@@ -148,18 +146,20 @@ fn overvoltage_produces_compile_error() {
 }
 
 #[test]
-fn decoupling_caps_appear_in_summary() {
-    let mut board = Board::new();
-    let src = board.add("SRC", PwrSource::new(3.3));
-    let part = board.add("U1", DecoupledPart::new());
-    board
-        .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
+fn valid_board_compiles_and_emits() {
+    let (board, _, _) = build_two_component_board(3.3, 3.6);
+    let report = board.compile().expect("valid board should compile");
+
+    let dir = tempfile::tempdir().unwrap();
+    let backend = KiCad::new().with_project_name("test");
+    backend
+        .emit(dir.path().to_str().unwrap(), &report.board)
         .unwrap();
 
-    let report = board.compile().expect("decoupling board should compile");
-    assert_eq!(report.summary.caps_synthesised.len(), 1);
-    assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
-    assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-18);
-    assert_eq!(report.summary.caps_synthesised[0].source_component, "U1");
-    assert_eq!(report.summary.caps_synthesised[0].source_pin, "VDD");
+    let names: Vec<_> = fs::read_dir(dir.path())
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect();
+    assert!(names.contains(&"test.kicad_sch".to_string()));
+    assert!(names.contains(&"test.net".to_string()));
 }

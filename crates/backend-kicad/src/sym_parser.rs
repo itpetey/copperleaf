@@ -28,6 +28,80 @@ pub fn find_symbol<'a>(symbols: &'a [SymbolDef], lib_id: &str) -> Option<&'a Sym
     symbols.iter().find(|s| s.lib_id == name)
 }
 
+pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
+    let Sexpr::List(mut children) = sym.raw.clone() else {
+        return sym.raw.clone();
+    };
+
+    let parent_name = match &sym.extends {
+        Some(name) => name.split(':').next_back().unwrap_or(name).to_string(),
+        None => return sym.raw.clone(),
+    };
+    let Some(parent) = symbols.iter().find(|s| s.lib_id == parent_name) else {
+        return sym.raw.clone();
+    };
+
+    children.retain(|child| match child {
+        Sexpr::List(parts) if parts.len() >= 2 => match &parts[0] {
+            Sexpr::Atom(key) => key != "extends",
+            _ => true,
+        },
+        _ => true,
+    });
+
+    let child_prefix = format!("{}_", sym.lib_id);
+    let parent_prefix = format!("{}_", parent_name);
+    if let Sexpr::List(parent_children) = &parent.raw {
+        for pchild in &parent_children[2..] {
+            let include = match pchild {
+                Sexpr::List(parts) if parts.len() >= 2 => match &parts[0] {
+                    Sexpr::Atom(key) if key == "symbol" => true,
+                    Sexpr::Atom(key)
+                        if matches!(
+                            key.as_str(),
+                            "polyline" | "rectangle" | "circle" | "arc" | "pin"
+                        ) =>
+                    {
+                        true
+                    }
+                    _ => false,
+                },
+                _ => false,
+            };
+            if !include {
+                continue;
+            }
+            let renamed = match pchild {
+                Sexpr::List(parts)
+                    if parts.len() >= 2
+                        && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") =>
+                {
+                    if let Sexpr::Atom(name) = &parts[1] {
+                        let name_unquoted = name.trim_matches('"');
+                        if let Some(rest) = name_unquoted.strip_prefix(&parent_prefix) {
+                            let new_name = format!("{}{}", child_prefix, rest);
+                            let mut new_parts = parts.clone();
+                            new_parts[1] = Sexpr::str(&new_name);
+                            Sexpr::List(new_parts)
+                        } else {
+                            pchild.clone()
+                        }
+                    } else {
+                        pchild.clone()
+                    }
+                }
+                _ => pchild.clone(),
+            };
+            if !children.contains(&renamed) {
+                children.push(renamed);
+            }
+        }
+    }
+
+    children = merge_conversions(children, &child_prefix);
+    Sexpr::List(children)
+}
+
 pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
     let sexpr = parse(input)?;
     let Sexpr::List(nodes) = &sexpr else {
@@ -69,6 +143,63 @@ fn collect_pins_and_footprint(
             collect_pins_and_footprint(&children[2..], pins, footprint);
         }
     }
+}
+
+fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
+    let mut result = Vec::with_capacity(children.len());
+    let mut unit_groups: std::collections::HashMap<i64, Vec<(i64, Vec<Sexpr>)>> =
+        std::collections::HashMap::new();
+
+    for child in children {
+        if let Sexpr::List(parts) = &child {
+            if parts.len() >= 2 && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") {
+                if let Sexpr::Atom(name) = &parts[1] {
+                    let name_unquoted = name.trim_matches('"');
+                    if let Some(rest) = name_unquoted.strip_prefix(child_prefix) {
+                        let mut split = rest.rsplitn(3, '_');
+                        let convert_str = split.next();
+                        let unit_str = split.next();
+                        if let (Some(c), Some(u)) = (convert_str, unit_str) {
+                            if let (Ok(unit), Ok(convert)) = (u.parse::<i64>(), c.parse::<i64>()) {
+                                if unit > 0 {
+                                    let inner = parts[2..].to_vec();
+                                    unit_groups.entry(unit).or_default().push((convert, inner));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        result.push(child);
+    }
+
+    for (unit, mut conversions) in unit_groups {
+        if conversions.len() <= 1 {
+            let (convert, inner) = conversions.into_iter().next().unwrap();
+            let name = format!("{}{}_{}", child_prefix, unit, convert);
+            let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
+            parts.extend(inner);
+            result.push(Sexpr::List(parts));
+            continue;
+        }
+        conversions.sort_by_key(|(c, _)| *c);
+        let mut merged_inner: Vec<Sexpr> = Vec::new();
+        for (_convert, inner) in conversions {
+            for item in inner {
+                if !merged_inner.contains(&item) {
+                    merged_inner.push(item);
+                }
+            }
+        }
+        let name = format!("{}{}_1", child_prefix, unit);
+        let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
+        parts.extend(merged_inner);
+        result.push(Sexpr::List(parts));
+    }
+
+    result
 }
 
 fn parse_footprint_property(node: &Sexpr) -> Option<String> {
@@ -254,137 +385,6 @@ fn resolve_extends(symbols: &mut Vec<SymbolDef>) {
         let mut visited = std::collections::HashSet::new();
         resolve_one(i, symbols, &by_name, &mut resolved, &mut visited);
     }
-}
-
-pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
-    let Sexpr::List(mut children) = sym.raw.clone() else {
-        return sym.raw.clone();
-    };
-
-    let parent_name = match &sym.extends {
-        Some(name) => name.split(':').next_back().unwrap_or(name).to_string(),
-        None => return sym.raw.clone(),
-    };
-    let Some(parent) = symbols.iter().find(|s| s.lib_id == parent_name) else {
-        return sym.raw.clone();
-    };
-
-    children.retain(|child| match child {
-        Sexpr::List(parts) if parts.len() >= 2 => match &parts[0] {
-            Sexpr::Atom(key) => key != "extends",
-            _ => true,
-        },
-        _ => true,
-    });
-
-    let child_prefix = format!("{}_", sym.lib_id);
-    let parent_prefix = format!("{}_", parent_name);
-    if let Sexpr::List(parent_children) = &parent.raw {
-        for pchild in &parent_children[2..] {
-            let include = match pchild {
-                Sexpr::List(parts) if parts.len() >= 2 => match &parts[0] {
-                    Sexpr::Atom(key) if key == "symbol" => true,
-                    Sexpr::Atom(key)
-                        if matches!(
-                            key.as_str(),
-                            "polyline" | "rectangle" | "circle" | "arc" | "pin"
-                        ) =>
-                    {
-                        true
-                    }
-                    _ => false,
-                },
-                _ => false,
-            };
-            if !include {
-                continue;
-            }
-            let renamed = match pchild {
-                Sexpr::List(parts)
-                    if parts.len() >= 2
-                        && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") =>
-                {
-                    if let Sexpr::Atom(name) = &parts[1] {
-                        let name_unquoted = name.trim_matches('"');
-                        if let Some(rest) = name_unquoted.strip_prefix(&parent_prefix) {
-                            let new_name = format!("{}{}", child_prefix, rest);
-                            let mut new_parts = parts.clone();
-                            new_parts[1] = Sexpr::str(&new_name);
-                            Sexpr::List(new_parts)
-                        } else {
-                            pchild.clone()
-                        }
-                    } else {
-                        pchild.clone()
-                    }
-                }
-                _ => pchild.clone(),
-            };
-            if !children.contains(&renamed) {
-                children.push(renamed);
-            }
-        }
-    }
-
-    children = merge_conversions(children, &child_prefix);
-    Sexpr::List(children)
-}
-
-fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
-    let mut result = Vec::with_capacity(children.len());
-    let mut unit_groups: std::collections::HashMap<i64, Vec<(i64, Vec<Sexpr>)>> =
-        std::collections::HashMap::new();
-
-    for child in children {
-        if let Sexpr::List(parts) = &child {
-            if parts.len() >= 2 && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") {
-                if let Sexpr::Atom(name) = &parts[1] {
-                    let name_unquoted = name.trim_matches('"');
-                    if let Some(rest) = name_unquoted.strip_prefix(child_prefix) {
-                        let mut split = rest.rsplitn(3, '_');
-                        let convert_str = split.next();
-                        let unit_str = split.next();
-                        if let (Some(c), Some(u)) = (convert_str, unit_str) {
-                            if let (Ok(unit), Ok(convert)) = (u.parse::<i64>(), c.parse::<i64>()) {
-                                if unit > 0 {
-                                    let inner = parts[2..].to_vec();
-                                    unit_groups.entry(unit).or_default().push((convert, inner));
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        result.push(child);
-    }
-
-    for (unit, mut conversions) in unit_groups {
-        if conversions.len() <= 1 {
-            let (convert, inner) = conversions.into_iter().next().unwrap();
-            let name = format!("{}{}_{}", child_prefix, unit, convert);
-            let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
-            parts.extend(inner);
-            result.push(Sexpr::List(parts));
-            continue;
-        }
-        conversions.sort_by_key(|(c, _)| *c);
-        let mut merged_inner: Vec<Sexpr> = Vec::new();
-        for (_convert, inner) in conversions {
-            for item in inner {
-                if !merged_inner.contains(&item) {
-                    merged_inner.push(item);
-                }
-            }
-        }
-        let name = format!("{}{}_1", child_prefix, unit);
-        let mut parts = vec![Sexpr::atom("symbol"), Sexpr::str(&name)];
-        parts.extend(merged_inner);
-        result.push(Sexpr::List(parts));
-    }
-
-    result
 }
 
 fn string_value(expr: &Sexpr) -> String {

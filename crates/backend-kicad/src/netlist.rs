@@ -2,8 +2,10 @@
 
 use copperleaf_model::CompiledBoard;
 
-use crate::common::{build_net_codes, refdes_prefix, role_to_pintype};
-use crate::sexpr::{Sexpr, kv};
+use crate::{
+    common::{build_net_codes, refdes_prefix, role_to_pintype},
+    sexpr::{Sexpr, kv},
+};
 
 /// Emit a KiCad S-expression netlist for the given compiled board.
 pub fn emit_netlist(board: &CompiledBoard) -> String {
@@ -16,6 +18,21 @@ pub fn emit_netlist(board: &CompiledBoard) -> String {
     ];
     let export = Sexpr::list(std::iter::once(Sexpr::atom("export")).chain(children));
     format!("{}\n", export)
+}
+
+fn components_node(board: &CompiledBoard) -> Sexpr {
+    let comps: Vec<_> = board
+        .components
+        .iter()
+        .map(|c| {
+            Sexpr::list([
+                Sexpr::atom("comp"),
+                kv("ref", &c.refdes),
+                kv("value", &refdes_prefix(&c.refdes)),
+            ])
+        })
+        .collect();
+    Sexpr::list(std::iter::once(Sexpr::atom("components")).chain(comps))
 }
 
 fn design_node() -> Sexpr {
@@ -36,21 +53,6 @@ fn design_node() -> Sexpr {
             kv("tstamps", "/"),
         ]),
     ])
-}
-
-fn components_node(board: &CompiledBoard) -> Sexpr {
-    let comps: Vec<_> = board
-        .components
-        .iter()
-        .map(|c| {
-            Sexpr::list([
-                Sexpr::atom("comp"),
-                kv("ref", &c.refdes),
-                kv("value", &refdes_prefix(&c.refdes)),
-            ])
-        })
-        .collect();
-    Sexpr::list(std::iter::once(Sexpr::atom("components")).chain(comps))
 }
 
 fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {

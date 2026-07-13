@@ -10,10 +10,12 @@
     clippy::ptr_arg
 )]
 
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use copperleaf_model::{Backend, BackendError, CompiledBoard};
+
+pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
+pub use sym_parser::{PinDef, SymbolDef, find_symbol, flatten_extends, parse_symbol_lib};
 
 pub mod common;
 pub mod netlist;
@@ -22,9 +24,6 @@ pub mod project;
 pub mod schematic;
 pub mod sexpr;
 pub mod sym_parser;
-
-pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
-pub use sym_parser::{PinDef, SymbolDef, find_symbol, flatten_extends, parse_symbol_lib};
 
 /// KiCad backend configuration.
 #[derive(Clone, Debug, Default)]

@@ -1,61 +1,49 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fmt;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use serde::{Deserialize, Serialize};
-
-pub mod units;
 
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
 
-// ---------------------------------------------------------------------------
-// Deterministic IDs
-// ---------------------------------------------------------------------------
+pub mod units;
 
-/// Deterministic UUID-formatted string (8-4-4-4-12 hex) derived from `seed`.
-pub fn deterministic_id(seed: &str) -> String {
-    let h1 = fnv1a_64(seed, 0);
-    let h2 = fnv1a_64(seed, 0x6c14_4f3a_7af5_c5d2); // arbitrary fixed salt
-    let b1 = h1.to_be_bytes();
-    let b2 = h2.to_be_bytes();
-    format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        b1[0],
-        b1[1],
-        b1[2],
-        b1[3],
-        b1[4],
-        b1[5],
-        b1[6],
-        b1[7],
-        b2[0],
-        b2[1],
-        b2[2],
-        b2[3],
-        b2[4],
-        b2[5],
-        b2[6],
-        b2[7]
-    )
+/// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
+pub trait Backend {
+    type Error;
+    fn emit(&self, output_dir: &str, board: &CompiledBoard) -> Result<(), Self::Error>;
 }
 
-fn fnv1a_64(seed: &str, salt: u64) -> u64 {
-    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-    let mut hash = FNV_OFFSET ^ salt;
-    for b in seed.bytes() {
-        hash ^= b as u64;
-        hash = hash.wrapping_mul(FNV_PRIME);
+/// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
+pub trait Component {
+    /// Retrieves all [`Pin`]s attached to the [`Component`].
+    fn pins(&self) -> &[Pin];
+
+    /// Retrieves a [`Pin`] from this [`Component`] by ID, if it exists.
+    fn pin(&self, id: PinId) -> Option<&Pin> {
+        self.pins().iter().find(|p| *p.id() == id)
     }
-    hash
-}
 
-// ---------------------------------------------------------------------------
-// Identifiers
-// ---------------------------------------------------------------------------
+    /// Retrieves a [`Pin`] by its name from this [`Component`], if it exists.
+    fn pin_name(&self, name: &str) -> Option<&Pin> {
+        self.pins().iter().find(|p| p.name() == name)
+    }
+
+    /// Constraints declared by this component for synthesis and analysis.
+    fn constraints(&self) -> Vec<Constraint> {
+        vec![]
+    }
+
+    /// Embedded symbol S-expression, if any.
+    fn symbol(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// Embedded footprint S-expression, if any.
+    fn footprint(&self) -> Option<&'static str> {
+        None
+    }
+}
 
 /// Identifier for a specific pin on a component.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -64,10 +52,6 @@ pub struct PinId(pub String);
 /// Identifier for a net name.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NetId(pub String);
-
-// ---------------------------------------------------------------------------
-// Roles
-// ---------------------------------------------------------------------------
 
 /// Electrical role of a pin used to infer ERC rules and routing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -82,10 +66,6 @@ pub enum Role {
     Gnd,
 }
 
-// ---------------------------------------------------------------------------
-// PowerSpec
-// ---------------------------------------------------------------------------
-
 /// Absolute electrical limits and nominal voltage for a pin.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PowerSpec {
@@ -95,9 +75,26 @@ pub struct PowerSpec {
     pub i_max: Qty<Amp>,
 }
 
-// ---------------------------------------------------------------------------
-// Pin and PinBuilder
-// ---------------------------------------------------------------------------
+/// Classifies a signal family and integrity expectations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SigKind {
+    Generic,
+    Usb2Hs,
+    Usb3,
+    Ddr3,
+    PcieGen2,
+    Clock,
+    AnalogLowNoise,
+}
+
+/// Signal integrity specification for a net or pin.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct SigSpec {
+    pub kind: SigKind,
+    pub bandwidth: Option<Qty<Hertz>>,
+    pub edge_rate: Option<Qty<Second>>,
+    pub target_impedance: Option<Qty<Ohm>>,
+}
 
 /// A logical pin on a component footprint.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -122,6 +119,239 @@ pub struct PinBuilder {
     pos: Option<(f64, f64)>,
     rotation: Option<f64>,
     length: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum NetKind {
+    Power {
+        v_nom: Qty<Volt>,
+        ripple: Option<Qty<Volt>>,
+    },
+    Signal {
+        spec: SigSpec,
+    },
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct NetClass {
+    pub min_width: Option<Qty<Meter>>,
+    pub clearance: Option<Qty<Meter>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Constraint {
+    Impedance {
+        target: Qty<Ohm>,
+        tol_pct: f64,
+    },
+    LengthMatch {
+        group: String,
+        skew_ps: f64,
+    },
+    ReturnPath {
+        requires_plane: bool,
+    },
+    NetClass {
+        min_width: Qty<Meter>,
+        clearance: Qty<Meter>,
+    },
+    Creepage {
+        min: Qty<Meter>,
+        voltage: Qty<Volt>,
+    },
+    Decoupling {
+        values: Vec<Qty<Farad>>,
+        per_pin: bool,
+    },
+    ResonanceIndex {
+        max: f64,
+    },
+    MaxJunction {
+        temp: Qty<Celsius>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Net {
+    pub name: String,
+    pub kind: NetKind,
+    pub class: NetClass,
+    pub constraints: Vec<Constraint>,
+}
+
+/// Typed reference to a pin name constant on a component.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PinRef(pub &'static str);
+
+/// Handle to a component instance on a [`Board`].
+#[derive(Clone, Copy, Debug)]
+pub struct ComponentHandle(pub usize);
+
+/// Handle to a specific pin on a specific component instance.
+#[derive(Clone, Copy, Debug)]
+pub struct PinHandle {
+    pub component: usize,
+    pub pin: &'static str,
+}
+
+/// Handle to an emerging net, returned by [`Board::connect`].
+#[derive(Clone, Debug)]
+pub struct NetHandle {
+    edge: usize,
+    overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
+}
+
+/// Top level structure representing the PCB being designed.
+pub struct Board {
+    components: Vec<ComponentEntry>,
+    connections: Vec<RawConnection>,
+    net_overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
+    next_edge: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+struct NetOverride {
+    voltage: Option<Qty<Volt>>,
+    name: Option<String>,
+}
+
+struct ComponentEntry {
+    name: String,
+    component: Box<dyn Component>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RawConnection {
+    from: PinHandle,
+    to: PinHandle,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompiledComponent {
+    pub refdes: String,
+    pub pins: Vec<Pin>,
+    pub constraints: Vec<Constraint>,
+    pub symbol: Option<String>,
+    pub footprint: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Connection {
+    pub component: usize,
+    pub pin: String,
+    pub net: NetId,
+}
+
+/// An immutable structure representing a finished [`Board`] that is ready for export.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompiledBoard {
+    pub components: Vec<CompiledComponent>,
+    pub nets: Vec<Net>,
+    pub connections: Vec<Connection>,
+    pub constraints: Vec<Constraint>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NetInfo {
+    pub name: String,
+    pub kind: NetKind,
+    pub pin_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SynthCap {
+    pub refdes: String,
+    pub value: Qty<Farad>,
+    pub net: String,
+    pub source_component: String,
+    pub source_pin: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompileSummary {
+    pub nets: Vec<NetInfo>,
+    pub caps_synthesised: Vec<SynthCap>,
+    pub pin_count: usize,
+    pub component_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompileReport {
+    pub board: CompiledBoard,
+    pub warnings: Vec<Diagnostic>,
+    pub summary: CompileSummary,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompileError {
+    pub errors: Vec<Diagnostic>,
+}
+
+/// Common backend errors.
+#[derive(Debug)]
+pub enum BackendError {
+    IoError(std::io::Error),
+    EmitError(String),
+}
+
+struct UnionFind {
+    parent: Vec<usize>,
+}
+
+impl SigSpec {
+    pub fn new(
+        kind: SigKind,
+        bandwidth: Option<Qty<Hertz>>,
+        edge_rate: Option<Qty<Second>>,
+        target_impedance: Option<Qty<Ohm>>,
+    ) -> Self {
+        Self {
+            kind,
+            bandwidth,
+            edge_rate,
+            target_impedance,
+        }
+    }
+
+    /// Generic SPI signal with the given bandwidth in MHz and 50 Ω target impedance.
+    pub fn spi(bw_mhz: f64) -> Self {
+        Self {
+            kind: SigKind::Generic,
+            bandwidth: Some(bw_mhz.mhz()),
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
+
+    /// SPI clock signal with the given bandwidth in MHz and 50 Ω target impedance.
+    pub fn spi_clk(bw_mhz: f64) -> Self {
+        Self {
+            kind: SigKind::Clock,
+            bandwidth: Some(bw_mhz.mhz()),
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
+
+    /// Generic control signal with no bandwidth or impedance target.
+    pub fn control() -> Self {
+        Self {
+            kind: SigKind::Generic,
+            bandwidth: None,
+            edge_rate: None,
+            target_impedance: None,
+        }
+    }
+
+    /// Analog low-noise 50 Ω signal (e.g., RF).
+    pub fn rf_50ohm() -> Self {
+        Self {
+            kind: SigKind::AnalogLowNoise,
+            bandwidth: None,
+            edge_rate: None,
+            target_impedance: Some(50.0.ohm()),
+        }
+    }
 }
 
 impl Pin {
@@ -330,116 +560,6 @@ impl PinBuilder {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Signal specifications
-// ---------------------------------------------------------------------------
-
-/// Classifies a signal family and integrity expectations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SigKind {
-    Generic,
-    Usb2Hs,
-    Usb3,
-    Ddr3,
-    PcieGen2,
-    Clock,
-    AnalogLowNoise,
-}
-
-/// Signal integrity specification for a net or pin.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct SigSpec {
-    pub kind: SigKind,
-    pub bandwidth: Option<Qty<Hertz>>,
-    pub edge_rate: Option<Qty<Second>>,
-    pub target_impedance: Option<Qty<Ohm>>,
-}
-
-impl SigSpec {
-    pub fn new(
-        kind: SigKind,
-        bandwidth: Option<Qty<Hertz>>,
-        edge_rate: Option<Qty<Second>>,
-        target_impedance: Option<Qty<Ohm>>,
-    ) -> Self {
-        Self {
-            kind,
-            bandwidth,
-            edge_rate,
-            target_impedance,
-        }
-    }
-
-    /// Generic SPI signal with the given bandwidth in MHz and 50 Ω target impedance.
-    pub fn spi(bw_mhz: f64) -> Self {
-        Self {
-            kind: SigKind::Generic,
-            bandwidth: Some(bw_mhz.mhz()),
-            edge_rate: None,
-            target_impedance: Some(50.0.ohm()),
-        }
-    }
-
-    /// SPI clock signal with the given bandwidth in MHz and 50 Ω target impedance.
-    pub fn spi_clk(bw_mhz: f64) -> Self {
-        Self {
-            kind: SigKind::Clock,
-            bandwidth: Some(bw_mhz.mhz()),
-            edge_rate: None,
-            target_impedance: Some(50.0.ohm()),
-        }
-    }
-
-    /// Generic control signal with no bandwidth or impedance target.
-    pub fn control() -> Self {
-        Self {
-            kind: SigKind::Generic,
-            bandwidth: None,
-            edge_rate: None,
-            target_impedance: None,
-        }
-    }
-
-    /// Analog low-noise 50 Ω signal (e.g., RF).
-    pub fn rf_50ohm() -> Self {
-        Self {
-            kind: SigKind::AnalogLowNoise,
-            bandwidth: None,
-            edge_rate: None,
-            target_impedance: Some(50.0.ohm()),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Net kinds, classes, and nets
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum NetKind {
-    Power {
-        v_nom: Qty<Volt>,
-        ripple: Option<Qty<Volt>>,
-    },
-    Signal {
-        spec: SigSpec,
-    },
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct NetClass {
-    pub min_width: Option<Qty<Meter>>,
-    pub clearance: Option<Qty<Meter>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Net {
-    pub name: String,
-    pub kind: NetKind,
-    pub class: NetClass,
-    pub constraints: Vec<Constraint>,
-}
-
 impl Net {
     /// Create a power net with nominal voltage.
     pub fn power(name: &str, v_nom: Qty<Volt>) -> Self {
@@ -471,86 +591,6 @@ impl Net {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Constraints
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Constraint {
-    Impedance {
-        target: Qty<Ohm>,
-        tol_pct: f64,
-    },
-    LengthMatch {
-        group: String,
-        skew_ps: f64,
-    },
-    ReturnPath {
-        requires_plane: bool,
-    },
-    NetClass {
-        min_width: Qty<Meter>,
-        clearance: Qty<Meter>,
-    },
-    Creepage {
-        min: Qty<Meter>,
-        voltage: Qty<Volt>,
-    },
-    Decoupling {
-        values: Vec<Qty<Farad>>,
-        per_pin: bool,
-    },
-    ResonanceIndex {
-        max: f64,
-    },
-    MaxJunction {
-        temp: Qty<Celsius>,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Component trait and typed handles
-// ---------------------------------------------------------------------------
-
-/// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
-pub trait Component {
-    /// Retrieves all [`Pin`]s attached to the [`Component`].
-    fn pins(&self) -> &[Pin];
-
-    /// Retrieves a [`Pin`] from this [`Component`] by ID, if it exists.
-    fn pin(&self, id: PinId) -> Option<&Pin> {
-        self.pins().iter().find(|p| *p.id() == id)
-    }
-
-    /// Retrieves a [`Pin`] by its name from this [`Component`], if it exists.
-    fn pin_name(&self, name: &str) -> Option<&Pin> {
-        self.pins().iter().find(|p| p.name() == name)
-    }
-
-    /// Constraints declared by this component for synthesis and analysis.
-    fn constraints(&self) -> Vec<Constraint> {
-        vec![]
-    }
-
-    /// Embedded symbol S-expression, if any.
-    fn symbol(&self) -> Option<&'static str> {
-        None
-    }
-
-    /// Embedded footprint S-expression, if any.
-    fn footprint(&self) -> Option<&'static str> {
-        None
-    }
-}
-
-/// Typed reference to a pin name constant on a component.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PinRef(pub &'static str);
-
-/// Handle to a component instance on a [`Board`].
-#[derive(Clone, Copy, Debug)]
-pub struct ComponentHandle(pub usize);
-
 impl ComponentHandle {
     /// Create a [`PinHandle`] for a pin on this component.
     pub fn pin(&self, pin: PinRef) -> PinHandle {
@@ -559,20 +599,6 @@ impl ComponentHandle {
             pin: pin.0,
         }
     }
-}
-
-/// Handle to a specific pin on a specific component instance.
-#[derive(Clone, Copy, Debug)]
-pub struct PinHandle {
-    pub component: usize,
-    pub pin: &'static str,
-}
-
-/// Handle to an emerging net, returned by [`Board::connect`].
-#[derive(Clone, Debug)]
-pub struct NetHandle {
-    edge: usize,
-    overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
 }
 
 impl NetHandle {
@@ -592,167 +618,6 @@ impl NetHandle {
             .entry(self.edge)
             .or_default()
             .name = Some(name.to_owned());
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-struct NetOverride {
-    voltage: Option<Qty<Volt>>,
-    name: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// Board and connections
-// ---------------------------------------------------------------------------
-
-struct ComponentEntry {
-    name: String,
-    component: Box<dyn Component>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct RawConnection {
-    from: PinHandle,
-    to: PinHandle,
-}
-
-/// Top level structure representing the PCB being designed.
-pub struct Board {
-    components: Vec<ComponentEntry>,
-    connections: Vec<RawConnection>,
-    net_overrides: Rc<RefCell<HashMap<usize, NetOverride>>>,
-    next_edge: usize,
-}
-
-/// An immutable structure representing a finished [`Board`] that is ready for export.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CompiledBoard {
-    pub components: Vec<CompiledComponent>,
-    pub nets: Vec<Net>,
-    pub connections: Vec<Connection>,
-    pub constraints: Vec<Constraint>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CompiledComponent {
-    pub refdes: String,
-    pub pins: Vec<Pin>,
-    pub constraints: Vec<Constraint>,
-    pub symbol: Option<String>,
-    pub footprint: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Connection {
-    pub component: usize,
-    pub pin: String,
-    pub net: NetId,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CompileReport {
-    pub board: CompiledBoard,
-    pub warnings: Vec<Diagnostic>,
-    pub summary: CompileSummary,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CompileSummary {
-    pub nets: Vec<NetInfo>,
-    pub caps_synthesised: Vec<SynthCap>,
-    pub pin_count: usize,
-    pub component_count: usize,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NetInfo {
-    pub name: String,
-    pub kind: NetKind,
-    pub pin_count: usize,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SynthCap {
-    pub refdes: String,
-    pub value: Qty<Farad>,
-    pub net: String,
-    pub source_component: String,
-    pub source_pin: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CompileError {
-    pub errors: Vec<Diagnostic>,
-}
-
-impl CompileError {
-    pub fn new(errors: Vec<Diagnostic>) -> Self {
-        Self { errors }
-    }
-}
-
-impl fmt::Display for CompileError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for e in &self.errors {
-            writeln!(f, "[{:?}] {} — {}", e.severity, e.code, e.message)?;
-            if let Some(hint) = &e.hint {
-                writeln!(f, "         hint: {}", hint)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for CompileError {}
-
-// ---------------------------------------------------------------------------
-// Backend trait
-// ---------------------------------------------------------------------------
-
-/// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
-pub trait Backend {
-    type Error;
-    fn emit(&self, output_dir: &str, board: &CompiledBoard) -> Result<(), Self::Error>;
-}
-
-/// Common backend errors.
-#[derive(Debug)]
-pub enum BackendError {
-    IoError(std::io::Error),
-    EmitError(String),
-}
-
-impl fmt::Display for BackendError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IoError(e) => write!(f, "backend I/O error: {}", e),
-            Self::EmitError(msg) => write!(f, "backend emit error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for BackendError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::IoError(e) => Some(e),
-            Self::EmitError(_) => None,
-        }
-    }
-}
-
-impl From<std::io::Error> for BackendError {
-    fn from(e: std::io::Error) -> Self {
-        Self::IoError(e)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Board implementation
-// ---------------------------------------------------------------------------
-
-impl Default for Board {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -1118,12 +983,54 @@ impl Board {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Union-find
-// ---------------------------------------------------------------------------
+impl Default for Board {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-struct UnionFind {
-    parent: Vec<usize>,
+impl CompileError {
+    pub fn new(errors: Vec<Diagnostic>) -> Self {
+        Self { errors }
+    }
+}
+
+impl fmt::Display for CompileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for e in &self.errors {
+            writeln!(f, "[{:?}] {} — {}", e.severity, e.code, e.message)?;
+            if let Some(hint) = &e.hint {
+                writeln!(f, "         hint: {}", hint)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for CompileError {}
+
+impl fmt::Display for BackendError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IoError(e) => write!(f, "backend I/O error: {}", e),
+            Self::EmitError(msg) => write!(f, "backend emit error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for BackendError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::IoError(e) => Some(e),
+            Self::EmitError(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for BackendError {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
+    }
 }
 
 impl UnionFind {
@@ -1149,15 +1056,31 @@ impl UnionFind {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ERC and synthesis helpers
-// ---------------------------------------------------------------------------
-
-fn pin_is_connected(comp: usize, pin: &str, connections: &[RawConnection]) -> bool {
-    connections.iter().any(|c| {
-        (c.from.component == comp && c.from.pin == pin)
-            || (c.to.component == comp && c.to.pin == pin)
-    })
+/// Deterministic UUID-formatted string (8-4-4-4-12 hex) derived from `seed`.
+pub fn deterministic_id(seed: &str) -> String {
+    let h1 = fnv1a_64(seed, 0);
+    let h2 = fnv1a_64(seed, 0x6c14_4f3a_7af5_c5d2); // arbitrary fixed salt
+    let b1 = h1.to_be_bytes();
+    let b2 = h2.to_be_bytes();
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        b1[0],
+        b1[1],
+        b1[2],
+        b1[3],
+        b1[4],
+        b1[5],
+        b1[6],
+        b1[7],
+        b2[0],
+        b2[1],
+        b2[2],
+        b2[3],
+        b2[4],
+        b2[5],
+        b2[6],
+        b2[7]
+    )
 }
 
 fn erc_floating_inputs(board: &CompiledBoard, connections: &[RawConnection]) -> Vec<Diagnostic> {
@@ -1210,6 +1133,26 @@ fn erc_floating_power_inputs(
     diags
 }
 
+fn erc_nc_pin_connected(board: &CompiledBoard, connections: &[RawConnection]) -> Vec<Diagnostic> {
+    let mut diags = Vec::new();
+    for (comp_idx, comp) in board.components.iter().enumerate() {
+        for pin in &comp.pins {
+            if (pin.name == "NC" || pin.name.starts_with("NC_"))
+                && pin_is_connected(comp_idx, &pin.name, connections)
+            {
+                diags.push(Diagnostic {
+                    code: "ERC:NC_CONNECTED".into(),
+                    severity: Severity::Error,
+                    message: format!("NC pin {}.{} is connected to a net", comp.refdes, pin.name),
+                    entities: vec![format!("{}.{}", comp.refdes, pin.name)],
+                    hint: Some("Leave no-connect pins unconnected".into()),
+                });
+            }
+        }
+    }
+    diags
+}
+
 fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for (comp_idx, comp) in board.components.iter().enumerate() {
@@ -1245,24 +1188,22 @@ fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
     diags
 }
 
-fn erc_nc_pin_connected(board: &CompiledBoard, connections: &[RawConnection]) -> Vec<Diagnostic> {
-    let mut diags = Vec::new();
-    for (comp_idx, comp) in board.components.iter().enumerate() {
-        for pin in &comp.pins {
-            if (pin.name == "NC" || pin.name.starts_with("NC_"))
-                && pin_is_connected(comp_idx, &pin.name, connections)
-            {
-                diags.push(Diagnostic {
-                    code: "ERC:NC_CONNECTED".into(),
-                    severity: Severity::Error,
-                    message: format!("NC pin {}.{} is connected to a net", comp.refdes, pin.name),
-                    entities: vec![format!("{}.{}", comp.refdes, pin.name)],
-                    hint: Some("Leave no-connect pins unconnected".into()),
-                });
-            }
-        }
+fn fnv1a_64(seed: &str, salt: u64) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET ^ salt;
+    for b in seed.bytes() {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
     }
-    diags
+    hash
+}
+
+fn pin_is_connected(comp: usize, pin: &str, connections: &[RawConnection]) -> bool {
+    connections.iter().any(|c| {
+        (c.from.component == comp && c.from.pin == pin)
+            || (c.to.component == comp && c.to.pin == pin)
+    })
 }
 
 fn synthesize_decoupling(
@@ -1370,10 +1311,6 @@ fn synthesize_decoupling(
 
     (components, caps, diagnostics)
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

@@ -4,8 +4,10 @@ use std::collections::HashMap;
 
 use copperleaf_model::{CompiledBoard, NetClass};
 
-use crate::common::{build_net_codes, fmt_mm, format_float};
-use crate::sexpr::{Sexpr, deterministic_uuid, kv};
+use crate::{
+    common::{build_net_codes, fmt_mm, format_float},
+    sexpr::{Sexpr, deterministic_uuid, kv},
+};
 
 /// Emit a KiCad S-expression PCB file for the given compiled board.
 pub fn emit_pcb(board: &CompiledBoard) -> String {
@@ -48,80 +50,6 @@ pub fn emit_pcb(board: &CompiledBoard) -> String {
 
     let pcb = Sexpr::list(std::iter::once(Sexpr::atom("kicad_pcb")).chain(children));
     format!("{}\n", pcb)
-}
-
-fn general_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("general"),
-        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("1.6")]),
-        Sexpr::list([Sexpr::atom("legacy_teardrops"), Sexpr::atom("no")]),
-    ])
-}
-
-fn layers_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("layers"),
-        Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("13"),
-            Sexpr::str("F.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("15"),
-            Sexpr::str("B.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("5"),
-            Sexpr::str("F.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("7"),
-            Sexpr::str("B.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("25"),
-            Sexpr::str("Edge.Cuts"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("31"),
-            Sexpr::str("F.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Courtyard"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("29"),
-            Sexpr::str("B.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Courtyard"),
-        ]),
-        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
-    ])
-}
-
-fn setup_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("setup"),
-        Sexpr::list([Sexpr::atom("pad_to_mask_clearance"), Sexpr::atom("0")]),
-        Sexpr::list([
-            Sexpr::atom("pcbplotparams"),
-            Sexpr::list([
-                Sexpr::atom("layerselection"),
-                Sexpr::atom("0x00010fc_ffffffff"),
-            ]),
-        ]),
-    ])
 }
 
 fn board_outline() -> Vec<Sexpr> {
@@ -289,6 +217,32 @@ fn footprint_node(
     Sexpr::list(children)
 }
 
+fn fp_line(from: (f64, f64), to: (f64, f64), layer: &str, uuid_seed: &str) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_line"),
+        Sexpr::list([
+            Sexpr::atom("start"),
+            Sexpr::atom(format_float(from.0, 2)),
+            Sexpr::atom(format_float(from.1, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("end"),
+            Sexpr::atom(format_float(to.0, 2)),
+            Sexpr::atom(format_float(to.1, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("stroke"),
+            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
+            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([
+            Sexpr::atom("uuid"),
+            Sexpr::str(deterministic_uuid(uuid_seed)),
+        ]),
+    ])
+}
+
 fn fp_text_node(
     text_type: &str,
     text: &str,
@@ -324,29 +278,63 @@ fn fp_text_node(
     ])
 }
 
-fn fp_line(from: (f64, f64), to: (f64, f64), layer: &str, uuid_seed: &str) -> Sexpr {
+fn general_node() -> Sexpr {
     Sexpr::list([
-        Sexpr::atom("fp_line"),
+        Sexpr::atom("general"),
+        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("1.6")]),
+        Sexpr::list([Sexpr::atom("legacy_teardrops"), Sexpr::atom("no")]),
+    ])
+}
+
+fn layers_node() -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("layers"),
+        Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
         Sexpr::list([
-            Sexpr::atom("start"),
-            Sexpr::atom(format_float(from.0, 2)),
-            Sexpr::atom(format_float(from.1, 2)),
+            Sexpr::atom("13"),
+            Sexpr::str("F.Paste"),
+            Sexpr::atom("user"),
         ]),
         Sexpr::list([
-            Sexpr::atom("end"),
-            Sexpr::atom(format_float(to.0, 2)),
-            Sexpr::atom(format_float(to.1, 2)),
+            Sexpr::atom("15"),
+            Sexpr::str("B.Paste"),
+            Sexpr::atom("user"),
         ]),
         Sexpr::list([
-            Sexpr::atom("stroke"),
-            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
-            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
+            Sexpr::atom("5"),
+            Sexpr::str("F.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Silkscreen"),
         ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
         Sexpr::list([
-            Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(uuid_seed)),
+            Sexpr::atom("7"),
+            Sexpr::str("B.SilkS"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Silkscreen"),
         ]),
+        Sexpr::list([
+            Sexpr::atom("25"),
+            Sexpr::str("Edge.Cuts"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("31"),
+            Sexpr::str("F.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("F.Courtyard"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("29"),
+            Sexpr::str("B.CrtYd"),
+            Sexpr::atom("user"),
+            Sexpr::str("B.Courtyard"),
+        ]),
+        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
     ])
 }
 
@@ -399,6 +387,20 @@ fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<
         nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
     }
     nodes
+}
+
+fn setup_node() -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("setup"),
+        Sexpr::list([Sexpr::atom("pad_to_mask_clearance"), Sexpr::atom("0")]),
+        Sexpr::list([
+            Sexpr::atom("pcbplotparams"),
+            Sexpr::list([
+                Sexpr::atom("layerselection"),
+                Sexpr::atom("0x00010fc_ffffffff"),
+            ]),
+        ]),
+    ])
 }
 
 #[cfg(test)]
