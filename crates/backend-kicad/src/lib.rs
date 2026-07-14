@@ -92,7 +92,7 @@ mod tests {
         let mut board = Board::new();
         let u1 = board.add("U1", TwoPinPart::new());
         let _ = board.connect(u1.pin(TwoPinPart::A), u1.pin(TwoPinPart::B));
-        let report = copperleaf_analysis::analyse(board.compile().unwrap()).unwrap();
+        let report = board.compile().unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         let backend = KiCad::new().with_project_name("test");

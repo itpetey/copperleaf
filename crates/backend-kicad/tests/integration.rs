@@ -94,8 +94,7 @@ fn decoupling_caps_appear_in_summary() {
         .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
         .unwrap();
 
-    let report = copperleaf_analysis::analyse(board.compile().expect("board should lower"))
-        .expect("decoupling board should analyse");
+    let report = board.compile().expect("board should compile");
     assert_eq!(report.summary.caps_synthesised.len(), 1);
     assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
     assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-18);
@@ -106,7 +105,7 @@ fn decoupling_caps_appear_in_summary() {
 #[test]
 fn emitted_netlist_contains_components_and_nets() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_analysis::analyse(board.compile().unwrap()).unwrap();
+    let report = board.compile().unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -125,7 +124,7 @@ fn emitted_netlist_contains_components_and_nets() {
 #[test]
 fn emitted_schematic_contains_lib_id_and_pin_positions() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_analysis::analyse(board.compile().unwrap()).unwrap();
+    let report = board.compile().unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -142,16 +141,16 @@ fn emitted_schematic_contains_lib_id_and_pin_positions() {
 #[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
-    let err = copperleaf_analysis::analyse(board.compile().expect("board should lower"))
-        .expect_err("overvoltage should fail");
+    let err = board
+        .compile()
+        .expect_err("overvoltage should fail compilation");
     assert!(err.errors.iter().any(|d| d.code == "ERC:OVERVOLT"));
 }
 
 #[test]
 fn valid_board_compiles_and_emits() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_analysis::analyse(board.compile().expect("board should lower"))
-        .expect("valid board should analyse");
+    let report = board.compile().expect("valid board should compile");
 
     let dir = tempfile::tempdir().unwrap();
     let backend = KiCad::new().with_project_name("test");

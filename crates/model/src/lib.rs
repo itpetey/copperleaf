@@ -1,9 +1,5 @@
 // Re-export all public types at crate root for backward compatibility.
-pub use board::{Board, ComponentHandle};
-pub use compiled::{
-    CompileError, CompileReport, CompileSummary, CompiledBoard, CompiledComponent, Connection,
-    NetInfo, SynthCap,
-};
+pub use board::{Board, CompiledBoard, CompiledComponent, ComponentHandle, Connection};
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
 pub use pin::{Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec};
 pub use units::{
@@ -12,7 +8,8 @@ pub use units::{
 pub use util::deterministic_id;
 
 pub mod board;
-pub mod compiled;
+pub(crate) mod compile;
+pub mod erc;
 pub mod net;
 pub mod pin;
 pub mod units;
@@ -168,15 +165,15 @@ mod tests {
         let u1 = board.add("U1", TwoPins);
         let _ = board.connect(u1.pin(TwoPins::A), u1.pin(TwoPins::B));
         let compiled = board.compile().unwrap();
-        assert_eq!(compiled.nets.len(), 1);
+        assert_eq!(compiled.board.nets.len(), 1);
     }
 
     #[test]
     fn empty_board_compiles() {
         let board = Board::new();
         let compiled = board.compile().unwrap();
-        assert_eq!(compiled.components.len(), 0);
-        assert_eq!(compiled.nets.len(), 0);
+        assert_eq!(compiled.board.components.len(), 0);
+        assert_eq!(compiled.board.nets.len(), 0);
     }
 
     #[test]

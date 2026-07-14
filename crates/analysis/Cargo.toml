@@ -1,9 +1,0 @@
-[package]
-name = "copperleaf-analysis"
-version.workspace = true
-edition.workspace = true
-description = "ERC and synthesis analysis passes"
-license.workspace = true
-
-[dependencies]
-copperleaf-model.workspace = true
