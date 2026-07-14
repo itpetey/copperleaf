@@ -1,0 +1,432 @@
+[component]
+name = "Rp2354a"
+title = "Raspberry Pi RP2354A — RP2350 with 2 MB internal flash (QFN-60)."
+description = "Raspberry Pi RP2354A microcontroller"
+
+[[pin]]
+num = 1
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 2
+name = "GPIO0"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 3
+name = "GPIO1"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 4
+name = "GPIO2"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 5
+name = "GPIO3"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 6
+name = "DVDD"
+purpose = "Supply"
+notes = "Core supply"
+kind = "pwr"
+v_min = 1.1
+v_max = 1.1
+i_max = 0.1
+
+[[pin]]
+num = 7
+name = "GPIO4"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 8
+name = "GPIO5"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 9
+name = "GPIO6"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 10
+name = "GPIO7"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 11
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 12
+name = "GPIO8"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 13
+name = "GPIO9"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 14
+name = "GPIO10"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 15
+name = "GPIO11"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 16
+name = "GPIO12"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 17
+name = "GPIO13"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 18
+name = "GPIO14"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 19
+name = "GPIO15"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 20
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 21
+name = "XIN"
+purpose = "Crystal"
+notes = "12 MHz crystal input"
+kind = "clk"
+bw_mhz = 12.0
+
+[[pin]]
+num = 22
+name = "XOUT"
+purpose = "Crystal"
+notes = "12 MHz crystal output"
+kind = "clk"
+bw_mhz = 12.0
+
+[[pin]]
+num = 23
+name = "DVDD"
+purpose = "Supply"
+notes = "Core supply"
+kind = "pwr"
+v_min = 1.1
+v_max = 1.1
+i_max = 0.1
+
+[[pin]]
+num = 24
+name = "SWCLK"
+purpose = "SWD"
+kind = "clk"
+bw_mhz = 1.0
+
+[[pin]]
+num = 25
+name = "SWDIO"
+purpose = "SWD"
+kind = "dio"
+
+[[pin]]
+num = 26
+name = "RUN"
+purpose = "Reset"
+kind = "dio"
+
+[[pin]]
+num = 27
+name = "GPIO16"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 28
+name = "GPIO17"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 29
+name = "GPIO18"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 30
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 31
+name = "GPIO19"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 32
+name = "GPIO20"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 33
+name = "GPIO21"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 34
+name = "GPIO22"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 35
+name = "GPIO23"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 36
+name = "GPIO24"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 37
+name = "GPIO25"
+purpose = "GPIO"
+kind = "dio"
+
+[[pin]]
+num = 38
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 39
+name = "DVDD"
+purpose = "Supply"
+notes = "Core supply"
+kind = "pwr"
+v_min = 1.1
+v_max = 1.1
+i_max = 0.1
+
+[[pin]]
+num = 40
+name = "GPIO26_ADC0"
+purpose = "GPIO/ADC"
+kind = "dio"
+
+[[pin]]
+num = 41
+name = "GPIO27_ADC1"
+purpose = "GPIO/ADC"
+kind = "dio"
+
+[[pin]]
+num = 42
+name = "GPIO28_ADC2"
+purpose = "GPIO/ADC"
+kind = "dio"
+
+[[pin]]
+num = 43
+name = "GPIO29_ADC3"
+purpose = "GPIO/ADC"
+kind = "dio"
+
+[[pin]]
+num = 44
+name = "ADC_AVDD"
+purpose = "Supply"
+notes = "ADC supply"
+kind = "pwr_fixed"
+v = 3.3
+i = 0.1
+
+[[pin]]
+num = 45
+name = "IOVDD"
+purpose = "Supply"
+notes = "I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 46
+name = "VREG_AVDD"
+purpose = "Supply"
+notes = "Voltage regulator supply"
+kind = "pwr"
+v_min = 1.1
+v_max = 1.1
+i_max = 0.0
+
+[[pin]]
+num = 47
+name = "VREG_PGND"
+purpose = "Ground"
+kind = "gnd"
+
+[[pin]]
+num = 48
+name = "VREG_LX"
+purpose = "Supply"
+notes = "Voltage regulator switch node"
+kind = "pwr"
+v_min = 0.0
+v_max = 0.0
+i_max = 0.0
+
+[[pin]]
+num = 49
+name = "VREG_VIN"
+purpose = "Supply"
+notes = "Voltage regulator input"
+kind = "pwr"
+v_min = 2.7
+v_max = 5.5
+i_max = 0.0
+
+[[pin]]
+num = 50
+name = "VREG_FB"
+purpose = "Supply"
+notes = "Voltage regulator feedback"
+kind = "pwr"
+v_min = 0.0
+v_max = 0.0
+i_max = 0.0
+
+[[pin]]
+num = 51
+name = "USB_DM"
+purpose = "USB"
+kind = "dio"
+
+[[pin]]
+num = 52
+name = "USB_DP"
+purpose = "USB"
+kind = "dio"
+
+[[pin]]
+num = 53
+name = "USB_OTP_VDD"
+purpose = "Supply"
+notes = "USB OTP supply"
+kind = "pwr_fixed"
+v = 3.3
+i = 0.1
+
+[[pin]]
+num = 54
+name = "QSPI_IOVDD"
+purpose = "Supply"
+notes = "QSPI I/O supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 3.3
+i_max = 0.1
+
+[[pin]]
+num = 55
+name = "QSPI_SD3"
+purpose = "QSPI"
+kind = "dio"
+
+[[pin]]
+num = 56
+name = "QSPI_SCLK"
+purpose = "QSPI"
+kind = "clk"
+bw_mhz = 50.0
+
+[[pin]]
+num = 57
+name = "QSPI_SD0"
+purpose = "QSPI"
+kind = "dio"
+
+[[pin]]
+num = 58
+name = "QSPI_SD2"
+purpose = "QSPI"
+kind = "dio"
+
+[[pin]]
+num = 59
+name = "QSPI_SD1"
+purpose = "QSPI"
+kind = "dio"
+
+[[pin]]
+num = 60
+name = "QSPI_SS"
+purpose = "QSPI"
+kind = "dio"

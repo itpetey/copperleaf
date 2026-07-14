@@ -1,8 +1,8 @@
 [package]
-name = "copperleaf-parts-passives"
+name = "copperleaf-parts-morsemicro"
 version.workspace = true
 edition.workspace = true
-description = "Passive electronics components"
+description = "Morse Micro vendor components"
 license.workspace = true
 
 [lib]
@@ -10,3 +10,4 @@ path = "lib.rs"
 
 [dependencies]
 copperleaf-model.workspace = true
+copperleaf-part-macro.workspace = true

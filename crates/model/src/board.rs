@@ -134,7 +134,7 @@ impl Board {
     ///
     /// This performs net grouping, name/voltage resolution and net
     /// classification only.  Electrical-rule checks and synthesis passes live
-    /// in [`copperleaf_analysis::analyse`] and must be run separately to obtain
+    /// in `copperleaf_analysis::analyse` and must be run separately to obtain
     /// a full [`CompileReport`](crate::CompileReport).
     pub fn compile(self) -> Result<CompiledBoard, CompileError> {
         self.validate_connections()?;

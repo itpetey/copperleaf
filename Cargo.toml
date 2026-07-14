@@ -7,6 +7,8 @@ members = [
   "crates/part-codegen",
   "crates/part-macro",
   "parts/passives",
+  "parts/morsemicro",
+  "parts/raspberrypi"
 ]
 
 [workspace.package]

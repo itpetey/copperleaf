@@ -1,51 +1,47 @@
-pub mod {{{module_name}}} {
-    //! {{{title}}}
-    {{#description}}
-    //!
-    //! {{{.}}}
-    {{/description}}
-    //!
-    //! # Pinout
-    //!
-    //! | Pin | Name     | Purpose     | Notes                 |
-    //! |-----|----------|-------------|-----------------------|
-    {{#pins}}
-    //! | {{{row}}} |
-    {{/pins}}
+/// {{{title}}}
+{{#description}}
+///
+/// {{{.}}}
+{{/description}}
+///
+/// # Pinout
+///
+/// | Pin | Name     | Purpose     | Notes                 |
+/// |-----|----------|-------------|-----------------------|
+{{#pins}}
+/// | {{{row}}} |
+{{/pins}}
+pub struct {{{struct_name}}} {
+    pins: Vec<copperleaf_model::Pin>,
+}
 
-    use copperleaf_model::{Component, Pin, PinRef, Role, units::UnitExt};
+#[allow(dead_code)]
+impl {{{struct_name}}} {
+    {{#constants}}
+    pub const {{{name}}}: copperleaf_model::PinRef = copperleaf_model::PinRef("{{{pin_name}}}");
+    {{/constants}}
 
-    /// {{{struct_doc}}}
-    pub struct {{{struct_name}}} {
-        pins: Vec<Pin>,
-    }
+    pub fn new() -> Self {
+        use copperleaf_model::{Pin, Role, units::UnitExt};
 
-    #[allow(dead_code)]
-    impl {{{struct_name}}} {
-        {{#constants}}
-        pub const {{{name}}}: PinRef = PinRef("{{{pin_name}}}");
-        {{/constants}}
-
-        pub fn new() -> Self {
-            Self {
-                pins: vec![
-                    {{#builders}}
-                    {{{.}}},
-                    {{/builders}}
-                ],
-            }
+        Self {
+            pins: vec![
+                {{#builders}}
+                {{{.}}},
+                {{/builders}}
+            ],
         }
     }
+}
 
-    impl Component for {{{struct_name}}} {
-        fn pins(&self) -> &[Pin] {
-            &self.pins
-        }
+impl copperleaf_model::Component for {{{struct_name}}} {
+    fn pins(&self) -> &[copperleaf_model::Pin] {
+        &self.pins
     }
+}
 
-    impl Default for {{{struct_name}}} {
-        fn default() -> Self {
-            Self::new()
-        }
+impl Default for {{{struct_name}}} {
+    fn default() -> Self {
+        Self::new()
     }
 }

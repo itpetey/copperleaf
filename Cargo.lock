@@ -67,10 +67,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "copperleaf-part-passives"
+name = "copperleaf-parts-morsemicro"
 version = "0.1.0"
 dependencies = [
  "copperleaf-model",
+ "copperleaf-part-macro",
+]
+
+[[package]]
+name = "copperleaf-parts-passives"
+version = "0.1.0"
+dependencies = [
+ "copperleaf-model",
+]
+
+[[package]]
+name = "copperleaf-parts-raspberrypi"
+version = "0.1.0"
+dependencies = [
+ "copperleaf-model",
+ "copperleaf-part-macro",
 ]
 
 [[package]]
