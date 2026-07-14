@@ -69,16 +69,18 @@ pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
             if pin.name() == "NC" || pin.name().starts_with("NC_") {
                 continue;
             }
-            if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn) && pin.sig_spec().is_none()
-                && !connected.contains(&(comp.refdes.as_str(), pin.name())) {
-                    diags.push(Diagnostic {
-                        code: "ERC:FLOATING_INPUT".into(),
-                        severity: Severity::Warning,
-                        message: format!("Input pin {}.{} is floating", comp.refdes, pin.name()),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-                        hint: Some("Connect the pin or assign a signal specification".into()),
-                    });
-                }
+            if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn)
+                && pin.sig_spec().is_none()
+                && !connected.contains(&(comp.refdes.as_str(), pin.name()))
+            {
+                diags.push(Diagnostic {
+                    code: "ERC:FLOATING_INPUT".into(),
+                    severity: Severity::Warning,
+                    message: format!("Input pin {}.{} is floating", comp.refdes, pin.name()),
+                    entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+                    hint: Some("Connect the pin or assign a signal specification".into()),
+                });
+            }
         }
     }
     diags
@@ -91,19 +93,20 @@ pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
     for comp in &board.components {
         for pin in &comp.pins {
             if matches!(pin.role(), Role::PowerIn)
-                && !connected.contains(&(comp.refdes.as_str(), pin.name())) {
-                    diags.push(Diagnostic {
-                        code: "ERC:FLOATING_POWER_INPUT".into(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Power input pin {}.{} is unconnected",
-                            comp.refdes,
-                            pin.name()
-                        ),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-                        hint: Some("Connect the pin to a power net".into()),
-                    });
-                }
+                && !connected.contains(&(comp.refdes.as_str(), pin.name()))
+            {
+                diags.push(Diagnostic {
+                    code: "ERC:FLOATING_POWER_INPUT".into(),
+                    severity: Severity::Warning,
+                    message: format!(
+                        "Power input pin {}.{} is unconnected",
+                        comp.refdes,
+                        pin.name()
+                    ),
+                    entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+                    hint: Some("Connect the pin to a power net".into()),
+                });
+            }
         }
     }
     diags
@@ -116,19 +119,20 @@ pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
     for comp in &board.components {
         for pin in &comp.pins {
             if (pin.name() == "NC" || pin.name().starts_with("NC_"))
-                && connected.contains(&(comp.refdes.as_str(), pin.name())) {
-                    diags.push(Diagnostic {
-                        code: "ERC:NC_CONNECTED".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "NC pin {}.{} is connected to a net",
-                            comp.refdes,
-                            pin.name()
-                        ),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-                        hint: Some("Leave no-connect pins unconnected".into()),
-                    });
-                }
+                && connected.contains(&(comp.refdes.as_str(), pin.name()))
+            {
+                diags.push(Diagnostic {
+                    code: "ERC:NC_CONNECTED".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "NC pin {}.{} is connected to a net",
+                        comp.refdes,
+                        pin.name()
+                    ),
+                    entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+                    hint: Some("Leave no-connect pins unconnected".into()),
+                });
+            }
         }
     }
     diags
@@ -143,28 +147,27 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
                 continue;
             }
             for conn in &board.connections {
-                if conn.component == component_index(&comp.refdes, board) && conn.pin == pin.name()
+                if conn.component == component_index(&comp.refdes, board)
+                    && conn.pin == pin.name()
                     && let Some(net) = board.nets.iter().find(|n| n.name == conn.net.0)
-                        && let NetKind::Power { v_nom, .. } = net.kind
-                            && v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9 {
-                                diags.push(Diagnostic {
-                                    code: "ERC:OVERVOLT".into(),
-                                    severity: Severity::Error,
-                                    message: format!(
-                                        "Pin {}.{} max {:.2}V, connected to {:.2}V net {}",
-                                        comp.refdes,
-                                        pin.name(),
-                                        pin.power_spec().v_max.as_base(),
-                                        v_nom.as_base(),
-                                        net.name
-                                    ),
-                                    entities: vec![
-                                        format!("{}.{}", comp.refdes, pin.name()),
-                                        net.name.clone(),
-                                    ],
-                                    hint: Some("Use a level shifter or different pin".into()),
-                                });
-                            }
+                    && let NetKind::Power { v_nom, .. } = net.kind
+                    && v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9
+                {
+                    diags.push(Diagnostic {
+                        code: "ERC:OVERVOLT".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "Pin {}.{} max {:.2}V, connected to {:.2}V net {}",
+                            comp.refdes,
+                            pin.name(),
+                            pin.power_spec().v_max.as_base(),
+                            v_nom.as_base(),
+                            net.name
+                        ),
+                        entities: vec![format!("{}.{}", comp.refdes, pin.name()), net.name.clone()],
+                        hint: Some("Use a level shifter or different pin".into()),
+                    });
+                }
             }
         }
     }
