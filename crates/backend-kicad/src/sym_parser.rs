@@ -151,24 +151,23 @@ fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
         std::collections::HashMap::new();
 
     for child in children {
-        if let Sexpr::List(parts) = &child {
-            if parts.len() >= 2 && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol") {
-                if let Sexpr::Atom(name) = &parts[1] {
-                    let name_unquoted = name.trim_matches('"');
-                    if let Some(rest) = name_unquoted.strip_prefix(child_prefix) {
-                        let mut split = rest.rsplitn(3, '_');
-                        let convert_str = split.next();
-                        let unit_str = split.next();
-                        if let (Some(c), Some(u)) = (convert_str, unit_str) {
-                            if let (Ok(unit), Ok(convert)) = (u.parse::<i64>(), c.parse::<i64>()) {
-                                if unit > 0 {
-                                    let inner = parts[2..].to_vec();
-                                    unit_groups.entry(unit).or_default().push((convert, inner));
-                                    continue;
-                                }
-                            }
-                        }
-                    }
+        if let Sexpr::List(parts) = &child
+            && parts.len() >= 2
+            && matches!(&parts[0], Sexpr::Atom(key) if key == "symbol")
+            && let Sexpr::Atom(name) = &parts[1]
+        {
+            let name_unquoted = name.trim_matches('"');
+            if let Some(rest) = name_unquoted.strip_prefix(child_prefix) {
+                let mut split = rest.rsplitn(3, '_');
+                let convert_str = split.next();
+                let unit_str = split.next();
+                if let (Some(c), Some(u)) = (convert_str, unit_str)
+                    && let (Ok(unit), Ok(convert)) = (u.parse::<i64>(), c.parse::<i64>())
+                    && unit > 0
+                {
+                    let inner = parts[2..].to_vec();
+                    unit_groups.entry(unit).or_default().push((convert, inner));
+                    continue;
                 }
             }
         }
@@ -328,7 +327,7 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     })
 }
 
-fn resolve_extends(symbols: &mut Vec<SymbolDef>) {
+fn resolve_extends(symbols: &mut [SymbolDef]) {
     let mut by_name: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for (i, sym) in symbols.iter().enumerate() {
         by_name.insert(sym.lib_id.clone(), i);

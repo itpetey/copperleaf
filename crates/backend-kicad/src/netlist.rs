@@ -28,7 +28,7 @@ fn components_node(board: &CompiledBoard) -> Sexpr {
             Sexpr::list([
                 Sexpr::atom("comp"),
                 kv("ref", &c.refdes),
-                kv("value", &refdes_prefix(&c.refdes)),
+                kv("value", refdes_prefix(&c.refdes)),
             ])
         })
         .collect();
@@ -83,7 +83,7 @@ fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
 }
 
 fn node_sexpr(board: &CompiledBoard, conn: &copperleaf_model::Connection) -> Sexpr {
-    let mut children = vec![Sexpr::atom("node"), kv("ref", &conn.component.to_string())];
+    let mut children = vec![Sexpr::atom("node"), kv("ref", conn.component.to_string())];
     let comp = board.components.get(conn.component);
     let pin = comp.and_then(|c| c.pins.iter().find(|p| p.name() == conn.pin));
     if let Some(pin) = pin {

@@ -69,8 +69,8 @@ pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
             if pin.name() == "NC" || pin.name().starts_with("NC_") {
                 continue;
             }
-            if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn) && pin.sig_spec().is_none() {
-                if !connected.contains(&(comp.refdes.as_str(), pin.name())) {
+            if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn) && pin.sig_spec().is_none()
+                && !connected.contains(&(comp.refdes.as_str(), pin.name())) {
                     diags.push(Diagnostic {
                         code: "ERC:FLOATING_INPUT".into(),
                         severity: Severity::Warning,
@@ -79,7 +79,6 @@ pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
                         hint: Some("Connect the pin or assign a signal specification".into()),
                     });
                 }
-            }
         }
     }
     diags
@@ -91,8 +90,8 @@ pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for comp in &board.components {
         for pin in &comp.pins {
-            if matches!(pin.role(), Role::PowerIn) {
-                if !connected.contains(&(comp.refdes.as_str(), pin.name())) {
+            if matches!(pin.role(), Role::PowerIn)
+                && !connected.contains(&(comp.refdes.as_str(), pin.name())) {
                     diags.push(Diagnostic {
                         code: "ERC:FLOATING_POWER_INPUT".into(),
                         severity: Severity::Warning,
@@ -105,7 +104,6 @@ pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
                         hint: Some("Connect the pin to a power net".into()),
                     });
                 }
-            }
         }
     }
     diags
@@ -117,8 +115,8 @@ pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for comp in &board.components {
         for pin in &comp.pins {
-            if pin.name() == "NC" || pin.name().starts_with("NC_") {
-                if connected.contains(&(comp.refdes.as_str(), pin.name())) {
+            if (pin.name() == "NC" || pin.name().starts_with("NC_"))
+                && connected.contains(&(comp.refdes.as_str(), pin.name())) {
                     diags.push(Diagnostic {
                         code: "ERC:NC_CONNECTED".into(),
                         severity: Severity::Error,
@@ -131,7 +129,6 @@ pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
                         hint: Some("Leave no-connect pins unconnected".into()),
                     });
                 }
-            }
         }
     }
     diags
@@ -147,10 +144,9 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
             }
             for conn in &board.connections {
                 if conn.component == component_index(&comp.refdes, board) && conn.pin == pin.name()
-                {
-                    if let Some(net) = board.nets.iter().find(|n| n.name == conn.net.0) {
-                        if let NetKind::Power { v_nom, .. } = net.kind {
-                            if v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9 {
+                    && let Some(net) = board.nets.iter().find(|n| n.name == conn.net.0)
+                        && let NetKind::Power { v_nom, .. } = net.kind
+                            && v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9 {
                                 diags.push(Diagnostic {
                                     code: "ERC:OVERVOLT".into(),
                                     severity: Severity::Error,
@@ -169,9 +165,6 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
                                     hint: Some("Use a level shifter or different pin".into()),
                                 });
                             }
-                        }
-                    }
-                }
             }
         }
     }

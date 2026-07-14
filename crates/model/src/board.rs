@@ -26,7 +26,7 @@ pub(crate) struct ComponentEntry {
     pub(crate) component: Box<dyn Component>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct RawNetOverride {
     pub(crate) voltage: Option<Qty<Volt>>,
     pub(crate) name: Option<String>,
@@ -196,15 +196,6 @@ impl Board {
 impl Default for Board {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Default for RawNetOverride {
-    fn default() -> Self {
-        Self {
-            voltage: None,
-            name: None,
-        }
     }
 }
 
@@ -472,6 +463,7 @@ fn merge_overrides(
 ///
 /// Returns `(net_names, net_voltages)` keyed by the group representative id.
 /// Diagnostics are appended to `errors`.
+#[allow(clippy::type_complexity)]
 fn resolve_net_overrides(
     grouping: &NetGrouping,
     connections: &[RawConnection],

@@ -247,9 +247,7 @@ fn lib_symbols_node(board: &CompiledBoard) -> Sexpr {
 }
 
 fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexpr> {
-    if (from.0 - to.0).abs() < 0.01 {
-        vec![wire_seg(from, to, net_name)]
-    } else if (from.1 - to.1).abs() < 0.01 {
+    if (from.0 - to.0).abs() < 0.01 || (from.1 - to.1).abs() < 0.01 {
         vec![wire_seg(from, to, net_name)]
     } else {
         let corner = (to.0, from.1);

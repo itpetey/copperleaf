@@ -3,13 +3,6 @@
 //! Emits `.kicad_pro`, `.kicad_sch`, `.kicad_pcb`, and `.net` files from a
 //! [`CompiledBoard`].
 
-#![allow(
-    clippy::collapsible_if,
-    clippy::if_same_then_else,
-    clippy::needless_borrows_for_generic_args,
-    clippy::ptr_arg
-)]
-
 use std::{fs, path::PathBuf};
 
 use copperleaf_model::{Backend, BackendError, CompiledBoard};

@@ -185,7 +185,6 @@ mod tests {
             pins: Vec<Pin>,
         }
 
-        #[allow(dead_code)]
         impl PinPart {
             pub const VDD: PinRef = PinRef("VDD");
             pub const GND: PinRef = PinRef("GND");

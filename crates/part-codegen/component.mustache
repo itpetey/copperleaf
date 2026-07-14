@@ -15,7 +15,6 @@ pub struct {{{struct_name}}} {
     pins: Vec<copperleaf_model::Pin>,
 }
 
-#[allow(dead_code)]
 impl {{{struct_name}}} {
     {{#constants}}
     pub const {{{name}}}: copperleaf_model::PinRef = copperleaf_model::PinRef("{{{pin_name}}}");
