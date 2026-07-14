@@ -5,7 +5,7 @@
 
 use std::{fs, path::PathBuf};
 
-use copperleaf_model::{Backend, BackendError, CompiledBoard};
+use copperleaf::{Backend, BackendError, CompiledBoard};
 
 pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
 pub use sym_parser::{PinDef, SymbolDef, find_symbol, flatten_extends, parse_symbol_lib};
@@ -65,7 +65,7 @@ impl Backend for KiCad {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_model::{Board, Component, Pin, PinRef};
+    use copperleaf::{Board, Component, Pin, PinRef};
 
     struct TwoPinPart {
         pins: Vec<Pin>,

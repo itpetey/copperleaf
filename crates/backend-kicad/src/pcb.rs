@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use copperleaf_model::{CompiledBoard, NetClass};
+use copperleaf::{CompiledBoard, NetClass};
 
 use crate::{
     common::{build_net_codes, fmt_mm, format_float},
@@ -90,7 +90,7 @@ fn board_outline() -> Vec<Sexpr> {
 
 fn footprint_node(
     idx: usize,
-    comp: &copperleaf_model::CompiledComponent,
+    comp: &copperleaf::CompiledComponent,
     pin_to_net: &HashMap<(usize, &str), &str>,
     net_to_code: &HashMap<&str, usize>,
 ) -> Sexpr {
@@ -406,7 +406,7 @@ fn setup_node() -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_model::{CompiledComponent, Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{CompiledComponent, Connection, Net, NetClass, NetId, NetKind, Pin, UnitExt};
 
     #[test]
     fn pcb_starts_with_kicad_pcb() {
@@ -420,7 +420,7 @@ mod tests {
             }],
             nets: vec![Net {
                 name: "V3V3".into(),
-                kind: copperleaf_model::NetKind::Power {
+                kind: NetKind::Power {
                     v_nom: 3.3.volt(),
                     ripple: None,
                 },

@@ -12,16 +12,16 @@
 /// | {{{row}}} |
 {{/pins}}
 pub struct {{{struct_name}}} {
-    pins: Vec<copperleaf_model::Pin>,
+    pins: Vec<copperleaf::Pin>,
 }
 
 impl {{{struct_name}}} {
     {{#constants}}
-    pub const {{{name}}}: copperleaf_model::PinRef = copperleaf_model::PinRef("{{{pin_name}}}");
+    pub const {{{name}}}: copperleaf::PinRef = copperleaf::PinRef("{{{pin_name}}}");
     {{/constants}}
 
     pub fn new() -> Self {
-        use copperleaf_model::{Pin, Role, units::UnitExt};
+        use copperleaf::{Pin, Role, units::UnitExt};
 
         Self {
             pins: vec![
@@ -33,8 +33,8 @@ impl {{{struct_name}}} {
     }
 }
 
-impl copperleaf_model::Component for {{{struct_name}}} {
-    fn pins(&self) -> &[copperleaf_model::Pin] {
+impl copperleaf::Component for {{{struct_name}}} {
+    fn pins(&self) -> &[copperleaf::Pin] {
         &self.pins
     }
 }

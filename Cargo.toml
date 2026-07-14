@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   "crates/backend-kicad",
-  "crates/model",
+  "crates/core",
   "crates/part-codegen",
   "crates/part-macro",
   "parts/morsemicro",
@@ -16,7 +16,7 @@ edition = "2024"
 license = "MPL-2.0"
 
 [workspace.dependencies]
-copperleaf-model = { path = "crates/model", default-features = false }
+copperleaf = { path = "crates/core", default-features = false }
 copperleaf-part-codegen = {
   path = "crates/part-codegen",
   default-features = false

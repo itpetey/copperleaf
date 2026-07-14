@@ -1,9 +1,7 @@
 use std::fs;
 
+use copperleaf::{Backend, Board, Component, ComponentHandle, Constraint, Pin, PinRef, UnitExt};
 use copperleaf_backend_kicad::KiCad;
-use copperleaf_model::{
-    Backend, Board, Component, ComponentHandle, Constraint, Pin, PinRef, UnitExt,
-};
 
 struct PwrSource {
     pins: Vec<Pin>,

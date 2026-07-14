@@ -1,6 +1,6 @@
 //! Library of common parts used in examples and tests.
 
-use copperleaf_model::{
+use copperleaf::{
     Component, Farad, Henry, Hertz, Ohm, Pin, PinBuilder, PinRef, PowerSpec, Qty, Role, UnitExt,
 };
 

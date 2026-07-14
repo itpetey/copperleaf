@@ -15,21 +15,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
-name = "copperleaf-backend-kicad"
-version = "0.1.0"
-dependencies = [
- "copperleaf-model",
- "serde_json",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "copperleaf-model"
+name = "copperleaf"
 version = "0.1.0"
 dependencies = [
  "thiserror",
  "uom",
+]
+
+[[package]]
+name = "copperleaf-backend-kicad"
+version = "0.1.0"
+dependencies = [
+ "copperleaf",
+ "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -55,7 +55,7 @@ dependencies = [
 name = "copperleaf-parts-morsemicro"
 version = "0.1.0"
 dependencies = [
- "copperleaf-model",
+ "copperleaf",
  "copperleaf-part-macro",
 ]
 
@@ -63,14 +63,14 @@ dependencies = [
 name = "copperleaf-parts-passives"
 version = "0.1.0"
 dependencies = [
- "copperleaf-model",
+ "copperleaf",
 ]
 
 [[package]]
 name = "copperleaf-parts-raspberrypi"
 version = "0.1.0"
 dependencies = [
- "copperleaf-model",
+ "copperleaf",
  "copperleaf-part-macro",
 ]
 

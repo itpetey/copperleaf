@@ -9,4 +9,4 @@ license.workspace = true
 path = "lib.rs"
 
 [dependencies]
-copperleaf-model.workspace = true
+copperleaf.workspace = true

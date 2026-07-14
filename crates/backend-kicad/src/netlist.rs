@@ -1,6 +1,6 @@
 //! KiCad netlist emitter.
 
-use copperleaf_model::CompiledBoard;
+use copperleaf::CompiledBoard;
 
 use crate::{
     common::{build_net_codes, refdes_prefix, role_to_pintype},
@@ -57,7 +57,7 @@ fn design_node() -> Sexpr {
 
 fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
     use std::collections::HashMap;
-    let mut by_net: HashMap<&str, Vec<&copperleaf_model::Connection>> = HashMap::new();
+    let mut by_net: HashMap<&str, Vec<&copperleaf::Connection>> = HashMap::new();
     for conn in &board.connections {
         by_net.entry(conn.net.0.as_str()).or_default().push(conn);
     }
@@ -82,7 +82,7 @@ fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
     Sexpr::list(std::iter::once(Sexpr::atom("nets")).chain(nets))
 }
 
-fn node_sexpr(board: &CompiledBoard, conn: &copperleaf_model::Connection) -> Sexpr {
+fn node_sexpr(board: &CompiledBoard, conn: &copperleaf::Connection) -> Sexpr {
     let mut children = vec![Sexpr::atom("node"), kv("ref", conn.component.to_string())];
     let comp = board.components.get(conn.component);
     let pin = comp.and_then(|c| c.pins.iter().find(|p| p.name() == conn.pin));
@@ -99,12 +99,12 @@ fn node_sexpr(board: &CompiledBoard, conn: &copperleaf_model::Connection) -> Sex
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_model::{Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{Connection, Net, NetClass, NetId, Pin, UnitExt};
 
     fn make_board() -> CompiledBoard {
         CompiledBoard {
             components: vec![
-                copperleaf_model::CompiledComponent {
+                copperleaf::CompiledComponent {
                     refdes: "U1".into(),
                     pins: vec![
                         Pin::build("VIN").pwr_fixed(5.0.volt(), 1.0.amp()).pin(),
@@ -114,7 +114,7 @@ mod tests {
                     symbol: None,
                     footprint: None,
                 },
-                copperleaf_model::CompiledComponent {
+                copperleaf::CompiledComponent {
                     refdes: "U2".into(),
                     pins: vec![
                         Pin::build("VDD").pwr_fixed(3.3.volt(), 0.5.amp()).pin(),
@@ -128,7 +128,7 @@ mod tests {
             nets: vec![
                 Net {
                     name: "VBUS".into(),
-                    kind: copperleaf_model::NetKind::Power {
+                    kind: copperleaf::NetKind::Power {
                         v_nom: 5.0.volt(),
                         ripple: None,
                     },
@@ -137,7 +137,7 @@ mod tests {
                 },
                 Net {
                     name: "V3V3".into(),
-                    kind: copperleaf_model::NetKind::Power {
+                    kind: copperleaf::NetKind::Power {
                         v_nom: 3.3.volt(),
                         ripple: None,
                     },

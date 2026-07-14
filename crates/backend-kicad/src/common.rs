@@ -1,6 +1,6 @@
 //! Shared helpers for the KiCad backend emitters.
 
-use copperleaf_model::{CompiledBoard, Role};
+use copperleaf::{CompiledBoard, Role};
 
 /// Build deterministic 1-based net codes from a compiled board.
 pub fn build_net_codes(board: &CompiledBoard) -> Vec<(String, usize)> {

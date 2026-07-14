@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use copperleaf_model::{CompiledBoard, CompiledComponent, NetKind, Pin};
+use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Pin};
 
 use crate::{
     common::{format_float, refdes_prefix, role_to_pin_type},
@@ -28,7 +28,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
         children.push(symbol_instance_node(idx, comp));
     }
 
-    let mut net_conns: HashMap<&str, Vec<&copperleaf_model::Connection>> = HashMap::new();
+    let mut net_conns: HashMap<&str, Vec<&Connection>> = HashMap::new();
     for conn in &board.connections {
         net_conns.entry(conn.net.0.as_str()).or_default().push(conn);
     }
@@ -260,7 +260,7 @@ fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexp
 
 fn pin_tip_and_label(
     board: &CompiledBoard,
-    conn: &copperleaf_model::Connection,
+    conn: &copperleaf::Connection,
 ) -> Option<((f64, f64), f64)> {
     let comp = board.components.get(conn.component)?;
     let pin = comp.pins.iter().find(|p| p.name() == conn.pin)?;
@@ -454,7 +454,7 @@ fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_model::{CompiledComponent, Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{CompiledComponent, Connection, Net, NetClass, NetId, Pin, UnitExt};
 
     #[test]
     fn schematic_starts_with_kicad_sch() {

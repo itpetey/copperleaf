@@ -1,5 +1,5 @@
 [package]
-name = "copperleaf-model"
+name = "copperleaf"
 version.workspace = true
 edition.workspace = true
 description = "Domain model for electronics components"
