@@ -41,7 +41,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use mustache2::render::{provider::SourceProvider, RenderManager, SourceCache};
+use mustache2::render::{RenderManager, SourceCache, provider::SourceProvider};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_TEMPLATE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/component.mustache");
@@ -50,26 +50,6 @@ const TEMPLATE_KEY: &str = "component";
 /// A [`SourceProvider`] backed by an owned template string.
 struct TemplateProvider {
     source: String,
-}
-
-impl SourceProvider for TemplateProvider {
-    type Key = &'static str;
-
-    fn get_src(&mut self, key: &Self::Key) -> Result<String, Cow<'static, str>> {
-        if *key == TEMPLATE_KEY {
-            Ok(self.source.clone())
-        } else {
-            Err("unknown template key".into())
-        }
-    }
-
-    fn resolve_partial(&self, _key: &Self::Key, name: &str) -> Self::Key {
-        name.to_string().leak()
-    }
-
-    fn display_key(key: &'_ Self::Key) -> Cow<'_, str> {
-        Cow::Borrowed(*key)
-    }
 }
 
 /// Holds a loaded template and its renderer.
@@ -175,6 +155,26 @@ struct TemplateData {
     pins: Vec<PinRow>,
     constants: Vec<ConstantRow>,
     builders: Vec<String>,
+}
+
+impl SourceProvider for TemplateProvider {
+    type Key = &'static str;
+
+    fn get_src(&mut self, key: &Self::Key) -> Result<String, Cow<'static, str>> {
+        if *key == TEMPLATE_KEY {
+            Ok(self.source.clone())
+        } else {
+            Err("unknown template key".into())
+        }
+    }
+
+    fn resolve_partial(&self, _key: &Self::Key, name: &str) -> Self::Key {
+        name.to_string().leak()
+    }
+
+    fn display_key(key: &'_ Self::Key) -> Cow<'_, str> {
+        Cow::Borrowed(*key)
+    }
 }
 
 /// Generate a Rust source file from all `*.toml` files in `definitions_dir`.

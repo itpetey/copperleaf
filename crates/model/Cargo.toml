@@ -6,6 +6,5 @@ description = "Domain model for electronics components"
 license.workspace = true
 
 [dependencies]
-petgraph.workspace = true
 thiserror.workspace = true
 uom = { workspace = true, features = ["f64", "si"] }

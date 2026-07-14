@@ -270,6 +270,29 @@ pub fn synthesise_decoupling(
     (components, caps, diagnostics)
 }
 
+/// Build the [`CompileSummary`] from the final [`CompiledBoard`] and the
+/// decoupling capacitors synthesised during the pipeline.
+fn build_summary(board: &CompiledBoard, synth_caps: Vec<SynthCap>) -> CompileSummary {
+    CompileSummary {
+        nets: board
+            .nets
+            .iter()
+            .map(|n| NetInfo {
+                name: n.name.clone(),
+                kind: n.kind.clone(),
+                pin_count: board
+                    .connections
+                    .iter()
+                    .filter(|c| c.net.0 == n.name)
+                    .count(),
+            })
+            .collect(),
+        caps_synthesised: synth_caps,
+        pin_count: board.components.iter().map(|c| c.pins.len()).sum(),
+        component_count: board.components.len(),
+    }
+}
+
 fn component_index(refdes: &str, board: &CompiledBoard) -> usize {
     board
         .components
@@ -306,29 +329,6 @@ fn make_capacitor_component(refdes: &str) -> CompiledComponent {
         constraints: vec![],
         symbol: None,
         footprint: None,
-    }
-}
-
-/// Build the [`CompileSummary`] from the final [`CompiledBoard`] and the
-/// decoupling capacitors synthesised during the pipeline.
-fn build_summary(board: &CompiledBoard, synth_caps: Vec<SynthCap>) -> CompileSummary {
-    CompileSummary {
-        nets: board
-            .nets
-            .iter()
-            .map(|n| NetInfo {
-                name: n.name.clone(),
-                kind: n.kind.clone(),
-                pin_count: board
-                    .connections
-                    .iter()
-                    .filter(|c| c.net.0 == n.name)
-                    .count(),
-            })
-            .collect(),
-        caps_synthesised: synth_caps,
-        pin_count: board.components.iter().map(|c| c.pins.len()).sum(),
-        component_count: board.components.len(),
     }
 }
 
