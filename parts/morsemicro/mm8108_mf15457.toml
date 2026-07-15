@@ -267,3 +267,17 @@ num = 38
 name = "GND_8"
 purpose = "Ground"
 kind = "gnd"
+
+[[constraint]]
+type = "Decoupling"
+values = ["100.0.nf()", "10.0.uf()"]
+per_pin = false
+
+[[constraint]]
+type = "LengthMatch"
+group = "SPI0_BUS"
+skew_ps = 200.0
+
+[[constraint]]
+type = "MaxJunction"
+temp = "85.0.celsius()"

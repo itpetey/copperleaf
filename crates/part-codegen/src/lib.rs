@@ -19,6 +19,11 @@
 //! purpose = "Ground"
 //! notes = ""                  # Optional, rendered in the pinout table
 //! kind = "gnd"                # Selects the PinBuilder expression
+//!
+//! [[constraint]]
+//! type = "Decoupling"
+//! values = ["100.0.nf()", "10.0.uf()"]
+//! per_pin = false
 //! ```
 //!
 //! Supported `kind` values and required fields:
@@ -33,6 +38,7 @@
 //! | `spi`       | `bw_mhz`                       | `.spi(bw_mhz)`                             |
 //! | `pwr`       | `v_min`, `v_max`, `i_max`      | `.pwr(v_min.volt(), v_max.volt(), i_max.amp()).pin()` |
 //! | `pwr_fixed` | `v`, `i`                       | `.pwr_fixed(v.volt(), i.amp()).pin()`      |
+//! | `pwr_out`   | `v`, `i`                       | Power output with fixed voltage            |
 
 use std::{
     borrow::Cow,
@@ -42,7 +48,7 @@ use std::{
 };
 
 use mustache2::render::{RenderManager, SourceCache, provider::SourceProvider};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 const DEFAULT_TEMPLATE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/component.mustache");
 const TEMPLATE_KEY: &str = "component";
@@ -55,6 +61,7 @@ struct TemplateProvider {
 /// Holds a loaded template and its renderer.
 struct MustacheRenderer(RenderManager<'static, TemplateProvider>);
 
+/// Error type for the part code generator.
 #[derive(Debug, thiserror::Error)]
 pub enum CodegenError {
     #[error("IO error: {0}")]
@@ -77,57 +84,207 @@ pub enum CodegenError {
     UnknownKind { name: String, kind: String },
     #[error("Template error: {0}")]
     Mustache(#[from] mustache2::Error),
+    #[error("Constraint '{ty}' is missing required field '{field}'")]
+    MissingConstraintField { ty: String, field: String },
+    #[error("Unknown constraint type '{ty}'")]
+    UnknownConstraint { ty: String },
 }
 
-#[derive(Debug, Deserialize)]
-struct ComponentMeta {
+impl Serialize for CodegenError {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+/// Component metadata from the TOML `[component]` table.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ComponentMeta {
     /// Rust struct name for the component (PascalCase).
-    name: String,
+    pub name: String,
     /// Short human-readable title used in module docs.
-    title: String,
+    pub title: String,
     /// Optional shorter description used for the struct doc comment.
-    #[serde(default)]
-    description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct PinDef {
+/// A single pin definition from the TOML `[[pin]]` table.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PinDef {
     /// Physical pin number.
-    num: usize,
+    pub num: usize,
     /// Pin name as it appears on the schematic and in `PinRef` constants.
-    name: String,
+    pub name: String,
     /// Short purpose summary for the documentation table.
-    purpose: String,
+    pub purpose: String,
     /// Additional notes rendered in the documentation table.
     #[serde(default)]
-    notes: String,
+    pub notes: String,
     /// Pin kind selecting the builder expression to emit.
-    kind: String,
+    pub kind: String,
     /// Bandwidth in MHz for clock and SPI pins.
-    #[serde(default)]
-    bw_mhz: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bw_mhz: Option<f64>,
     /// Fixed voltage for `pwr_fixed` pins.
-    #[serde(default)]
-    v: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<f64>,
     /// Minimum voltage for flexible power pins.
-    #[serde(default)]
-    v_min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v_min: Option<f64>,
     /// Maximum voltage for flexible power pins.
-    #[serde(default)]
-    v_max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v_max: Option<f64>,
     /// Current for `pwr_fixed` pins.
-    #[serde(default)]
-    i: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i: Option<f64>,
     /// Maximum current for flexible power pins.
-    #[serde(default)]
-    i_max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i_max: Option<f64>,
+    /// Physical position in millimetres, extracted from KiCad symbols/footprints.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pos: Option<(f64, f64)>,
+    /// Pin rotation in degrees.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<f64>,
+    /// Pin length in millimetres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length: Option<f64>,
+    /// True if the pin is a no-connect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nc: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Manifest {
-    component: ComponentMeta,
+/// A constraint definition from the TOML `[[constraint]]` table.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
+pub struct ConstraintDef {
+    #[serde(rename = "type")]
+    pub ty: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub per_pin: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temp: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skew_ps: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tol_pct: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_plane: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_width: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clearance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voltage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// The complete TOML manifest for a component.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Manifest {
+    pub component: ComponentMeta,
     #[serde(rename = "pin")]
-    pins: Vec<PinDef>,
+    pub pins: Vec<PinDef>,
+    #[serde(rename = "constraint", default)]
+    pub constraints: Vec<ConstraintDef>,
+}
+
+/// Validates a manifest and returns diagnostics for any problems found.
+pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
+    use copperleaf::{Diagnostic, Severity};
+    let mut diags = Vec::new();
+    let mut seen_names: HashSet<&str> = HashSet::new();
+
+    for pin in &manifest.pins {
+        // Duplicate pin name check.
+        if !seen_names.insert(&pin.name) {
+            diags.push(Diagnostic {
+                code: "VALIDATE:DUPLICATE_PIN_NAME".into(),
+                severity: Severity::Error,
+                message: format!("Duplicate pin name '{}'", pin.name),
+                entities: vec![pin.name.clone()],
+                hint: Some("Pin names must be unique within a component".into()),
+            });
+        }
+
+        // Required fields per kind.
+        let missing = match pin.kind.as_str() {
+            "clk" | "spi" => pin.bw_mhz.is_none().then_some("bw_mhz"),
+            "pwr" => {
+                if pin.v_min.is_none() {
+                    Some("v_min")
+                } else if pin.v_max.is_none() {
+                    Some("v_max")
+                } else if pin.i_max.is_none() {
+                    Some("i_max")
+                } else {
+                    None
+                }
+            }
+            "pwr_fixed" | "pwr_out" => {
+                if pin.v.is_none() {
+                    Some("v")
+                } else if pin.i.is_none() {
+                    Some("i")
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if let Some(field) = missing {
+            diags.push(Diagnostic {
+                code: "VALIDATE:MISSING_FIELD".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "Pin '{}' (kind '{}') is missing required field '{}'",
+                    pin.name, pin.kind, field
+                ),
+                entities: vec![pin.name.clone()],
+                hint: None,
+            });
+        }
+
+        // Unresolved power pins.
+        if pin.kind == "pwr" && (pin.v_min.is_none() || pin.v_max.is_none() || pin.i_max.is_none())
+        {
+            diags.push(Diagnostic {
+                code: "VALIDATE:UNRESOLVED_POWER".into(),
+                severity: Severity::Warning,
+                message: format!("Power pin '{}' is missing voltage/current limits", pin.name),
+                entities: vec![pin.name.clone()],
+                hint: Some("Add v_min, v_max, and i_max".into()),
+            });
+        }
+
+        // Pin-name-to-const sanity: names that start with a digit need the PIN_ prefix.
+        if !pin.name.is_empty() {
+            let first = pin.name.chars().next().unwrap();
+            if first.is_ascii_digit() && !pin.name.starts_with("PIN_") {
+                diags.push(Diagnostic {
+                    code: "VALIDATE:NUMERIC_PIN_NAME".into(),
+                    severity: Severity::Warning,
+                    message: format!(
+                        "Pin name '{}' starts with a digit and will be prefixed with PIN_",
+                        pin.name
+                    ),
+                    entities: vec![pin.name.clone()],
+                    hint: Some("Rename the pin or accept the PIN_ prefix".into()),
+                });
+            }
+        }
+    }
+
+    diags
 }
 
 #[derive(Serialize)]
@@ -155,6 +312,7 @@ struct TemplateData {
     pins: Vec<PinRow>,
     constants: Vec<ConstantRow>,
     builders: Vec<String>,
+    constraints: Vec<String>,
 }
 
 impl SourceProvider for TemplateProvider {
@@ -212,8 +370,23 @@ pub fn generate_component_to_string(toml_path: impl AsRef<Path>) -> Result<Strin
     render_component_file(toml_path.as_ref(), &mut renderer)
 }
 
+fn physical_suffix(pin: &PinDef) -> String {
+    let mut suffix = String::new();
+    if let Some((x, y)) = pin.pos {
+        suffix.push_str(&format!(".pos({}, {})", fmt_f64(x), fmt_f64(y)));
+    }
+    if let Some(r) = pin.rotation {
+        suffix.push_str(&format!(".rotation({})", fmt_f64(r)));
+    }
+    if let Some(l) = pin.length {
+        suffix.push_str(&format!(".length({})", fmt_f64(l)));
+    }
+    suffix
+}
+
 fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
     let base = format!("Pin::build({:?})", pin.name);
+    let suffix = physical_suffix(pin);
     let missing = |field: &str| {
         Err(CodegenError::MissingField {
             name: pin.name.clone(),
@@ -222,21 +395,24 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
         })
     };
     match pin.kind.as_str() {
-        "gnd" => Ok(format!("{}.gnd()", base)),
-        "dio" => Ok(format!("{}.dio()", base)),
-        "analog_in" => Ok(format!("{}.analog_in()", base)),
-        "analog_rf" => Ok(format!("{}.role(Role::AnalogIn).rf_limits().pin()", base)),
+        "gnd" => Ok(format!("{}{}.gnd()", base, suffix)),
+        "dio" => Ok(format!("{}{}.dio()", base, suffix)),
+        "analog_in" => Ok(format!("{}{}.analog_in()", base, suffix)),
+        "analog_rf" => Ok(format!(
+            "{}{}.role(Role::AnalogIn).rf_limits().pin()",
+            base, suffix
+        )),
         "clk" => {
             let Some(bw) = pin.bw_mhz else {
                 return missing("bw_mhz");
             };
-            Ok(format!("{}.clk({})", base, fmt_f64(bw)))
+            Ok(format!("{}{}.clk({})", base, suffix, fmt_f64(bw)))
         }
         "spi" => {
             let Some(bw) = pin.bw_mhz else {
                 return missing("bw_mhz");
             };
-            Ok(format!("{}.spi({})", base, fmt_f64(bw)))
+            Ok(format!("{}{}.spi({})", base, suffix, fmt_f64(bw)))
         }
         "pwr" => {
             let Some(vmin) = pin.v_min else {
@@ -249,8 +425,9 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
                 return missing("i_max");
             };
             Ok(format!(
-                "{}.pwr({}.volt(), {}.volt(), {}.amp()).pin()",
+                "{}{}.pwr({}.volt(), {}.volt(), {}.amp()).pin()",
                 base,
+                suffix,
                 fmt_f64(vmin),
                 fmt_f64(vmax),
                 fmt_f64(imax)
@@ -264,8 +441,26 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
                 return missing("i");
             };
             Ok(format!(
-                "{}.pwr_fixed({}.volt(), {}.amp()).pin()",
+                "{}{}.pwr_fixed({}.volt(), {}.amp()).pin()",
                 base,
+                suffix,
+                fmt_f64(v),
+                fmt_f64(i)
+            ))
+        }
+        "pwr_out" => {
+            let Some(v) = pin.v else {
+                return missing("v");
+            };
+            let Some(i) = pin.i else {
+                return missing("i");
+            };
+            Ok(format!(
+                "Pin::build({:?}){}.role(Role::PowerOut).power_spec(PowerSpec {{ v_min: {}.volt(), v_max: {}.volt(), v_nom: Some({}.volt()), i_max: {}.amp() }}).pin()",
+                pin.name,
+                suffix,
+                fmt_f64(v),
+                fmt_f64(v),
                 fmt_f64(v),
                 fmt_f64(i)
             ))
@@ -274,6 +469,48 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
             name: pin.name.clone(),
             kind: pin.kind.clone(),
         }),
+    }
+}
+
+fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
+    let missing = |field: &str| {
+        Err(CodegenError::MissingConstraintField {
+            ty: c.ty.clone(),
+            field: field.to_string(),
+        })
+    };
+    match c.ty.as_str() {
+        "Decoupling" => {
+            let Some(values) = &c.values else {
+                return missing("values");
+            };
+            let values_expr = values.join(", ");
+            let per_pin = c.per_pin.unwrap_or(false);
+            Ok(format!(
+                "Constraint::Decoupling {{ values: vec![{}], per_pin: {} }}",
+                values_expr, per_pin
+            ))
+        }
+        "MaxJunction" => {
+            let Some(temp) = &c.temp else {
+                return missing("temp");
+            };
+            Ok(format!("Constraint::MaxJunction {{ temp: {} }}", temp))
+        }
+        "LengthMatch" => {
+            let Some(group) = &c.group else {
+                return missing("group");
+            };
+            let Some(skew_ps) = c.skew_ps else {
+                return missing("skew_ps");
+            };
+            Ok(format!(
+                "Constraint::LengthMatch {{ group: {:?}.into(), skew_ps: {} }}",
+                group,
+                fmt_f64(skew_ps)
+            ))
+        }
+        _ => Err(CodegenError::UnknownConstraint { ty: c.ty.clone() }),
     }
 }
 
@@ -356,6 +593,9 @@ fn render_component(
         });
     }
 
+    let constraints: Result<Vec<String>, CodegenError> =
+        manifest.constraints.iter().map(constraint_expr).collect();
+
     let data = TemplateData {
         title: title.clone(),
         description: manifest.component.description.clone(),
@@ -370,6 +610,7 @@ fn render_component(
         pins: pin_rows,
         constants,
         builders,
+        constraints: constraints?,
     };
 
     let mut out = String::new();
@@ -388,4 +629,110 @@ fn render_component_file(
         source: e,
     })?;
     render_component(&module_name, &manifest, renderer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pin_with_physical() -> PinDef {
+        PinDef {
+            num: 1,
+            name: "TXN".into(),
+            purpose: "Test".into(),
+            notes: String::new(),
+            kind: "dio".into(),
+            bw_mhz: None,
+            v: None,
+            v_min: None,
+            v_max: None,
+            i: None,
+            i_max: None,
+            pos: Some((101.6, 12.7)),
+            rotation: Some(90.0),
+            length: Some(2.54),
+            nc: None,
+        }
+    }
+
+    #[test]
+    fn pin_def_physical_round_trip() {
+        let pin = pin_with_physical();
+        let toml = toml::to_string(&pin).unwrap();
+        let parsed: PinDef = toml::from_str(&toml).unwrap();
+        assert_eq!(parsed.pos, Some((101.6, 12.7)));
+        assert_eq!(parsed.rotation, Some(90.0));
+        assert_eq!(parsed.length, Some(2.54));
+    }
+
+    #[test]
+    fn builder_expr_emits_physical_fields() {
+        let pin = pin_with_physical();
+        let expr = builder_expr(&pin).unwrap();
+        assert!(expr.contains(".pos(101.6, 12.7)"), "{}", expr);
+        assert!(expr.contains(".rotation(90.0)"), "{}", expr);
+        assert!(expr.contains(".length(2.54)"), "{}", expr);
+    }
+
+    #[test]
+    fn validate_flags_unresolved_power() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+            },
+            pins: vec![PinDef {
+                num: 1,
+                name: "VDD".into(),
+                purpose: "Supply".into(),
+                notes: String::new(),
+                kind: "pwr".into(),
+                bw_mhz: None,
+                v: None,
+                v_min: None,
+                v_max: None,
+                i: None,
+                i_max: None,
+                pos: None,
+                rotation: None,
+                length: None,
+                nc: None,
+            }],
+            constraints: vec![],
+        };
+        let diags = validate(&manifest);
+        assert!(diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
+    }
+
+    #[test]
+    fn validate_passes_complete_power() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+            },
+            pins: vec![PinDef {
+                num: 1,
+                name: "VDD".into(),
+                purpose: "Supply".into(),
+                notes: String::new(),
+                kind: "pwr".into(),
+                bw_mhz: None,
+                v: None,
+                v_min: Some(1.8),
+                v_max: Some(3.3),
+                i: None,
+                i_max: Some(0.1),
+                pos: None,
+                rotation: None,
+                length: None,
+                nc: None,
+            }],
+            constraints: vec![],
+        };
+        let diags = validate(&manifest);
+        assert!(!diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
+    }
 }

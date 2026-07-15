@@ -169,7 +169,7 @@ num = 22
 name = "1V2O"
 purpose = "Regulator output"
 notes = "1.2V regulator output; 10nF to GND"
-kind = "pwr_fixed"
+kind = "pwr_out"
 v = 1.2
 i = 0.01
 
@@ -368,3 +368,12 @@ num = 48
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+
+[[constraint]]
+type = "Decoupling"
+values = ["100.0.nf()", "10.0.uf()"]
+per_pin = false
+
+[[constraint]]
+type = "MaxJunction"
+temp = "125.0.celsius()"

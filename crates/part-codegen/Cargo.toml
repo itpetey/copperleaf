@@ -6,7 +6,8 @@ description = "TOML-to-Rust generator for Copperleaf component definitions"
 license.workspace = true
 
 [dependencies]
+copperleaf.workspace = true
 mustache2 = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
-toml = { workspace = true, features = ["parse", "serde"] }
+toml = { workspace = true, features = ["parse", "serde", "display"] }

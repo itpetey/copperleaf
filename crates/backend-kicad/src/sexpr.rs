@@ -15,7 +15,7 @@ pub enum Sexpr {
     Raw(String),
 }
 
-/// Error returned when an S-expression cannot be parsed.
+/// Error returned when an S-expression cannot be parsed or read.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     /// Input ended while a string or list was still open.
@@ -30,6 +30,15 @@ pub enum ParseError {
     /// An unexpected character was found at the given byte position.
     #[error("unexpected character {ch:?} at position {pos}")]
     UnexpectedChar { ch: char, pos: usize },
+    /// An I/O error occurred while reading a file.
+    #[error("I/O error: {0}")]
+    Io(String),
+}
+
+impl From<std::io::Error> for ParseError {
+    fn from(err: std::io::Error) -> Self {
+        ParseError::Io(err.to_string())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

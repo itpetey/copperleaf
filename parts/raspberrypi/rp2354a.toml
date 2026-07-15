@@ -430,3 +430,17 @@ num = 60
 name = "QSPI_SS"
 purpose = "QSPI"
 kind = "dio"
+
+[[constraint]]
+type = "LengthMatch"
+group = "SPI0_BUS"
+skew_ps = 200.0
+
+[[constraint]]
+type = "LengthMatch"
+group = "SPI1_BUS"
+skew_ps = 500.0
+
+[[constraint]]
+type = "MaxJunction"
+temp = "85.0.celsius()"
