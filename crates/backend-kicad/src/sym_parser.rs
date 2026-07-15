@@ -209,30 +209,6 @@ fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
     result
 }
 
-fn parse_property_value(node: &Sexpr, key: &str) -> Option<String> {
-    let Sexpr::List(children) = node else {
-        return None;
-    };
-    if children.len() < 3 {
-        return None;
-    }
-    let Sexpr::Atom(head) = &children[0] else {
-        return None;
-    };
-    if head != "property" {
-        return None;
-    }
-    let prop_key = string_value(children.get(1)?);
-    if prop_key != key {
-        return None;
-    }
-    let val = string_value(children.get(2)?);
-    if val.is_empty() {
-        return None;
-    }
-    Some(val)
-}
-
 fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
     let Sexpr::List(children) = node else {
         return None;
@@ -294,6 +270,30 @@ fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
         pin_type,
         length,
     })
+}
+
+fn parse_property_value(node: &Sexpr, key: &str) -> Option<String> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    if children.len() < 3 {
+        return None;
+    }
+    let Sexpr::Atom(head) = &children[0] else {
+        return None;
+    };
+    if head != "property" {
+        return None;
+    }
+    let prop_key = string_value(children.get(1)?);
+    if prop_key != key {
+        return None;
+    }
+    let val = string_value(children.get(2)?);
+    if val.is_empty() {
+        return None;
+    }
+    Some(val)
 }
 
 fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
