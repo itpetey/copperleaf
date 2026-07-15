@@ -21,7 +21,7 @@ impl {{{struct_name}}} {
     {{/constants}}
 
     pub fn new() -> Self {
-        use copperleaf::{Pin, Role, units::UnitExt};
+        use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};
 
         Self {
             pins: vec![
@@ -31,11 +31,24 @@ impl {{{struct_name}}} {
             ],
         }
     }
+
+    pub fn constraints(&self) -> Vec<copperleaf::Constraint> {
+        use copperleaf::{Constraint, units::UnitExt};
+        vec![
+            {{#constraints}}
+            {{{.}}},
+            {{/constraints}}
+        ]
+    }
 }
 
 impl copperleaf::Component for {{{struct_name}}} {
     fn pins(&self) -> &[copperleaf::Pin] {
         &self.pins
+    }
+
+    fn constraints(&self) -> Vec<copperleaf::Constraint> {
+        Self::constraints(self)
     }
 }
 

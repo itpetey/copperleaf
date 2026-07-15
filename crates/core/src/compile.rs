@@ -21,7 +21,7 @@ use crate::{
     CompiledComponent,
     board::{Board, CompiledBoard, ComponentEntry, Connection, RawNetOverride},
     erc,
-    net::{Constraint, Net, NetId, NetKind},
+    net::{Constraint, Net, NetClass, NetId, NetKind},
     pin::{Pin, PinId, RawConnection, Role, SigSpec},
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
     util::{UnionFind, deterministic_id},
@@ -69,6 +69,8 @@ struct NetGrouping {
     pin_to_node: HashMap<(usize, &'static str), usize>,
     nodes: Vec<(usize, &'static str)>,
     groups: HashMap<usize, Vec<usize>>,
+    /// Map from node index to its union-find root.
+    roots: Vec<usize>,
 }
 
 impl CompileError {
@@ -114,8 +116,10 @@ impl NetGrouping {
         }
 
         let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut roots = Vec::with_capacity(nodes.len());
         for i in 0..nodes.len() {
             let root = uf.find(i);
+            roots.push(root);
             groups.entry(root).or_default().push(i);
         }
 
@@ -123,6 +127,7 @@ impl NetGrouping {
             pin_to_node,
             nodes,
             groups,
+            roots,
         }
     }
 
@@ -133,13 +138,13 @@ impl NetGrouping {
         for (edge_id, conn) in connections.iter().enumerate() {
             let a = (conn.from.component, conn.from.pin);
             let b = (conn.to.component, conn.to.pin);
-            let a_rep = self.pin_to_node[&a];
-            if a_rep == rep {
+            let a_node = self.pin_to_node[&a];
+            if self.roots[a_node] == rep {
                 edge_ids.push(edge_id);
                 continue;
             }
-            let b_rep = self.pin_to_node[&b];
-            if b_rep == rep {
+            let b_node = self.pin_to_node[&b];
+            if self.roots[b_node] == rep {
                 edge_ids.push(edge_id);
             }
         }
@@ -200,15 +205,31 @@ pub(crate) fn run(board: Board) -> Result<CompileReport, CompileError> {
     }
 
     // --- Phase 3: Generation (synthesis) ---
-    let (synth_components, synth_caps, synth_diags) = synthesise_decoupling(&board_struct);
+    let (synth_components, synth_caps, synth_diags, synth_connections, synth_net) =
+        synthesise_decoupling(&board_struct);
     warnings.extend(synth_diags);
 
     let mut final_components = board_struct.components;
     final_components.extend(synth_components);
 
+    let has_synth_connections = !synth_connections.is_empty();
+    let mut final_connections = board_struct.connections;
+    final_connections.extend(synth_connections);
+
+    let mut final_nets = board_struct.nets;
+    if let Some(net) = synth_net {
+        // Only add a fallback ground net if decoupling capacitors were actually
+        // placed and reference it.
+        if has_synth_connections {
+            final_nets.push(net);
+        }
+    }
+
     let final_board = CompiledBoard {
         components: final_components,
-        ..board_struct
+        nets: final_nets,
+        connections: final_connections,
+        constraints: board_struct.constraints,
     };
 
     let summary = build_summary(&final_board, synth_caps);
@@ -368,6 +389,10 @@ fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
 
 /// Collect `v_nom` from every power pin on the net.  Returns `None` if no pin
 /// provides a nominal voltage, or emits an error on conflict.
+///
+/// Ground pins are ignored as voltage sources unless the net contains no other
+/// `PowerIn`/`PowerOut` pins, so that decoupling capacitors and direct ground
+/// ties do not create false conflicts.
 fn infer_voltage_from_pins(
     members: &[usize],
     nodes: &[(usize, &'static str)],
@@ -376,35 +401,44 @@ fn infer_voltage_from_pins(
     errors: &mut Vec<Diagnostic>,
 ) -> Option<Qty<Volt>> {
     let mut inferred: Option<Qty<Volt>> = None;
+    let mut ground: Option<Qty<Volt>> = None;
 
     for &node_idx in members {
         let (comp_idx, pin_name) = nodes[node_idx];
         let comp = &compiled[comp_idx];
         let pin = comp.pins.iter().find(|p| p.name() == pin_name).unwrap();
 
-        if let Some(v) = pin.power_spec().v_nom {
-            if let Some(existing) = inferred {
-                if (existing.as_base() - v.as_base()).abs() > 1e-9 {
-                    errors.push(Diagnostic {
-                        code: "NET:VOLTAGE_CONFLICT".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "conflicting v_nom values on net '{}' ({:.2}V vs {:.2}V)",
-                            net_name,
-                            existing.as_base(),
-                            v.as_base()
-                        ),
-                        entities: vec![net_name.to_owned()],
-                        hint: Some("check connected power pins".into()),
-                    });
-                }
-            } else {
-                inferred = Some(v);
+        let v = pin.power_spec().v_nom;
+        if matches!(pin.role(), Role::Gnd) {
+            ground = v.or(Some(0.0.volt()));
+            continue;
+        }
+
+        let Some(v) = v else {
+            continue;
+        };
+
+        if let Some(existing) = inferred {
+            if (existing.as_base() - v.as_base()).abs() > 1e-9 {
+                errors.push(Diagnostic {
+                    code: "NET:VOLTAGE_CONFLICT".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "conflicting v_nom values on net '{}' ({:.2}V vs {:.2}V)",
+                        net_name,
+                        existing.as_base(),
+                        v.as_base()
+                    ),
+                    entities: vec![net_name.to_owned()],
+                    hint: Some("check connected power pins".into()),
+                });
             }
+        } else {
+            inferred = Some(v);
         }
     }
 
-    inferred
+    inferred.or(ground)
 }
 
 fn make_capacitor_component(refdes: &str) -> CompiledComponent {
@@ -507,23 +541,69 @@ fn resolve_net_overrides(
     (net_names, net_voltages)
 }
 
+fn is_ground_net(board: &CompiledBoard, net_name: &str) -> bool {
+    board
+        .nets
+        .iter()
+        .find(|n| n.name == net_name)
+        .map(|n| matches!(n.kind, NetKind::Power { v_nom, .. } if v_nom.as_base().abs() < 1e-9))
+        .unwrap_or(false)
+}
+
+fn ground_net_name_and_fallback(board: &CompiledBoard) -> (String, Option<Net>) {
+    if let Some(n) = board.nets.iter().find(|n| n.name == "GND") {
+        return (n.name.clone(), None);
+    }
+    if let Some(n) = board
+        .nets
+        .iter()
+        .find(|n| matches!(n.kind, NetKind::Power { v_nom, .. } if v_nom.as_base().abs() < 1e-9))
+    {
+        return (n.name.clone(), None);
+    }
+    let net = Net {
+        name: "GND".into(),
+        kind: NetKind::Power {
+            v_nom: 0.0.volt(),
+            ripple: None,
+        },
+        class: NetClass::default(),
+        constraints: vec![],
+    };
+    ("GND".into(), Some(net))
+}
+
 /// Synthesise decoupling capacitors from part-level [`Constraint::Decoupling`] rules.
 ///
-/// Returns `(components, caps, diagnostics)`:
+/// Returns `(components, caps, diagnostics, connections, fallback_ground_net)`:
 /// - `components` -- new [`CompiledComponent`]s to append to the board.
 /// - `caps` -- [`SynthCap`] records for the compile summary.
 /// - `diagnostics` -- informational warnings about missing power pins or
 ///   unconnected power nets, plus an info-level summary.
+/// - `connections` -- new connections wiring each synthesised capacitor between
+///   its target power net and ground.
+/// - `fallback_ground_net` -- a fresh ground net if the board did not already
+///   contain one.
 ///
 /// The board itself is never mutated; the caller appends the returned
-/// components exactly once when assembling the final `CompiledBoard`.
+/// components and connections exactly once when assembling the final `CompiledBoard`.
+#[allow(clippy::type_complexity)]
 fn synthesise_decoupling(
     board: &CompiledBoard,
-) -> (Vec<CompiledComponent>, Vec<SynthCap>, Vec<Diagnostic>) {
+) -> (
+    Vec<CompiledComponent>,
+    Vec<SynthCap>,
+    Vec<Diagnostic>,
+    Vec<Connection>,
+    Option<Net>,
+) {
     let mut components = Vec::new();
     let mut caps = Vec::new();
     let mut diagnostics = Vec::new();
+    let mut connections = Vec::new();
     let mut next_c = 1u32;
+
+    let (gnd_net_name, fallback_gnd_net) = ground_net_name_and_fallback(board);
 
     for (comp_idx, comp) in board.components.iter().enumerate() {
         for constraint in &comp.constraints {
@@ -551,45 +631,64 @@ fn synthesise_decoupling(
                 continue;
             }
 
-            let target_pins: Vec<&Pin> = if *per_pin {
-                power_pins.clone()
+            if *per_pin {
+                for pin in power_pins {
+                    place_decoupling_set(
+                        board,
+                        comp_idx,
+                        comp,
+                        pin,
+                        values,
+                        &gnd_net_name,
+                        &mut components,
+                        &mut caps,
+                        &mut connections,
+                        &mut diagnostics,
+                        &mut next_c,
+                    );
+                }
             } else {
-                vec![power_pins[0]]
-            };
-
-            for pin in target_pins {
-                let net_name = board
-                    .connections
-                    .iter()
-                    .find(|c| c.component == comp_idx && c.pin == pin.name())
-                    .map(|c| c.net.0.clone());
-
-                let Some(net) = net_name else {
-                    diagnostics.push(Diagnostic {
-                        code: "DECOUPLE:UNCONNECTED".into(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "power pin {}.{} is not connected to a net",
-                            comp.refdes,
-                            pin.name()
-                        ),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-                        hint: Some("connect the pin to a power net".into()),
-                    });
-                    continue;
-                };
-
-                for value in values {
-                    let refdes = format!("C{}", next_c);
-                    next_c += 1;
-                    components.push(make_capacitor_component(&refdes));
-                    caps.push(SynthCap {
-                        refdes: refdes.clone(),
-                        value: *value,
-                        net: net.clone(),
-                        source_component: comp.refdes.clone(),
-                        source_pin: pin.name().to_owned(),
-                    });
+                // One set of decoupling capacitors per unique power net.
+                let mut pins_by_net: HashMap<String, Vec<&Pin>> = HashMap::new();
+                for pin in power_pins {
+                    let net_name = board
+                        .connections
+                        .iter()
+                        .find(|c| c.component == comp_idx && c.pin == pin.name())
+                        .map(|c| c.net.0.clone());
+                    if let Some(name) = net_name {
+                        pins_by_net.entry(name).or_default().push(pin);
+                    } else {
+                        diagnostics.push(Diagnostic {
+                            code: "DECOUPLE:UNCONNECTED".into(),
+                            severity: Severity::Warning,
+                            message: format!(
+                                "power pin {}.{} is not connected to a net",
+                                comp.refdes,
+                                pin.name()
+                            ),
+                            entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+                            hint: Some("connect the pin to a power net".into()),
+                        });
+                    }
+                }
+                for (_, pins) in pins_by_net {
+                    // Use the first pin on the net as the representative.
+                    if let Some(pin) = pins.first() {
+                        place_decoupling_set(
+                            board,
+                            comp_idx,
+                            comp,
+                            pin,
+                            values,
+                            &gnd_net_name,
+                            &mut components,
+                            &mut caps,
+                            &mut connections,
+                            &mut diagnostics,
+                            &mut next_c,
+                        );
+                    }
                 }
             }
         }
@@ -605,7 +704,73 @@ fn synthesise_decoupling(
         });
     }
 
-    (components, caps, diagnostics)
+    (components, caps, diagnostics, connections, fallback_gnd_net)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn place_decoupling_set(
+    board: &CompiledBoard,
+    comp_idx: usize,
+    comp: &CompiledComponent,
+    pin: &Pin,
+    values: &[Qty<crate::units::Farad>],
+    gnd_net_name: &str,
+    components: &mut Vec<CompiledComponent>,
+    caps: &mut Vec<SynthCap>,
+    connections: &mut Vec<Connection>,
+    diagnostics: &mut Vec<Diagnostic>,
+    next_c: &mut u32,
+) {
+    let net_name = board
+        .connections
+        .iter()
+        .find(|c| c.component == comp_idx && c.pin == pin.name())
+        .map(|c| c.net.0.clone());
+
+    let Some(net) = net_name else {
+        diagnostics.push(Diagnostic {
+            code: "DECOUPLE:UNCONNECTED".into(),
+            severity: Severity::Warning,
+            message: format!(
+                "power pin {}.{} is not connected to a net",
+                comp.refdes,
+                pin.name()
+            ),
+            entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+            hint: Some("connect the pin to a power net".into()),
+        });
+        return;
+    };
+
+    // Skip pins that are tied directly to ground (e.g. VDD_USB in SPI mode).
+    if is_ground_net(board, &net) {
+        return;
+    }
+
+    for value in values {
+        let refdes = format!("C{}", *next_c);
+        *next_c += 1;
+
+        let comp_idx_in_final = board.components.len() + components.len();
+        components.push(make_capacitor_component(&refdes));
+        caps.push(SynthCap {
+            refdes: refdes.clone(),
+            value: *value,
+            net: net.clone(),
+            source_component: comp.refdes.clone(),
+            source_pin: pin.name().to_owned(),
+        });
+        connections.push(Connection {
+            component: comp_idx_in_final,
+            pin: "1".into(),
+            net: NetId(net.clone()),
+        });
+        connections.push(Connection {
+            component: comp_idx_in_final,
+            pin: "2".into(),
+            net: NetId(gnd_net_name.into()),
+        });
+    }
 }
 
 #[cfg(test)]
@@ -654,7 +819,7 @@ mod tests {
             }],
             constraints: vec![],
         };
-        let (comps, caps, diags) = synthesise_decoupling(&board);
+        let (comps, caps, diags, conns, fallback) = synthesise_decoupling(&board);
         assert_eq!(caps.len(), 2);
         assert_eq!(caps[0].refdes, "C1");
         assert_eq!(caps[0].net, "V3V3");
@@ -662,6 +827,129 @@ mod tests {
         assert_eq!(caps[0].source_pin, "VIN");
         assert!(approx_eq(caps[0].value.as_base(), 100e-9));
         assert_eq!(comps.len(), 2);
+        assert_eq!(conns.len(), 4);
+        assert!(fallback.is_some());
         assert!(diags.iter().any(|d| d.code == "DECOUPLE:SUMMARY"));
+    }
+
+    #[test]
+    fn skips_ground_tied_power_pin() {
+        let board = CompiledBoard {
+            components: vec![make_comp(
+                "U1",
+                vec![
+                    Pin::build("VDD").pwr_fixed(3.3.volt(), 1.0.amp()).pin(),
+                    Pin::build("VDD_USB")
+                        .pwr(3.0.volt(), 3.6.volt(), 0.1.amp())
+                        .pin(),
+                ],
+                vec![Constraint::Decoupling {
+                    values: vec![100.0.nf()],
+                    per_pin: false,
+                }],
+            )],
+            nets: vec![
+                Net {
+                    name: "V3V3".into(),
+                    kind: NetKind::Power {
+                        v_nom: 3.3.volt(),
+                        ripple: None,
+                    },
+                    class: crate::net::NetClass::default(),
+                    constraints: vec![],
+                },
+                Net {
+                    name: "GND".into(),
+                    kind: NetKind::Power {
+                        v_nom: 0.0.volt(),
+                        ripple: None,
+                    },
+                    class: crate::net::NetClass::default(),
+                    constraints: vec![],
+                },
+            ],
+            connections: vec![
+                Connection {
+                    component: 0,
+                    pin: "VDD".into(),
+                    net: NetId("V3V3".into()),
+                },
+                Connection {
+                    component: 0,
+                    pin: "VDD_USB".into(),
+                    net: NetId("GND".into()),
+                },
+            ],
+            constraints: vec![],
+        };
+        let (comps, caps, _, _, _) = synthesise_decoupling(&board);
+        assert_eq!(caps.len(), 1);
+        assert_eq!(caps[0].net, "V3V3");
+        assert_eq!(comps.len(), 1);
+    }
+
+    #[test]
+    fn groups_per_net_when_not_per_pin() {
+        let board = CompiledBoard {
+            components: vec![make_comp(
+                "U1",
+                vec![
+                    Pin::build("AVDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                    Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                ],
+                vec![Constraint::Decoupling {
+                    values: vec![100.0.nf()],
+                    per_pin: false,
+                }],
+            )],
+            nets: vec![
+                Net {
+                    name: "AVDD".into(),
+                    kind: NetKind::Power {
+                        v_nom: 3.3.volt(),
+                        ripple: None,
+                    },
+                    class: crate::net::NetClass::default(),
+                    constraints: vec![],
+                },
+                Net {
+                    name: "VDD".into(),
+                    kind: NetKind::Power {
+                        v_nom: 3.3.volt(),
+                        ripple: None,
+                    },
+                    class: crate::net::NetClass::default(),
+                    constraints: vec![],
+                },
+                Net {
+                    name: "GND".into(),
+                    kind: NetKind::Power {
+                        v_nom: 0.0.volt(),
+                        ripple: None,
+                    },
+                    class: crate::net::NetClass::default(),
+                    constraints: vec![],
+                },
+            ],
+            connections: vec![
+                Connection {
+                    component: 0,
+                    pin: "AVDD".into(),
+                    net: NetId("AVDD".into()),
+                },
+                Connection {
+                    component: 0,
+                    pin: "VDD".into(),
+                    net: NetId("VDD".into()),
+                },
+            ],
+            constraints: vec![],
+        };
+        let (comps, caps, _, _, _) = synthesise_decoupling(&board);
+        assert_eq!(caps.len(), 2);
+        let nets: Vec<&str> = caps.iter().map(|c| c.net.as_str()).collect();
+        assert!(nets.contains(&"AVDD"));
+        assert!(nets.contains(&"VDD"));
+        assert_eq!(comps.len(), 2);
     }
 }
