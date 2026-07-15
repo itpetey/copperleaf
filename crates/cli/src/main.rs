@@ -28,38 +28,6 @@ pub enum CliError {
     Parse(#[from] copperleaf_backend_kicad::ParseError),
 }
 
-pub fn print_diagnostic(d: &Diagnostic) {
-    match d.severity {
-        Severity::Info => eprint!("info"),
-        Severity::Warning => eprint!("warning"),
-        Severity::Error => eprint!("error"),
-    }
-    eprint!("[{}]", d.code);
-    if !d.entities.is_empty() {
-        eprint!(" {}", d.entities.join(", "));
-    }
-    eprintln!(": {}", d.message);
-    if let Some(hint) = &d.hint {
-        eprintln!("  hint: {}", hint);
-    }
-}
-
-#[derive(Parser)]
-#[command(name = "copperleaf")]
-#[command(version, about = "Parts-creation CLI for Copperleaf")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Create a new part TOML from a source.
-    New(NewArgs),
-    /// Update an existing part TOML from a source.
-    Update(UpdateArgs),
-}
-
 #[derive(Parser)]
 #[command(group = clap::ArgGroup::new("source").required(true).multiple(false))]
 struct NewArgs {
@@ -123,21 +91,20 @@ struct UpdateArgs {
     default_kind: String,
 }
 
-pub fn datasheet_stub(_path: &str) -> CliError {
-    CliError::Diagnostic(Diagnostic {
-        code: "CLI:DATASHEET_STUB".into(),
-        severity: Severity::Error,
-        message: "LLM-assisted datasheet parsing is a future capability".into(),
-        entities: vec![],
-        hint: Some("Use --symbol or --footprint instead".into()),
-    })
+#[derive(Subcommand)]
+enum Command {
+    /// Create a new part TOML from a source.
+    New(NewArgs),
+    /// Update an existing part TOML from a source.
+    Update(UpdateArgs),
 }
 
-fn run(cli: Cli) -> Result<(), CliError> {
-    match cli.command {
-        Command::New(args) => new::run(args),
-        Command::Update(args) => update::run(args),
-    }
+#[derive(Parser)]
+#[command(name = "copperleaf")]
+#[command(version, about = "Parts-creation CLI for Copperleaf")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
 }
 
 fn main() -> Result<()> {
@@ -149,5 +116,38 @@ fn main() -> Result<()> {
             bail!(CliError::Diagnostic(d))
         }
         Err(e) => bail!(e),
+    }
+}
+
+pub fn datasheet_stub(_path: &str) -> CliError {
+    CliError::Diagnostic(Diagnostic {
+        code: "CLI:DATASHEET_STUB".into(),
+        severity: Severity::Error,
+        message: "LLM-assisted datasheet parsing is a future capability".into(),
+        entities: vec![],
+        hint: Some("Use --symbol or --footprint instead".into()),
+    })
+}
+
+pub fn print_diagnostic(d: &Diagnostic) {
+    match d.severity {
+        Severity::Info => eprint!("info"),
+        Severity::Warning => eprint!("warning"),
+        Severity::Error => eprint!("error"),
+    }
+    eprint!("[{}]", d.code);
+    if !d.entities.is_empty() {
+        eprint!(" {}", d.entities.join(", "));
+    }
+    eprintln!(": {}", d.message);
+    if let Some(hint) = &d.hint {
+        eprintln!("  hint: {}", hint);
+    }
+}
+
+fn run(cli: Cli) -> Result<(), CliError> {
+    match cli.command {
+        Command::New(args) => new::run(args),
+        Command::Update(args) => update::run(args),
     }
 }

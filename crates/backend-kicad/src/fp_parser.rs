@@ -57,12 +57,6 @@ pub fn parse_footprint_lib(
     Ok(entries)
 }
 
-fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
-    let mut pads = Vec::new();
-    collect_pads(sexpr, &mut pads);
-    pads
-}
-
 fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     let Sexpr::List(children) = node else {
         return;
@@ -73,6 +67,12 @@ fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     for child in children {
         collect_pads(child, pads);
     }
+}
+
+fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
+    let mut pads = Vec::new();
+    collect_pads(sexpr, &mut pads);
+    pads
 }
 
 fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {

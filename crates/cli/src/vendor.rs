@@ -46,21 +46,6 @@ pub fn scaffold(root: &Path, vendor: &str, lib_id: &str) -> Result<(), CliError>
     Ok(())
 }
 
-fn toml_filename(lib_id: &str) -> String {
-    let mut out = String::new();
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        out.push_str("part");
-    }
-    out
-}
-
 fn add_workspace_member(root_cargo: &Path, member: &str) -> Result<(), CliError> {
     let content = std::fs::read_to_string(root_cargo)?;
     if content.contains(&format!("\"{member}\"")) {
@@ -86,6 +71,21 @@ fn add_workspace_member(root_cargo: &Path, member: &str) -> Result<(), CliError>
     new_content.insert_str(insert_pos, &format!(",\n{member_line}"));
     std::fs::write(root_cargo, new_content)?;
     Ok(())
+}
+
+fn toml_filename(lib_id: &str) -> String {
+    let mut out = String::new();
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        out.push_str("part");
+    }
+    out
 }
 
 #[cfg(test)]

@@ -24,6 +24,48 @@ pub fn run(args: NewArgs) -> Result<(), CliError> {
     Ok(())
 }
 
+fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Result<(), CliError> {
+    let lib_id = args.lib_id.clone().unwrap_or_default();
+    let pads = if std::fs::metadata(footprint_path)?.is_dir() {
+        let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
+        let Some((_, pads)) = lib.into_iter().find(|(name, _)| name == &lib_id) else {
+            return Err(CliError::Diagnostic(Diagnostic {
+                code: "CLI:FOOTPRINT_NOT_FOUND".into(),
+                severity: Severity::Error,
+                message: format!("Footprint '{}' not found in '{}'", lib_id, footprint_path),
+                entities: vec![lib_id.clone()],
+                hint: None,
+            }));
+        };
+        pads
+    } else {
+        copperleaf_backend_kicad::parse_footprint(footprint_path)?
+    };
+
+    let title = args.title.clone().unwrap_or_else(|| lib_id.clone());
+    let description = args.description.clone();
+    let manifest = manifest::manifest_from_footprint(
+        &pads,
+        ComponentMeta {
+            name: struct_name(&lib_id),
+            title,
+            description,
+        },
+        &args.default_kind,
+    );
+
+    let output = manifest::serialise(&manifest);
+    let diags = vec![Diagnostic {
+        code: "CLI:ANON_PAD_NAMES".into(),
+        severity: Severity::Warning,
+        message: "Pin names were synthesised from pad numbers".into(),
+        entities: vec![],
+        hint: Some("Run update --symbol to replace placeholder names".into()),
+    }];
+    write_output(args, &lib_id, &output, &diags)?;
+    Ok(())
+}
+
 fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError> {
     let lib_id = args.lib_id.as_deref().ok_or_else(|| {
         CliError::Diagnostic(Diagnostic {
@@ -71,46 +113,40 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
     Ok(())
 }
 
-fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Result<(), CliError> {
-    let lib_id = args.lib_id.clone().unwrap_or_default();
-    let pads = if std::fs::metadata(footprint_path)?.is_dir() {
-        let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
-        let Some((_, pads)) = lib.into_iter().find(|(name, _)| name == &lib_id) else {
-            return Err(CliError::Diagnostic(Diagnostic {
-                code: "CLI:FOOTPRINT_NOT_FOUND".into(),
-                severity: Severity::Error,
-                message: format!("Footprint '{}' not found in '{}'", lib_id, footprint_path),
-                entities: vec![lib_id.clone()],
-                hint: None,
-            }));
-        };
-        pads
-    } else {
-        copperleaf_backend_kicad::parse_footprint(footprint_path)?
-    };
+fn struct_name(lib_id: &str) -> String {
+    let mut out = String::new();
+    let mut first = true;
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if first {
+                out.push(ch.to_ascii_uppercase());
+            } else {
+                out.push(ch.to_ascii_lowercase());
+            }
+            first = false;
+        } else {
+            first = true;
+        }
+    }
+    if out.is_empty() {
+        out.push_str("Part");
+    }
+    out
+}
 
-    let title = args.title.clone().unwrap_or_else(|| lib_id.clone());
-    let description = args.description.clone();
-    let manifest = manifest::manifest_from_footprint(
-        &pads,
-        ComponentMeta {
-            name: struct_name(&lib_id),
-            title,
-            description,
-        },
-        &args.default_kind,
-    );
-
-    let output = manifest::serialise(&manifest);
-    let diags = vec![Diagnostic {
-        code: "CLI:ANON_PAD_NAMES".into(),
-        severity: Severity::Warning,
-        message: "Pin names were synthesised from pad numbers".into(),
-        entities: vec![],
-        hint: Some("Run update --symbol to replace placeholder names".into()),
-    }];
-    write_output(args, &lib_id, &output, &diags)?;
-    Ok(())
+fn toml_filename(lib_id: &str) -> String {
+    let mut out = String::new();
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        out.push_str("part");
+    }
+    format!("{}.toml", out)
 }
 
 fn write_output(
@@ -141,42 +177,6 @@ fn write_output(
     }
     std::fs::write(&out_path, output)?;
     Ok(())
-}
-
-fn toml_filename(lib_id: &str) -> String {
-    let mut out = String::new();
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        out.push_str("part");
-    }
-    format!("{}.toml", out)
-}
-
-fn struct_name(lib_id: &str) -> String {
-    let mut out = String::new();
-    let mut first = true;
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            if first {
-                out.push(ch.to_ascii_uppercase());
-            } else {
-                out.push(ch.to_ascii_lowercase());
-            }
-            first = false;
-        } else {
-            first = true;
-        }
-    }
-    if out.is_empty() {
-        out.push_str("Part");
-    }
-    out
 }
 
 #[cfg(test)]

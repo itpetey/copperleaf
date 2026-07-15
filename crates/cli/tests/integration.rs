@@ -1,23 +1,9 @@
 use std::process::Command;
 
-fn sample_symbol_lib() -> &'static str {
-    r#"(kicad_symbol_lib
-  (symbol "TEST"
-    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
-    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
-    (pin clock line (at 5.08 2.54 180) (length 2.54) (name "CLK") (number "3"))
-    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "4"))
-  )
-)"#
-}
-
-fn sample_footprint() -> &'static str {
-    r#"(footprint "TEST"
-  (pad "1" smd rect (at -2.0 1.0 90.0) (size 0.5 0.25))
-  (pad "2" smd rect (at -2.0 -1.0) (size 0.5 0.25))
-  (pad "3" smd rect (at 2.0 1.0 180.0) (size 0.5 0.25))
-  (pad "4" smd rect (at 2.0 -1.0) (size 0.5 0.25))
-)"#
+fn copperleaf() -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_copperleaf"));
+    cmd.current_dir(std::env::current_dir().unwrap());
+    cmd
 }
 
 /// Minimal embedded RP2354A symbol derived from `MCU_RaspberryPi.kicad_sym`.
@@ -46,39 +32,23 @@ fn minimal_rp2354a_symbol_lib() -> &'static str {
 )"#
 }
 
-fn copperleaf() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_copperleaf"));
-    cmd.current_dir(std::env::current_dir().unwrap());
-    cmd
-}
-
 #[test]
-fn new_symbol_generates_toml_with_physical_fields() {
+fn new_datasheet_fails_with_stub() {
     let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let ds = dir.path().join("test.pdf");
+    std::fs::write(&ds, "PDF").unwrap();
     let out = dir.path().join("test.toml");
 
     let status = copperleaf()
         .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
+        .arg("--datasheet")
+        .arg(&ds)
         .arg("--out")
         .arg(&out)
         .status()
         .unwrap();
-    assert!(status.success());
-
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("kind = \"pwr\""));
-    assert!(toml.contains("kind = \"gnd\""));
-    assert!(toml.contains("kind = \"clk\""));
-    assert!(toml.contains("bw_mhz = 25.0"));
-    assert!(toml.contains("pos = [-5.08, 2.54]"));
-    assert!(toml.contains("rotation = 0.0"));
-    assert!(toml.contains("length = 2.54"));
+    assert!(!status.success());
+    assert!(!out.exists());
 }
 
 #[test]
@@ -117,15 +87,13 @@ power_in = { kind = "pwr", v_min = 1.8, v_max = 3.3, i_max = 0.1 }
 }
 
 #[test]
-fn new_then_update_footprint_preserves_logical_fields() {
+fn new_symbol_generates_toml_with_physical_fields() {
     let dir = tempfile::tempdir().unwrap();
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let fp = dir.path().join("test.kicad_mod");
-    std::fs::write(&fp, sample_footprint()).unwrap();
     let out = dir.path().join("test.toml");
 
-    copperleaf()
+    let status = copperleaf()
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
@@ -133,77 +101,18 @@ fn new_then_update_footprint_preserves_logical_fields() {
         .arg("TEST")
         .arg("--out")
         .arg(&out)
-        .status()
-        .unwrap();
-
-    copperleaf()
-        .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
-        .arg("--lib-id")
-        .arg("TEST")
-        .status()
-        .unwrap();
-
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("kind = \"pwr\""));
-    assert!(toml.contains("name = \"VDD\""));
-    assert!(toml.contains("pos = [-2.0, 1.0]"));
-    assert!(toml.contains("rotation = 90.0"));
-}
-
-#[test]
-fn new_datasheet_fails_with_stub() {
-    let dir = tempfile::tempdir().unwrap();
-    let ds = dir.path().join("test.pdf");
-    std::fs::write(&ds, "PDF").unwrap();
-    let out = dir.path().join("test.toml");
-
-    let status = copperleaf()
-        .arg("new")
-        .arg("--datasheet")
-        .arg(&ds)
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-    assert!(!status.success());
-    assert!(!out.exists());
-}
-
-#[test]
-fn new_symbol_with_crate_scaffolds_vendor_crate() {
-    let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-
-    // The CLI expects to run in a workspace root. Create a minimal one.
-    std::fs::write(
-        dir.path().join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"parts/existing\"\n]\n",
-    )
-    .unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
         .status()
         .unwrap();
     assert!(status.success());
 
-    let cargo_toml = dir.path().join("parts/testvendor/Cargo.toml");
-    assert!(cargo_toml.exists());
-    let lib_rs = dir.path().join("parts/testvendor/lib.rs");
-    assert!(lib_rs.exists());
-    let root_cargo = std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();
-    assert!(root_cargo.contains("\"parts/testvendor\""));
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("kind = \"gnd\""));
+    assert!(toml.contains("kind = \"clk\""));
+    assert!(toml.contains("bw_mhz = 25.0"));
+    assert!(toml.contains("pos = [-5.08, 2.54]"));
+    assert!(toml.contains("rotation = 0.0"));
+    assert!(toml.contains("length = 2.54"));
 }
 
 #[test]
@@ -249,4 +158,95 @@ fn new_symbol_matches_existing_rp2354a_part() {
         assert_eq!(generated_pin.num, existing_pin.num);
         assert!(!generated_pin.kind.is_empty());
     }
+}
+
+#[test]
+fn new_symbol_with_crate_scaffolds_vendor_crate() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+
+    // The CLI expects to run in a workspace root. Create a minimal one.
+    std::fs::write(
+        dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\n  \"parts/existing\"\n]\n",
+    )
+    .unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let cargo_toml = dir.path().join("parts/testvendor/Cargo.toml");
+    assert!(cargo_toml.exists());
+    let lib_rs = dir.path().join("parts/testvendor/lib.rs");
+    assert!(lib_rs.exists());
+    let root_cargo = std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();
+    assert!(root_cargo.contains("\"parts/testvendor\""));
+}
+
+#[test]
+fn new_then_update_footprint_preserves_logical_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let fp = dir.path().join("test.kicad_mod");
+    std::fs::write(&fp, sample_footprint()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+
+    copperleaf()
+        .arg("update")
+        .arg(&out)
+        .arg("--footprint")
+        .arg(&fp)
+        .arg("--lib-id")
+        .arg("TEST")
+        .status()
+        .unwrap();
+
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("name = \"VDD\""));
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+    assert!(toml.contains("rotation = 90.0"));
+}
+
+fn sample_footprint() -> &'static str {
+    r#"(footprint "TEST"
+  (pad "1" smd rect (at -2.0 1.0 90.0) (size 0.5 0.25))
+  (pad "2" smd rect (at -2.0 -1.0) (size 0.5 0.25))
+  (pad "3" smd rect (at 2.0 1.0 180.0) (size 0.5 0.25))
+  (pad "4" smd rect (at 2.0 -1.0) (size 0.5 0.25))
+)"#
+}
+
+fn sample_symbol_lib() -> &'static str {
+    r#"(kicad_symbol_lib
+  (symbol "TEST"
+    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
+    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
+    (pin clock line (at 5.08 2.54 180) (length 2.54) (name "CLK") (number "3"))
+    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "4"))
+  )
+)"#
 }

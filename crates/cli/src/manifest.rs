@@ -14,6 +14,138 @@ pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
     })
 }
 
+/// Build a manifest from footprint pads alone.
+pub fn manifest_from_footprint(
+    pads: &[PadDef],
+    component: ComponentMeta,
+    default_kind: &str,
+) -> Manifest {
+    let mut pins = Vec::new();
+    for pad in pads {
+        let num = pad.number.parse::<usize>().unwrap_or(0);
+        pins.push(PinDef {
+            num,
+            name: format!("PAD_{}", pad.number),
+            purpose: "Pad".into(),
+            notes: String::new(),
+            kind: default_kind.into(),
+            bw_mhz: None,
+            v: None,
+            v_min: None,
+            v_max: None,
+            i: None,
+            i_max: None,
+            pos: Some(pad.pos),
+            rotation: Some(pad.rotation),
+            length: Some(pad.width.max(pad.height)),
+            nc: None,
+        });
+    }
+    pins.sort_by_key(|p| p.num);
+    Manifest {
+        component,
+        pins,
+        constraints: vec![],
+    }
+}
+
+/// Merge footprint pad data into an existing manifest.
+pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for pad in pads {
+        let num = pad.number.parse::<usize>().unwrap_or(0);
+        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
+            pin.pos = Some(pad.pos);
+            pin.rotation = Some(pad.rotation);
+            pin.length = Some(pad.width.max(pad.height));
+        } else {
+            diagnostics.push(Diagnostic {
+                code: "CLI:UNMATCHED_PAD".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Footprint pad {} has no matching pin in the existing TOML",
+                    pad.number
+                ),
+                entities: vec![pad.number.clone()],
+                hint: None,
+            });
+        }
+    }
+
+    diagnostics
+}
+
+/// Merge symbol pin data into an existing manifest.
+pub fn merge_symbol(
+    existing: &mut Manifest,
+    symbol: &[SymPinDef],
+    kindmap: &KindMap,
+    default_kind: &str,
+) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for sym_pin in symbol {
+        let num = sym_pin.number.parse::<usize>().unwrap_or(0);
+        let (entry, fallback) = kindmap.resolve(&sym_pin.name, &sym_pin.pin_type, default_kind);
+
+        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
+            if is_placeholder_name(&pin.name) && !sym_pin.name.is_empty() {
+                pin.name = sym_pin.name.clone();
+            }
+            if pin.kind == default_kind || pin.kind.is_empty() {
+                apply_entry(pin, &entry);
+            }
+        } else {
+            let mut pin = PinDef {
+                num,
+                name: sym_pin.name.clone(),
+                purpose: purpose_for_kind(&entry.kind).into(),
+                notes: String::new(),
+                kind: String::new(),
+                bw_mhz: None,
+                v: None,
+                v_min: None,
+                v_max: None,
+                i: None,
+                i_max: None,
+                pos: Some(sym_pin.pos),
+                rotation: Some(sym_pin.rotation),
+                length: Some(sym_pin.length),
+                nc: None,
+            };
+            apply_entry(&mut pin, &entry);
+            existing.pins.push(pin);
+            diagnostics.push(Diagnostic {
+                code: "CLI:NEW_PIN".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Pin {} ({}) from source is not in the existing TOML; appending",
+                    num, sym_pin.name
+                ),
+                entities: vec![format!("{}", num), sym_pin.name.clone()],
+                hint: None,
+            });
+        }
+
+        if fallback {
+            diagnostics.push(Diagnostic {
+                code: "CLI:UNKNOWN_PIN_TYPE".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Unrecognised pin type '{}' for pin {}; using default kind '{}'",
+                    sym_pin.pin_type, sym_pin.name, default_kind
+                ),
+                entities: vec![sym_pin.name.clone()],
+                hint: Some("Provide a --kind-map override if needed".into()),
+            });
+        }
+    }
+
+    existing.pins.sort_by_key(|p| p.num);
+    diagnostics
+}
+
 /// Serialise a manifest to TOML, with `# TODO` comments for power pins that
 /// still need voltage or current limits.
 pub fn serialise(manifest: &Manifest) -> String {
@@ -132,6 +264,43 @@ pub fn serialise(manifest: &Manifest) -> String {
     out
 }
 
+fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
+    pin.kind = entry.kind.clone();
+    if let Some(bw) = entry.bw_mhz {
+        pin.bw_mhz = pin.bw_mhz.or(Some(bw));
+    }
+    if let Some(v) = entry.v {
+        pin.v = pin.v.or(Some(v));
+    }
+    if let Some(v_min) = entry.v_min {
+        pin.v_min = pin.v_min.or(Some(v_min));
+    }
+    if let Some(v_max) = entry.v_max {
+        pin.v_max = pin.v_max.or(Some(v_max));
+    }
+    if let Some(i) = entry.i {
+        pin.i = pin.i.or(Some(i));
+    }
+    if let Some(i_max) = entry.i_max {
+        pin.i_max = pin.i_max.or(Some(i_max));
+    }
+    if let Some(nc) = entry.nc {
+        pin.nc = pin.nc.or(Some(nc));
+    }
+}
+
+fn escape_toml_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn fmt_f64(v: f64) -> String {
+    format!("{:?}", v)
+}
+
+fn is_placeholder_name(name: &str) -> bool {
+    name.starts_with("PAD_")
+}
+
 fn missing_power_fields(pin: &PinDef) -> Vec<&'static str> {
     match pin.kind.as_str() {
         "pwr" => {
@@ -161,180 +330,11 @@ fn missing_power_fields(pin: &PinDef) -> Vec<&'static str> {
     }
 }
 
-fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
-}
-
-fn escape_toml_string(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
 fn purpose_for_kind(kind: &str) -> &'static str {
     match kind {
         "gnd" => "Ground",
         "pwr" | "pwr_fixed" | "pwr_out" => "Supply",
         _ => "I/O",
-    }
-}
-
-fn is_placeholder_name(name: &str) -> bool {
-    name.starts_with("PAD_")
-}
-
-fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
-    pin.kind = entry.kind.clone();
-    if let Some(bw) = entry.bw_mhz {
-        pin.bw_mhz = pin.bw_mhz.or(Some(bw));
-    }
-    if let Some(v) = entry.v {
-        pin.v = pin.v.or(Some(v));
-    }
-    if let Some(v_min) = entry.v_min {
-        pin.v_min = pin.v_min.or(Some(v_min));
-    }
-    if let Some(v_max) = entry.v_max {
-        pin.v_max = pin.v_max.or(Some(v_max));
-    }
-    if let Some(i) = entry.i {
-        pin.i = pin.i.or(Some(i));
-    }
-    if let Some(i_max) = entry.i_max {
-        pin.i_max = pin.i_max.or(Some(i_max));
-    }
-    if let Some(nc) = entry.nc {
-        pin.nc = pin.nc.or(Some(nc));
-    }
-}
-
-/// Merge symbol pin data into an existing manifest.
-pub fn merge_symbol(
-    existing: &mut Manifest,
-    symbol: &[SymPinDef],
-    kindmap: &KindMap,
-    default_kind: &str,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    for sym_pin in symbol {
-        let num = sym_pin.number.parse::<usize>().unwrap_or(0);
-        let (entry, fallback) = kindmap.resolve(&sym_pin.name, &sym_pin.pin_type, default_kind);
-
-        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
-            if is_placeholder_name(&pin.name) && !sym_pin.name.is_empty() {
-                pin.name = sym_pin.name.clone();
-            }
-            if pin.kind == default_kind || pin.kind.is_empty() {
-                apply_entry(pin, &entry);
-            }
-        } else {
-            let mut pin = PinDef {
-                num,
-                name: sym_pin.name.clone(),
-                purpose: purpose_for_kind(&entry.kind).into(),
-                notes: String::new(),
-                kind: String::new(),
-                bw_mhz: None,
-                v: None,
-                v_min: None,
-                v_max: None,
-                i: None,
-                i_max: None,
-                pos: Some(sym_pin.pos),
-                rotation: Some(sym_pin.rotation),
-                length: Some(sym_pin.length),
-                nc: None,
-            };
-            apply_entry(&mut pin, &entry);
-            existing.pins.push(pin);
-            diagnostics.push(Diagnostic {
-                code: "CLI:NEW_PIN".into(),
-                severity: Severity::Warning,
-                message: format!(
-                    "Pin {} ({}) from source is not in the existing TOML; appending",
-                    num, sym_pin.name
-                ),
-                entities: vec![format!("{}", num), sym_pin.name.clone()],
-                hint: None,
-            });
-        }
-
-        if fallback {
-            diagnostics.push(Diagnostic {
-                code: "CLI:UNKNOWN_PIN_TYPE".into(),
-                severity: Severity::Warning,
-                message: format!(
-                    "Unrecognised pin type '{}' for pin {}; using default kind '{}'",
-                    sym_pin.pin_type, sym_pin.name, default_kind
-                ),
-                entities: vec![sym_pin.name.clone()],
-                hint: Some("Provide a --kind-map override if needed".into()),
-            });
-        }
-    }
-
-    existing.pins.sort_by_key(|p| p.num);
-    diagnostics
-}
-
-/// Merge footprint pad data into an existing manifest.
-pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    for pad in pads {
-        let num = pad.number.parse::<usize>().unwrap_or(0);
-        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
-            pin.pos = Some(pad.pos);
-            pin.rotation = Some(pad.rotation);
-            pin.length = Some(pad.width.max(pad.height));
-        } else {
-            diagnostics.push(Diagnostic {
-                code: "CLI:UNMATCHED_PAD".into(),
-                severity: Severity::Warning,
-                message: format!(
-                    "Footprint pad {} has no matching pin in the existing TOML",
-                    pad.number
-                ),
-                entities: vec![pad.number.clone()],
-                hint: None,
-            });
-        }
-    }
-
-    diagnostics
-}
-
-/// Build a manifest from footprint pads alone.
-pub fn manifest_from_footprint(
-    pads: &[PadDef],
-    component: ComponentMeta,
-    default_kind: &str,
-) -> Manifest {
-    let mut pins = Vec::new();
-    for pad in pads {
-        let num = pad.number.parse::<usize>().unwrap_or(0);
-        pins.push(PinDef {
-            num,
-            name: format!("PAD_{}", pad.number),
-            purpose: "Pad".into(),
-            notes: String::new(),
-            kind: default_kind.into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
-            pos: Some(pad.pos),
-            rotation: Some(pad.rotation),
-            length: Some(pad.width.max(pad.height)),
-            nc: None,
-        });
-    }
-    pins.sort_by_key(|p| p.num);
-    Manifest {
-        component,
-        pins,
-        constraints: vec![],
     }
 }
 

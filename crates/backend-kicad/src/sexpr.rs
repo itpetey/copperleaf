@@ -35,12 +35,6 @@ pub enum ParseError {
     Io(String),
 }
 
-impl From<std::io::Error> for ParseError {
-    fn from(err: std::io::Error) -> Self {
-        ParseError::Io(err.to_string())
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
     LParen,
@@ -128,6 +122,12 @@ impl Sexpr {
 impl fmt::Display for Sexpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.write(f, 0)
+    }
+}
+
+impl From<std::io::Error> for ParseError {
+    fn from(err: std::io::Error) -> Self {
+        ParseError::Io(err.to_string())
     }
 }
 
