@@ -50,6 +50,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
             name: struct_name(&lib_id),
             title,
             description,
+            datasheet: None,
         },
         &args.default_kind,
     );
@@ -101,6 +102,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
             name: struct_name(lib_id),
             title,
             description,
+            datasheet: symbol.datasheet.clone(),
         },
         pins: vec![],
         constraints: vec![],

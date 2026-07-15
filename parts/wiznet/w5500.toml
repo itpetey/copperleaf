@@ -2,6 +2,7 @@
 name = "W5500"
 title = "WIZnet W5500 Hardwired TCP/IP Ethernet controller with integrated 10/100 PHY (48-LQFP)."
 description = "WIZnet W5500 Ethernet controller"
+datasheet = "https://docs.wiznet.io/img/products/w5500/W5500_ds_v110e.pdf"
 
 # Ethernet PHY analog differential pairs
 [[pin]]

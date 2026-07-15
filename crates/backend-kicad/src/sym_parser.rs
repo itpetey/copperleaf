@@ -20,6 +20,7 @@ pub struct SymbolDef {
     pub pins: Vec<PinDef>,
     pub extends: Option<String>,
     pub footprint: Option<String>,
+    pub datasheet: Option<String>,
     pub raw: Sexpr,
 }
 
@@ -119,10 +120,11 @@ pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {
     Ok(symbols)
 }
 
-fn collect_pins_and_footprint(
+fn collect_pins_and_properties(
     nodes: &[Sexpr],
     pins: &mut Vec<PinDef>,
     footprint: &mut Option<String>,
+    datasheet: &mut Option<String>,
 ) {
     for node in nodes {
         if let Some(pin) = parse_pin_node(node) {
@@ -130,9 +132,15 @@ fn collect_pins_and_footprint(
             continue;
         }
         if footprint.is_none()
-            && let Some(fp) = parse_footprint_property(node)
+            && let Some(fp) = parse_property_value(node, "Footprint")
         {
             *footprint = Some(fp);
+            continue;
+        }
+        if datasheet.is_none()
+            && let Some(ds) = parse_property_value(node, "Datasheet")
+        {
+            *datasheet = Some(ds);
             continue;
         }
         if let Sexpr::List(children) = node
@@ -140,7 +148,7 @@ fn collect_pins_and_footprint(
             && head == "symbol"
             && children.len() > 2
         {
-            collect_pins_and_footprint(&children[2..], pins, footprint);
+            collect_pins_and_properties(&children[2..], pins, footprint, datasheet);
         }
     }
 }
@@ -201,7 +209,7 @@ fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
     result
 }
 
-fn parse_footprint_property(node: &Sexpr) -> Option<String> {
+fn parse_property_value(node: &Sexpr, key: &str) -> Option<String> {
     let Sexpr::List(children) = node else {
         return None;
     };
@@ -214,8 +222,8 @@ fn parse_footprint_property(node: &Sexpr) -> Option<String> {
     if head != "property" {
         return None;
     }
-    let key = string_value(children.get(1)?);
-    if key != "Footprint" {
+    let prop_key = string_value(children.get(1)?);
+    if prop_key != key {
         return None;
     }
     let val = string_value(children.get(2)?);
@@ -316,13 +324,15 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
 
     let mut pins = Vec::new();
     let mut footprint = None;
-    collect_pins_and_footprint(&children[2..], &mut pins, &mut footprint);
+    let mut datasheet = None;
+    collect_pins_and_properties(&children[2..], &mut pins, &mut footprint, &mut datasheet);
 
     Some(SymbolDef {
         lib_id,
         pins,
         extends,
         footprint,
+        datasheet,
         raw: node.clone(),
     })
 }
@@ -377,6 +387,13 @@ fn resolve_extends(symbols: &mut [SymbolDef]) {
                 symbols[i].pins.push(pin.clone());
             }
         }
+        // Inherit footprint and datasheet from parent if child doesn't have one.
+        if symbols[i].footprint.is_none() {
+            symbols[i].footprint = symbols[parent_idx].footprint.clone();
+        }
+        if symbols[i].datasheet.is_none() {
+            symbols[i].datasheet = symbols[parent_idx].datasheet.clone();
+        }
         resolved[i] = true;
     }
 
@@ -408,6 +425,13 @@ mod tests {
     fn sample_lib() -> &'static str {
         r#"(kicad_symbol_lib
   (symbol "RP2354a"
+    (property "Datasheet" "https://example.com/rp2354a.pdf"
+      (at 0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (hide yes)
+      (effects (font (size 1.27 1.27)))
+    )
     (pin power_in line (at -15.24 5.08 0) (length 2.54) (name "VDD") (number "1"))
     (pin power_in line (at -15.24 -5.08 0) (length 2.54) (name "GND") (number "2"))
   )
@@ -420,5 +444,40 @@ mod tests {
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].lib_id, "RP2354a");
         assert_eq!(symbols[0].pins.len(), 2);
+    }
+
+    #[test]
+    fn parse_extracts_datasheet() {
+        let symbols = parse_symbol_lib(sample_lib()).unwrap();
+        assert_eq!(
+            symbols[0].datasheet.as_deref(),
+            Some("https://example.com/rp2354a.pdf")
+        );
+    }
+
+    #[test]
+    fn extends_inherits_datasheet() {
+        let lib = r#"(kicad_symbol_lib
+  (symbol "PARENT"
+    (property "Datasheet" "https://example.com/parent.pdf"
+      (at 0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (hide yes)
+      (effects (font (size 1.27 1.27)))
+    )
+    (pin power_in line (at 0 0 0) (length 2.54) (name "VDD") (number "1"))
+  )
+  (symbol "CHILD"
+    (extends "PARENT")
+  )
+)"#;
+        let symbols = parse_symbol_lib(lib).unwrap();
+        assert_eq!(symbols.len(), 2);
+        let child = symbols.iter().find(|s| s.lib_id == "CHILD").unwrap();
+        assert_eq!(
+            child.datasheet.as_deref(),
+            Some("https://example.com/parent.pdf")
+        );
     }
 }

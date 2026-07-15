@@ -2,6 +2,7 @@
 name = "Mm8108Mf15457"
 title = "Morse Micro MM8108-MF15457 Wi-Fi HaLow module (MM8108 SoC)."
 description = "Morse Micro Wi-Fi HaLow module"
+datasheet = "https://www.morsemicro.com/resources/datasheets/modules/MM8108-MF15457_Data_Sheet.pdf"
 
 [[pin]]
 num = 1

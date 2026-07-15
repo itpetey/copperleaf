@@ -12,6 +12,7 @@
 //! name = "Mm8108Mf15457"      # Rust struct name
 //! title = "..."               # Used for module and struct docs
 //! description = "..."         # Optional extra doc paragraph
+//! datasheet = "https://..."   # Optional URL to the component datasheet
 //!
 //! [[pin]]
 //! num = 1
@@ -100,6 +101,9 @@ pub struct ComponentMeta {
     /// Optional shorter description used for the struct doc comment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Optional URL pointing to the component datasheet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub datasheet: Option<String>,
 }
 
 /// A single pin definition from the TOML `[[pin]]` table.
@@ -211,6 +215,7 @@ struct ConstantRow {
 struct TemplateData {
     title: String,
     description: Option<String>,
+    datasheet: Option<String>,
     struct_doc: String,
     struct_name: String,
     module_name: String,
@@ -599,6 +604,7 @@ fn render_component(
     let data = TemplateData {
         title: title.clone(),
         description: manifest.component.description.clone(),
+        datasheet: manifest.component.datasheet.clone(),
         struct_doc: manifest
             .component
             .description
@@ -681,6 +687,7 @@ mod tests {
                 name: "Test".into(),
                 title: "Test".into(),
                 description: None,
+                datasheet: None,
             },
             pins: vec![PinDef {
                 num: 1,
@@ -712,6 +719,7 @@ mod tests {
                 name: "Test".into(),
                 title: "Test".into(),
                 description: None,
+                datasheet: None,
             },
             pins: vec![PinDef {
                 num: 1,

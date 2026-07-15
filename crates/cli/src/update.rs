@@ -45,6 +45,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             &kindmap,
             &args.default_kind,
         ));
+        // Inherit datasheet from symbol if the manifest doesn't have one.
+        if manifest.component.datasheet.is_none() {
+            manifest.component.datasheet = symbol.datasheet.clone();
+        }
     }
 
     if let Some(ref footprint_path) = args.footprint {
