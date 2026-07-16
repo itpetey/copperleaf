@@ -101,16 +101,6 @@ impl KindMap {
     }
 }
 
-/// Built-in name-based overrides for common pin names that KiCad classifies
-/// as `power_in` but should map to `gnd` in Copperleaf.
-fn builtin_name_entries() -> Vec<(&'static str, KindEntry)> {
-    let gnd = KindEntry {
-        kind: "gnd".into(),
-        ..Default::default()
-    };
-    vec![("GND", gnd.clone()), ("VSS", gnd.clone()), ("PGND", gnd)]
-}
-
 fn builtin_entries() -> Vec<(&'static str, KindEntry)> {
     vec![
         (
@@ -228,6 +218,16 @@ fn builtin_entries() -> Vec<(&'static str, KindEntry)> {
             },
         ),
     ]
+}
+
+/// Built-in name-based overrides for common pin names that KiCad classifies
+/// as `power_in` but should map to `gnd` in Copperleaf.
+fn builtin_name_entries() -> Vec<(&'static str, KindEntry)> {
+    let gnd = KindEntry {
+        kind: "gnd".into(),
+        ..Default::default()
+    };
+    vec![("GND", gnd.clone()), ("VSS", gnd.clone()), ("PGND", gnd)]
 }
 
 #[cfg(test)]

@@ -113,10 +113,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
                 return Err(CliError::Diagnostic(Diagnostic {
                     code: "CLI:NO_SYMBOLS".into(),
                     severity: Severity::Error,
-                    message: format!(
-                        "No symbols found in '{}'",
-                        symbol_path
-                    ),
+                    message: format!("No symbols found in '{}'", symbol_path),
                     entities: vec![],
                     hint: None,
                 }));

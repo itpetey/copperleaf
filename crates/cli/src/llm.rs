@@ -51,19 +51,6 @@ pub fn update_from_datasheet(
     Ok(manifest)
 }
 
-/// Extract plain text from a PDF file.
-fn extract_pdf_text(path: &str) -> Result<String, CliError> {
-    pdf_extract::extract_text(path).map_err(|e| {
-        CliError::Diagnostic(Diagnostic {
-            code: "CLI:PDF_EXTRACT".into(),
-            severity: Severity::Error,
-            message: format!("Failed to extract text from PDF '{path}': {e}"),
-            entities: vec![path.into()],
-            hint: Some("Ensure the file is a readable PDF".into()),
-        })
-    })
-}
-
 /// Invoke `opencode run` with the supplied prompt and file attachments.
 ///
 /// The files are written to a temporary directory which is also passed as
@@ -152,6 +139,19 @@ fn call_opencode(prompt: &str, file_contents: &[&str]) -> Result<String, CliErro
     }
 
     Ok(text)
+}
+
+/// Extract plain text from a PDF file.
+fn extract_pdf_text(path: &str) -> Result<String, CliError> {
+    pdf_extract::extract_text(path).map_err(|e| {
+        CliError::Diagnostic(Diagnostic {
+            code: "CLI:PDF_EXTRACT".into(),
+            severity: Severity::Error,
+            message: format!("Failed to extract text from PDF '{path}': {e}"),
+            entities: vec![path.into()],
+            hint: Some("Ensure the file is a readable PDF".into()),
+        })
+    })
 }
 
 /// Strip markdown fences and return the TOML payload.

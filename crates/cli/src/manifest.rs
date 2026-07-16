@@ -6,21 +6,6 @@ use copperleaf_part_codegen::{CodegenError, ComponentMeta, Manifest, PinDef};
 
 use crate::kindmap::{KindEntry, KindMap};
 
-/// Parse a KiCad pin/pad number string into a numeric `usize`.
-///
-/// Purely numeric strings are parsed directly. Non-numeric strings (common in
-/// connectors, e.g. `"TD2+"`) get an auto-incrementing number starting at 1
-/// so that every pin receives a unique identity.
-pub fn pin_number(number: &str, counter: &mut usize) -> usize {
-    if let Ok(n) = number.parse::<usize>() {
-        n
-    } else {
-        let n = *counter;
-        *counter += 1;
-        n
-    }
-}
-
 /// Deserialise a TOML string into a manifest.
 pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
     toml::from_str(input).map_err(|e| CodegenError::Toml {
@@ -103,19 +88,16 @@ pub fn merge_symbol(
 
     // Start auto-increment counter past the highest existing num so that
     // auto-assigned numbers never collide with numeric pins.
-    let mut next_num = existing
-        .pins
-        .iter()
-        .map(|p| p.num)
-        .max()
-        .unwrap_or(0)
-        + 1;
+    let mut next_num = existing.pins.iter().map(|p| p.num).max().unwrap_or(0) + 1;
 
     for sym_pin in symbol {
         let (entry, fallback) = kindmap.resolve(&sym_pin.name, &sym_pin.pin_type, default_kind);
 
         // Try to find an existing pin whose stored `number` matches.
-        let matched = existing.pins.iter_mut().find(|p| p.number == sym_pin.number);
+        let matched = existing
+            .pins
+            .iter_mut()
+            .find(|p| p.number == sym_pin.number);
 
         if let Some(pin) = matched {
             // Found by number string — update in place.
@@ -177,6 +159,21 @@ pub fn merge_symbol(
     diagnostics
 }
 
+/// Parse a KiCad pin/pad number string into a numeric `usize`.
+///
+/// Purely numeric strings are parsed directly. Non-numeric strings (common in
+/// connectors, e.g. `"TD2+"`) get an auto-incrementing number starting at 1
+/// so that every pin receives a unique identity.
+pub fn pin_number(number: &str, counter: &mut usize) -> usize {
+    if let Ok(n) = number.parse::<usize>() {
+        n
+    } else {
+        let n = *counter;
+        *counter += 1;
+        n
+    }
+}
+
 /// Serialise a manifest to TOML, with `# TODO` comments for power pins that
 /// still need voltage or current limits.
 pub fn serialise(manifest: &Manifest) -> String {
@@ -200,7 +197,10 @@ pub fn serialise(manifest: &Manifest) -> String {
         out.push_str("[[pin]]\n");
         out.push_str(&format!("num = {}\n", pin.num));
         if !pin.number.is_empty() {
-            out.push_str(&format!("number = \"{}\"\n", escape_toml_string(&pin.number)));
+            out.push_str(&format!(
+                "number = \"{}\"\n",
+                escape_toml_string(&pin.number)
+            ));
         }
         out.push_str(&format!("name = \"{}\"\n", pin.name));
         if !pin.purpose.is_empty() {

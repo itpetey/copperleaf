@@ -29,15 +29,6 @@ pub fn find_symbol<'a>(symbols: &'a [SymbolDef], lib_id: &str) -> Option<&'a Sym
     symbols.iter().find(|s| s.lib_id == name)
 }
 
-/// Parse a single symbol S-expression into a [`SymbolDef`].
-///
-/// Unlike [`parse_symbol_lib`], this does **not** resolve `extends` — the
-/// caller is responsible for flattening inheritance first (e.g. via
-/// [`flatten_extends`]) and then passing the result here.
-pub fn parse_single_symbol(sexpr: &Sexpr) -> Option<SymbolDef> {
-    parse_symbol_node(sexpr)
-}
-
 pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
     let Sexpr::List(mut children) = sym.raw.clone() else {
         return sym.raw.clone();
@@ -110,6 +101,15 @@ pub fn flatten_extends(sym: &SymbolDef, symbols: &[SymbolDef]) -> Sexpr {
 
     children = merge_conversions(children, &child_prefix);
     Sexpr::List(children)
+}
+
+/// Parse a single symbol S-expression into a [`SymbolDef`].
+///
+/// Unlike [`parse_symbol_lib`], this does **not** resolve `extends` — the
+/// caller is responsible for flattening inheritance first (e.g. via
+/// [`flatten_extends`]) and then passing the result here.
+pub fn parse_single_symbol(sexpr: &Sexpr) -> Option<SymbolDef> {
+    parse_symbol_node(sexpr)
 }
 
 pub fn parse_symbol_lib(input: &str) -> Result<Vec<SymbolDef>, ParseError> {

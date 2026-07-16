@@ -8,13 +8,6 @@
 use copperleaf::{Pin, PowerSpec, Role, UnitExt};
 use serde::Deserialize;
 
-/// A parsed connector manifest (TOML `[connector]` + `[pin_template]`).
-#[derive(Deserialize)]
-pub(crate) struct Config {
-    pub connector: Meta,
-    pub pin_template: PinTemplate,
-}
-
 /// Connector mechanical parameters.
 #[derive(Deserialize)]
 #[allow(dead_code)] // fields consumed as footprint emission improves
@@ -76,23 +69,11 @@ pub(crate) struct PinTemplate {
     pub bw_mhz: Option<f64>,
 }
 
-fn default_pad_diameter() -> f64 {
-    1.524
-}
-fn default_drill_diameter() -> f64 {
-    0.762
-}
-fn default_housing_overhang_x() -> f64 {
-    1.27
-}
-fn default_housing_overhang_y() -> f64 {
-    3.5
-}
-fn default_v_max() -> f64 {
-    100.0
-}
-fn default_pin_length() -> f64 {
-    5.08
+/// A parsed connector manifest (TOML `[connector]` + `[pin_template]`).
+#[derive(Deserialize)]
+pub(crate) struct Config {
+    pub connector: Meta,
+    pub pin_template: PinTemplate,
 }
 
 impl PinTemplate {
@@ -153,6 +134,30 @@ impl PinTemplate {
             other => panic!("unknown pin kind '{}'", other),
         }
     }
+}
+
+fn default_drill_diameter() -> f64 {
+    0.762
+}
+
+fn default_housing_overhang_x() -> f64 {
+    1.27
+}
+
+fn default_housing_overhang_y() -> f64 {
+    3.5
+}
+
+fn default_pad_diameter() -> f64 {
+    1.524
+}
+
+fn default_pin_length() -> f64 {
+    5.08
+}
+
+fn default_v_max() -> f64 {
+    100.0
 }
 
 #[cfg(test)]

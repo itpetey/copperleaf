@@ -13,12 +13,6 @@ use copperleaf_part_macro::build_component;
 
 mod connector;
 
-build_component!("arjm11d7_502_ab_ew2.toml");
-
-// ---------------------------------------------------------------------------
-// JST PH
-// ---------------------------------------------------------------------------
-
 /// Standard JST PH through-hole wire-to-board connector.
 ///
 /// Configuration is read from `jst_ph.toml` at construction time (embedded at
@@ -61,8 +55,7 @@ impl JstPh {
 
     /// The pin pitch in millimetres.
     pub fn pitch(&self) -> f64 {
-        let config: connector::Config =
-            toml::from_str(include_str!("jst_ph.toml")).unwrap();
+        let config: connector::Config = toml::from_str(include_str!("jst_ph.toml")).unwrap();
         config.connector.pitch
     }
 
@@ -78,9 +71,7 @@ impl Component for JstPh {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+build_component!("arjm11d7_502_ab_ew2.toml");
 
 #[cfg(test)]
 mod tests {

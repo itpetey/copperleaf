@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use copperleaf::{Diagnostic, Severity};
-use copperleaf_backend_kicad::{find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib};
+use copperleaf_backend_kicad::{
+    find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib,
+};
 
 use crate::{CliError, UpdateArgs, kindmap::KindMap, manifest};
 
@@ -74,9 +76,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                     existing, lib_id
                 ),
                 entities: vec![existing.clone(), lib_id.to_string()],
-                hint: Some(
-                    "Use --lib-id to override, or update the correct TOML file".into(),
-                ),
+                hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
             }));
         }
         let Some(symbol) = find_symbol(&symbols, lib_id) else {
@@ -139,17 +139,12 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                     existing, resolved_lib_id
                 ),
                 entities: vec![existing.clone(), resolved_lib_id.to_string()],
-                hint: Some(
-                    "Use --lib-id to override, or update the correct TOML file".into(),
-                ),
+                hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
             }));
         }
         let pads = if std::fs::metadata(footprint_path)?.is_dir() {
             let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
-            let Some((_, pads)) = lib
-                .into_iter()
-                .find(|(name, _)| name == resolved_lib_id)
-            else {
+            let Some((_, pads)) = lib.into_iter().find(|(name, _)| name == resolved_lib_id) else {
                 return Err(CliError::Diagnostic(Diagnostic {
                     code: "CLI:FOOTPRINT_NOT_FOUND".into(),
                     severity: Severity::Error,

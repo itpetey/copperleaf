@@ -9,7 +9,9 @@ use copperleaf::{Backend, BackendError, CompiledBoard};
 
 pub use fp_parser::{PadDef, parse_footprint, parse_footprint_lib};
 pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
-pub use sym_parser::{PinDef, SymbolDef, find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib};
+pub use sym_parser::{
+    PinDef, SymbolDef, find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib,
+};
 
 pub mod common;
 pub mod fp_parser;

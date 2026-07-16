@@ -32,6 +32,19 @@ fn minimal_rp2354a_symbol_lib() -> &'static str {
 )"#
 }
 
+fn multi_symbol_lib() -> &'static str {
+    r#"(kicad_symbol_lib
+  (symbol "ALPHA"
+    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
+    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
+  )
+  (symbol "BETA"
+    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "1"))
+    (pin output line (at 5.08 -2.54 180) (length 2.54) (name "Q0") (number "2"))
+  )
+)"#
+}
+
 #[test]
 fn new_datasheet_invalid_pdf_fails_gracefully() {
     let dir = tempfile::tempdir().unwrap();
@@ -51,6 +64,28 @@ fn new_datasheet_invalid_pdf_fails_gracefully() {
     assert!(!out.exists());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("CLI:PDF_EXTRACT"));
+}
+
+#[test]
+fn new_symbol_auto_detects_lib_id_single_symbol() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    // No --lib-id provided; should auto-detect "TEST" from the single symbol.
+    let status = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
 }
 
 #[test]
@@ -163,6 +198,53 @@ fn new_symbol_matches_existing_rp2354a_part() {
 }
 
 #[test]
+fn new_symbol_multiple_symbols_with_lib_id_succeeds() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("multi.kicad_sym");
+    std::fs::write(&sym, multi_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    let status = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("BETA")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"BETA\""));
+}
+
+#[test]
+fn new_symbol_multiple_symbols_without_lib_id_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("multi.kicad_sym");
+    std::fs::write(&sym, multi_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    let output = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
+    assert!(stderr.contains("Multiple symbols found"));
+    assert!(stderr.contains("ALPHA"));
+    assert!(stderr.contains("BETA"));
+}
+
+#[test]
 fn new_symbol_with_crate_scaffolds_vendor_crate() {
     let dir = tempfile::tempdir().unwrap();
     let sym = dir.path().join("test.kicad_sym");
@@ -253,13 +335,10 @@ fn sample_symbol_lib() -> &'static str {
 )"#
 }
 
-fn wrong_symbol_lib() -> &'static str {
-    r#"(kicad_symbol_lib
-  (symbol "WRONG"
-    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
-    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
-    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "3"))
-  )
+fn two_pad_footprint() -> &'static str {
+    r#"(footprint "TEST"
+  (pad "1" smd rect (at -2.0 1.0 90.0) (size 0.5 0.25))
+  (pad "2" smd rect (at -2.0 -1.0) (size 0.5 0.25))
 )"#
 }
 
@@ -272,97 +351,8 @@ fn two_pin_symbol_lib() -> &'static str {
 )"#
 }
 
-fn two_pad_footprint() -> &'static str {
-    r#"(footprint "TEST"
-  (pad "1" smd rect (at -2.0 1.0 90.0) (size 0.5 0.25))
-  (pad "2" smd rect (at -2.0 -1.0) (size 0.5 0.25))
-)"#
-}
-
-fn multi_symbol_lib() -> &'static str {
-    r#"(kicad_symbol_lib
-  (symbol "ALPHA"
-    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
-    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
-  )
-  (symbol "BETA"
-    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "1"))
-    (pin output line (at 5.08 -2.54 180) (length 2.54) (name "Q0") (number "2"))
-  )
-)"#
-}
-
 #[test]
-fn new_symbol_auto_detects_lib_id_single_symbol() {
-    let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
-
-    // No --lib-id provided; should auto-detect "TEST" from the single symbol.
-    let status = copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("lib_id = \"TEST\""));
-}
-
-#[test]
-fn new_symbol_multiple_symbols_without_lib_id_fails() {
-    let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("multi.kicad_sym");
-    std::fs::write(&sym, multi_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
-
-    let output = copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--out")
-        .arg(&out)
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
-    assert!(stderr.contains("Multiple symbols found"));
-    assert!(stderr.contains("ALPHA"));
-    assert!(stderr.contains("BETA"));
-}
-
-#[test]
-fn new_symbol_multiple_symbols_with_lib_id_succeeds() {
-    let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("multi.kicad_sym");
-    std::fs::write(&sym, multi_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
-
-    let status = copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("BETA")
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("lib_id = \"BETA\""));
-}
-
-#[test]
-fn update_symbol_wrong_lib_id_fails() {
+fn update_footprint_pad_count_mismatch_warns() {
     let dir = tempfile::tempdir().unwrap();
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
@@ -379,14 +369,50 @@ fn update_symbol_wrong_lib_id_fails() {
         .status()
         .unwrap();
 
-    let wrong_sym = dir.path().join("wrong.kicad_sym");
-    std::fs::write(&wrong_sym, wrong_symbol_lib()).unwrap();
+    let two_pad_fp = dir.path().join("two.kicad_mod");
+    std::fs::write(&two_pad_fp, two_pad_footprint()).unwrap();
 
     let output = copperleaf()
         .arg("update")
         .arg(&out)
+        .arg("--footprint")
+        .arg(&two_pad_fp)
+        .arg("--lib-id")
+        .arg("TEST")
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:PAD_COUNT_MISMATCH"));
+    assert!(stderr.contains("Footprint has 2 pads, but part TOML has 4 pins"));
+}
+
+#[test]
+fn update_footprint_wrong_lib_id_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let fp = dir.path().join("test.kicad_mod");
+    std::fs::write(&fp, sample_footprint()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    copperleaf()
+        .arg("new")
         .arg("--symbol")
-        .arg(&wrong_sym)
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+
+    let output = copperleaf()
+        .arg("update")
+        .arg(&out)
+        .arg("--footprint")
+        .arg(&fp)
         .arg("--lib-id")
         .arg("WRONG")
         .output()
@@ -436,12 +462,10 @@ fn update_symbol_pin_count_mismatch_warns() {
 }
 
 #[test]
-fn update_footprint_wrong_lib_id_fails() {
+fn update_symbol_wrong_lib_id_fails() {
     let dir = tempfile::tempdir().unwrap();
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let fp = dir.path().join("test.kicad_mod");
-    std::fs::write(&fp, sample_footprint()).unwrap();
     let out = dir.path().join("test.toml");
 
     copperleaf()
@@ -455,11 +479,14 @@ fn update_footprint_wrong_lib_id_fails() {
         .status()
         .unwrap();
 
+    let wrong_sym = dir.path().join("wrong.kicad_sym");
+    std::fs::write(&wrong_sym, wrong_symbol_lib()).unwrap();
+
     let output = copperleaf()
         .arg("update")
         .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
+        .arg("--symbol")
+        .arg(&wrong_sym)
         .arg("--lib-id")
         .arg("WRONG")
         .output()
@@ -471,39 +498,12 @@ fn update_footprint_wrong_lib_id_fails() {
     assert!(stderr.contains("Part TOML has lib_id 'TEST', but source contains 'WRONG'"));
 }
 
-#[test]
-fn update_footprint_pad_count_mismatch_warns() {
-    let dir = tempfile::tempdir().unwrap();
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
-
-    copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-
-    let two_pad_fp = dir.path().join("two.kicad_mod");
-    std::fs::write(&two_pad_fp, two_pad_footprint()).unwrap();
-
-    let output = copperleaf()
-        .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&two_pad_fp)
-        .arg("--lib-id")
-        .arg("TEST")
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:PAD_COUNT_MISMATCH"));
-    assert!(stderr.contains("Footprint has 2 pads, but part TOML has 4 pins"));
+fn wrong_symbol_lib() -> &'static str {
+    r#"(kicad_symbol_lib
+  (symbol "WRONG"
+    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
+    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
+    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "3"))
+  )
+)"#
 }
