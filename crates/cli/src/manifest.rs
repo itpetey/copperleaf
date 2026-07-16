@@ -267,7 +267,9 @@ pub fn serialise(manifest: &Manifest) -> String {
         out.push('\n');
     }
 
-    out
+    // Ensure the file ends with exactly one newline.
+    let trimmed = out.trim_end_matches('\n');
+    format!("{trimmed}\n")
 }
 
 fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
