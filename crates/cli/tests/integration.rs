@@ -33,22 +33,24 @@ fn minimal_rp2354a_symbol_lib() -> &'static str {
 }
 
 #[test]
-fn new_datasheet_fails_with_stub() {
+fn new_datasheet_invalid_pdf_fails_gracefully() {
     let dir = tempfile::tempdir().unwrap();
     let ds = dir.path().join("test.pdf");
     std::fs::write(&ds, "PDF").unwrap();
     let out = dir.path().join("test.toml");
 
-    let status = copperleaf()
+    let output = copperleaf()
         .arg("new")
         .arg("--datasheet")
         .arg(&ds)
         .arg("--out")
         .arg(&out)
-        .status()
+        .output()
         .unwrap();
-    assert!(!status.success());
+    assert!(!output.status.success());
     assert!(!out.exists());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:PDF_EXTRACT"));
 }
 
 #[test]

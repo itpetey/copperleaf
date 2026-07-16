@@ -31,6 +31,7 @@ copperleaf-part-codegen = {
 }
 copperleaf-part-macro = { path = "crates/part-macro", default-features = false }
 mustache2 = { version = "1.0", default-features = false }
+pdf-extract = { version = "0.8", default-features = false }
 proc-macro2 = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false }

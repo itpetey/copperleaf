@@ -8,12 +8,12 @@ use crate::{CliError, UpdateArgs, kindmap::KindMap, manifest};
 pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     let kindmap = KindMap::load(args.kind_map.as_deref())?;
 
-    if args.datasheet.is_some() {
-        return Err(crate::datasheet_stub(""));
-    }
-
     let source = std::fs::read_to_string(&args.part_toml)?;
     let mut manifest = manifest::deserialise(&source)?;
+
+    if let Some(ref path) = args.datasheet {
+        manifest = crate::llm::update_from_datasheet(path, &args, &manifest)?;
+    }
 
     let mut diags = Vec::new();
 

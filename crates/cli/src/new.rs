@@ -10,7 +10,7 @@ pub fn run(args: NewArgs) -> Result<(), CliError> {
     let kindmap = KindMap::load(args.kind_map.as_deref())?;
 
     if let Some(ref path) = args.datasheet {
-        return Err(crate::datasheet_stub(path));
+        return run_datasheet(path, &args);
     }
 
     if let Some(ref symbol_path) = args.symbol {
@@ -21,6 +21,35 @@ pub fn run(args: NewArgs) -> Result<(), CliError> {
         return run_footprint(footprint_path, &args, &kindmap);
     }
 
+    Ok(())
+}
+
+fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
+    let manifest = crate::llm::new_from_datasheet(path, args)?;
+
+    // Determine the identifier to use for filenames and scaffolding.
+    let lib_id = args
+        .lib_id
+        .clone()
+        .or_else(|| manifest.component.lib_id.clone())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| manifest.component.name.clone());
+
+    if lib_id.is_empty() {
+        return Err(CliError::Diagnostic(Diagnostic {
+            code: "CLI:MISSING_LIB_ID".into(),
+            severity: Severity::Error,
+            message: "Could not determine a part identifier for the output file".into(),
+            entities: vec![],
+            hint: Some(
+                "Provide --lib-id, or make sure the LLM emits component.name or component.lib_id"
+                    .into(),
+            ),
+        }));
+    }
+
+    let output = crate::manifest::serialise(&manifest);
+    write_output(args, &lib_id, &output, &[])?;
     Ok(())
 }
 

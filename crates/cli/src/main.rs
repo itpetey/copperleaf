@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use copperleaf::{Diagnostic, Severity};
 
 mod kindmap;
+mod llm;
 mod manifest;
 mod new;
 mod update;
@@ -117,16 +118,6 @@ fn main() -> Result<()> {
         }
         Err(e) => bail!(e),
     }
-}
-
-pub fn datasheet_stub(_path: &str) -> CliError {
-    CliError::Diagnostic(Diagnostic {
-        code: "CLI:DATASHEET_STUB".into(),
-        severity: Severity::Error,
-        message: "LLM-assisted datasheet parsing is a future capability".into(),
-        entities: vec![],
-        hint: Some("Use --symbol or --footprint instead".into()),
-    })
 }
 
 pub fn print_diagnostic(d: &Diagnostic) {

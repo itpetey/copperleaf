@@ -18,7 +18,10 @@ clap = {
 copperleaf.workspace = true
 copperleaf-backend-kicad.workspace = true
 copperleaf-part-codegen.workspace = true
+pdf-extract.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 toml = { workspace = true, features = ["display", "parse", "serde"] }
 
