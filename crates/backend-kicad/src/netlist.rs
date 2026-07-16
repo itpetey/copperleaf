@@ -110,7 +110,8 @@ mod tests {
                         Pin::build("VIN").pwr_fixed(5.0.volt(), 1.0.amp()).pin(),
                         Pin::build("GND").gnd(),
                     ],
-                    constraints: vec![],                    symbol: None,
+                    constraints: vec![],
+                    symbol: None,
                     footprint: None,
                 },
                 copperleaf::CompiledComponent {
@@ -119,7 +120,8 @@ mod tests {
                         Pin::build("VDD").pwr_fixed(3.3.volt(), 0.5.amp()).pin(),
                         Pin::build("GPIO").dio(),
                     ],
-                    constraints: vec![],                    symbol: None,
+                    constraints: vec![],
+                    symbol: None,
                     footprint: None,
                 },
             ],
@@ -131,7 +133,8 @@ mod tests {
                         ripple: None,
                     },
                     class: NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
                 Net {
                     name: "V3V3".into(),
                     kind: copperleaf::NetKind::Power {
@@ -139,7 +142,8 @@ mod tests {
                         ripple: None,
                     },
                     class: NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
             ],
             connections: vec![
                 Connection {
@@ -158,7 +162,8 @@ mod tests {
                     net: NetId("V3V3".into()),
                 },
             ],
-            constraints: vec![],        }
+            constraints: vec![],
+        }
     }
 
     #[test]

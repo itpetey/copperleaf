@@ -6,6 +6,192 @@ fn copperleaf() -> Command {
     cmd
 }
 
+/// A footprint with 4 pads + 9 paste-only apertures (like a QFN exposed pad stencil).
+fn footprint_with_paste() -> &'static str {
+    r#"(footprint "QFN_PASTE"
+  (pad "" smd roundrect (at -1.13 -1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at -1.13 0) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at -1.13 1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 0 -1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 0 0) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 0 1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 1.13 -1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 1.13 0) (size 0.91 0.91) (layers F.Paste))
+  (pad "" smd roundrect (at 1.13 1.13) (size 0.91 0.91) (layers F.Paste))
+  (pad "1" smd roundrect (roundrect_rratio 0.25) (at -2.0 1.0 90.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "2" smd roundrect (roundrect_rratio 0.25) (at -2.0 -1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "3" smd roundrect (roundrect_rratio 0.25) (at 2.0 1.0 180.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "4" smd roundrect (roundrect_rratio 0.25) (at 2.0 -1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "61" smd rect (at 0.0 0.0) (size 3.4 3.4) (layers F.Cu F.Mask))
+)"#
+}
+
+#[test]
+fn generate_footprint_round_trip_preserves_pad_numbers() {
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("input.kicad_mod");
+    std::fs::write(&fp, footprint_with_paste()).unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    // Create TOML from symbol + footprint.
+    copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+
+    copperleaf()
+        .arg("update")
+        .arg(&out)
+        .arg("--footprint")
+        .arg(&fp)
+        .arg("--lib-id")
+        .arg("TEST")
+        .status()
+        .unwrap();
+
+    // Verify the TOML has `number` fields.
+    let toml_content = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        toml_content.contains("number = \"1\""),
+        "missing number field for pin 1"
+    );
+    assert!(
+        toml_content.contains("number = \"2\""),
+        "missing number field for pin 2"
+    );
+
+    // Generate a footprint from the TOML.
+    let gen_fp = dir.path().join("output.kicad_mod");
+    let status = copperleaf()
+        .arg("generate")
+        .arg("footprint")
+        .arg(&out)
+        .arg("-o")
+        .arg(&gen_fp)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Parse the generated footprint.
+    let pads = copperleaf_backend_kicad::fp_parser::parse_footprint(&gen_fp).unwrap();
+
+    // Should have 4 electrical pads + 9 paste apertures = 13 total.
+    assert_eq!(
+        pads.len(),
+        13,
+        "expected 13 pads in generated footprint, got {}",
+        pads.len()
+    );
+
+    // Verify electrical pads have correct numbers.
+    let electrical: Vec<_> = pads.iter().filter(|p| !p.number.is_empty()).collect();
+    assert_eq!(electrical.len(), 4, "expected 4 electrical pads");
+    assert!(electrical.iter().any(|p| p.number == "1"));
+    assert!(electrical.iter().any(|p| p.number == "2"));
+    assert!(electrical.iter().any(|p| p.number == "3"));
+    assert!(electrical.iter().any(|p| p.number == "4"));
+
+    // Verify paste apertures have empty number.
+    let paste_apertures: Vec<_> = pads.iter().filter(|p| p.number.is_empty()).collect();
+    assert_eq!(paste_apertures.len(), 9, "expected 9 paste apertures");
+
+    // Verify positions match (spot-check pin 1).
+    let pin1 = pads.iter().find(|p| p.number == "1").unwrap();
+    assert!((pin1.pos.0 - (-2.0)).abs() < 1e-9);
+    assert!((pin1.pos.1 - 1.0).abs() < 1e-9);
+    assert!((pin1.rotation - 90.0).abs() < 1e-9);
+}
+
+#[test]
+fn generate_footprint_thermal_vias_not_as_electrical_pads() {
+    let dir = tempfile::tempdir().unwrap();
+    // Footprint with 2 signal pads + 1 exposed pad + 2 thermal vias (thru_hole inside exposed pad).
+    std::fs::write(
+        dir.path().join("test.kicad_mod"),
+        r#"(footprint "TEST_THERMAL"
+  (pad "1" smd rect (at -2.0 1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "2" smd rect (at 2.0 1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
+  (pad "3" smd rect (at 0.0 0.0) (size 2.0 2.0) (layers F.Cu F.Mask))
+  (pad "" thru_hole circle (at 0.3 0.0) (size 0.3 0.3) (drill 0.2) (layers *.Cu))
+  (pad "" thru_hole circle (at -0.3 0.0) (size 0.3 0.3) (drill 0.2) (layers *.Cu))
+)"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("test.kicad_sym"),
+        r#"(kicad_symbol_lib
+  (symbol "TEST"
+    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
+    (pin gnd line (at 5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
+    (pin power_in line (at 0 -5.08 90) (length 2.54) (name "PGND") (number "3"))
+  )
+)"#,
+    )
+    .unwrap();
+
+    let out = dir.path().join("test.toml");
+    copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(dir.path().join("test.kicad_sym"))
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+
+    copperleaf()
+        .arg("update")
+        .arg(&out)
+        .arg("--footprint")
+        .arg(dir.path().join("test.kicad_mod"))
+        .arg("--lib-id")
+        .arg("TEST")
+        .status()
+        .unwrap();
+
+    // The TOML should have the thermal vias captured in `[[mechanical]]`.
+    let toml_content = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        toml_content.contains("[[mechanical]]"),
+        "thermal vias should be captured as mechanical"
+    );
+
+    // Generate and re-parse.
+    let gen_fp = dir.path().join("output.kicad_mod");
+    copperleaf()
+        .arg("generate")
+        .arg("footprint")
+        .arg(&out)
+        .arg("-o")
+        .arg(&gen_fp)
+        .status()
+        .unwrap();
+
+    let pads = copperleaf_backend_kicad::fp_parser::parse_footprint(&gen_fp).unwrap();
+
+    // 3 electrical pads + 2 thermal vias (as `pad ""`) = 5 total.
+    let electrical: Vec<_> = pads.iter().filter(|p| !p.number.is_empty()).collect();
+    assert_eq!(
+        electrical.len(),
+        3,
+        "expected 3 electrical pads, got {}",
+        electrical.len()
+    );
+
+    let vias: Vec<_> = pads.iter().filter(|p| p.pad_type == "thru_hole").collect();
+    assert_eq!(vias.len(), 2, "expected 2 thermal vias, got {}", vias.len());
+}
+
 /// Minimal embedded RP2354A symbol derived from `MCU_RaspberryPi.kicad_sym`.
 /// Synthesised so the test does not depend on a temporary external file.
 fn minimal_rp2354a_symbol_lib() -> &'static str {
@@ -555,173 +741,6 @@ fn update_symbol_wrong_lib_id_fails() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("CLI:LIB_ID_MISMATCH"));
     assert!(stderr.contains("Part TOML has lib_id 'TEST', but source contains 'WRONG'"));
-}
-
-/// A footprint with 4 pads + 9 paste-only apertures (like a QFN exposed pad stencil).
-fn footprint_with_paste() -> &'static str {
-    r#"(footprint "QFN_PASTE"
-  (pad "" smd roundrect (at -1.13 -1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at -1.13 0) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at -1.13 1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 0 -1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 0 0) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 0 1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 1.13 -1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 1.13 0) (size 0.91 0.91) (layers F.Paste))
-  (pad "" smd roundrect (at 1.13 1.13) (size 0.91 0.91) (layers F.Paste))
-  (pad "1" smd roundrect (roundrect_rratio 0.25) (at -2.0 1.0 90.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "2" smd roundrect (roundrect_rratio 0.25) (at -2.0 -1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "3" smd roundrect (roundrect_rratio 0.25) (at 2.0 1.0 180.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "4" smd roundrect (roundrect_rratio 0.25) (at 2.0 -1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "61" smd rect (at 0.0 0.0) (size 3.4 3.4) (layers F.Cu F.Mask))
-)"#
-}
-
-#[test]
-fn generate_footprint_round_trip_preserves_pad_numbers() {
-    let dir = tempfile::tempdir().unwrap();
-    let fp = dir.path().join("input.kicad_mod");
-    std::fs::write(&fp, footprint_with_paste()).unwrap();
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
-
-    // Create TOML from symbol + footprint.
-    copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-
-    copperleaf()
-        .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
-        .arg("--lib-id")
-        .arg("TEST")
-        .status()
-        .unwrap();
-
-    // Verify the TOML has `number` fields.
-    let toml_content = std::fs::read_to_string(&out).unwrap();
-    assert!(toml_content.contains("number = \"1\""), "missing number field for pin 1");
-    assert!(toml_content.contains("number = \"2\""), "missing number field for pin 2");
-
-    // Generate a footprint from the TOML.
-    let gen_fp = dir.path().join("output.kicad_mod");
-    let status = copperleaf()
-        .arg("generate")
-        .arg("footprint")
-        .arg(&out)
-        .arg("-o")
-        .arg(&gen_fp)
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    // Parse the generated footprint.
-    let pads = copperleaf_backend_kicad::fp_parser::parse_footprint(&gen_fp).unwrap();
-
-    // Should have 4 electrical pads + 9 paste apertures = 13 total.
-    assert_eq!(pads.len(), 13, "expected 13 pads in generated footprint, got {}", pads.len());
-
-    // Verify electrical pads have correct numbers.
-    let electrical: Vec<_> = pads.iter().filter(|p| !p.number.is_empty()).collect();
-    assert_eq!(electrical.len(), 4, "expected 4 electrical pads");
-    assert!(electrical.iter().any(|p| p.number == "1"));
-    assert!(electrical.iter().any(|p| p.number == "2"));
-    assert!(electrical.iter().any(|p| p.number == "3"));
-    assert!(electrical.iter().any(|p| p.number == "4"));
-
-    // Verify paste apertures have empty number.
-    let paste_apertures: Vec<_> = pads.iter().filter(|p| p.number.is_empty()).collect();
-    assert_eq!(paste_apertures.len(), 9, "expected 9 paste apertures");
-
-    // Verify positions match (spot-check pin 1).
-    let pin1 = pads.iter().find(|p| p.number == "1").unwrap();
-    assert!((pin1.pos.0 - (-2.0)).abs() < 1e-9);
-    assert!((pin1.pos.1 - 1.0).abs() < 1e-9);
-    assert!((pin1.rotation - 90.0).abs() < 1e-9);
-}
-
-#[test]
-fn generate_footprint_thermal_vias_not_as_electrical_pads() {
-    let dir = tempfile::tempdir().unwrap();
-    // Footprint with 2 signal pads + 1 exposed pad + 2 thermal vias (thru_hole inside exposed pad).
-    std::fs::write(
-        dir.path().join("test.kicad_mod"),
-        r#"(footprint "TEST_THERMAL"
-  (pad "1" smd rect (at -2.0 1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "2" smd rect (at 2.0 1.0) (size 0.5 0.25) (layers F.Cu F.Mask F.Paste))
-  (pad "3" smd rect (at 0.0 0.0) (size 2.0 2.0) (layers F.Cu F.Mask))
-  (pad "" thru_hole circle (at 0.3 0.0) (size 0.3 0.3) (drill 0.2) (layers *.Cu))
-  (pad "" thru_hole circle (at -0.3 0.0) (size 0.3 0.3) (drill 0.2) (layers *.Cu))
-)"#,
-    )
-    .unwrap();
-    std::fs::write(
-        dir.path().join("test.kicad_sym"),
-        r#"(kicad_symbol_lib
-  (symbol "TEST"
-    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
-    (pin gnd line (at 5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
-    (pin power_in line (at 0 -5.08 90) (length 2.54) (name "PGND") (number "3"))
-  )
-)"#,
-    )
-    .unwrap();
-
-    let out = dir.path().join("test.toml");
-    copperleaf()
-        .arg("new")
-        .arg("--symbol")
-        .arg(dir.path().join("test.kicad_sym"))
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--out")
-        .arg(&out)
-        .status()
-        .unwrap();
-
-    copperleaf()
-        .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(dir.path().join("test.kicad_mod"))
-        .arg("--lib-id")
-        .arg("TEST")
-        .status()
-        .unwrap();
-
-    // The TOML should have the thermal vias captured in `[[mechanical]]`.
-    let toml_content = std::fs::read_to_string(&out).unwrap();
-    assert!(toml_content.contains("[[mechanical]]"), "thermal vias should be captured as mechanical");
-
-    // Generate and re-parse.
-    let gen_fp = dir.path().join("output.kicad_mod");
-    copperleaf()
-        .arg("generate")
-        .arg("footprint")
-        .arg(&out)
-        .arg("-o")
-        .arg(&gen_fp)
-        .status()
-        .unwrap();
-
-    let pads = copperleaf_backend_kicad::fp_parser::parse_footprint(&gen_fp).unwrap();
-
-    // 3 electrical pads + 2 thermal vias (as `pad ""`) = 5 total.
-    let electrical: Vec<_> = pads.iter().filter(|p| !p.number.is_empty()).collect();
-    assert_eq!(electrical.len(), 3, "expected 3 electrical pads, got {}", electrical.len());
-
-    let vias: Vec<_> = pads.iter().filter(|p| p.pad_type == "thru_hole").collect();
-    assert_eq!(vias.len(), 2, "expected 2 thermal vias, got {}", vias.len());
 }
 
 fn wrong_symbol_lib() -> &'static str {

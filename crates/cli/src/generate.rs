@@ -46,11 +46,7 @@ fn default_out(
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("part");
-    let lib_id = manifest
-        .component
-        .lib_id
-        .as_deref()
-        .unwrap_or(stem);
+    let lib_id = manifest.component.lib_id.as_deref().unwrap_or(stem);
     toml_path
         .parent()
         .unwrap_or(std::path::Path::new("."))

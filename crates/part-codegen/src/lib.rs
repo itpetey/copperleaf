@@ -109,6 +109,17 @@ pub struct ComponentMeta {
     pub lib_id: Option<String>,
 }
 
+/// A thermal via that lives inside a pad (e.g. exposed thermal pad).
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ThermalViaDef {
+    /// Position relative to the footprint origin, in millimetres.
+    pub pos: (f64, f64),
+    /// Drill diameter in millimetres.
+    pub drill: f64,
+    /// Finished pad diameter in millimetres.
+    pub size: f64,
+}
+
 /// A single pin definition from the TOML `[[pin]]` table.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PinDef {
@@ -187,17 +198,6 @@ pub struct PinDef {
     pub thermal_vias: Vec<ThermalViaDef>,
 }
 
-/// A thermal via that lives inside a pad (e.g. exposed thermal pad).
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ThermalViaDef {
-    /// Position relative to the footprint origin, in millimetres.
-    pub pos: (f64, f64),
-    /// Drill diameter in millimetres.
-    pub drill: f64,
-    /// Finished pad diameter in millimetres.
-    pub size: f64,
-}
-
 /// A constraint definition from the TOML `[[constraint]]` table.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[allow(dead_code)]
@@ -232,20 +232,6 @@ pub struct ConstraintDef {
     pub max: Option<f64>,
 }
 
-/// The complete TOML manifest for a component.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Manifest {
-    pub component: ComponentMeta,
-    #[serde(rename = "pin")]
-    pub pins: Vec<PinDef>,
-    #[serde(rename = "constraint", default)]
-    pub constraints: Vec<ConstraintDef>,
-    /// Mechanical-only pads (mounting holes, fiducials, etc.) that are not
-    /// electrical pins.
-    #[serde(rename = "mechanical", default, skip_serializing_if = "Vec::is_empty")]
-    pub mechanical: Vec<MechanicalDef>,
-}
-
 /// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
 /// or paste-only stencil aperture on an exposed pad.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -277,16 +263,18 @@ pub struct MechanicalDef {
     pub drill: f64,
 }
 
-fn default_mech_number() -> String {
-    "None".into()
-}
-
-fn default_mech_pad_type() -> String {
-    "np_thru_hole".into()
-}
-
-fn default_mech_shape() -> String {
-    "circle".into()
+/// The complete TOML manifest for a component.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Manifest {
+    pub component: ComponentMeta,
+    #[serde(rename = "pin")]
+    pub pins: Vec<PinDef>,
+    #[serde(rename = "constraint", default)]
+    pub constraints: Vec<ConstraintDef>,
+    /// Mechanical-only pads (mounting holes, fiducials, etc.) that are not
+    /// electrical pins.
+    #[serde(rename = "mechanical", default, skip_serializing_if = "Vec::is_empty")]
+    pub mechanical: Vec<MechanicalDef>,
 }
 
 #[derive(Serialize)]
@@ -616,6 +604,18 @@ fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
         }
         _ => Err(CodegenError::UnknownConstraint { ty: c.ty.clone() }),
     }
+}
+
+fn default_mech_number() -> String {
+    "None".into()
+}
+
+fn default_mech_pad_type() -> String {
+    "np_thru_hole".into()
+}
+
+fn default_mech_shape() -> String {
+    "circle".into()
 }
 
 fn fmt_f64(v: f64) -> String {

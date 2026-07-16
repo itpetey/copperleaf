@@ -199,13 +199,15 @@ mod tests {
                     ripple: None,
                 },
                 class: NetClass::default(),
-                constraints: vec![],            }],
+                constraints: vec![],
+            }],
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
                 net: NetId("VBUS".into()),
             }],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let diags = erc_overvoltage(&board);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:OVERVOLT");
@@ -222,13 +224,15 @@ mod tests {
                     ripple: None,
                 },
                 class: NetClass::default(),
-                constraints: vec![],            }],
+                constraints: vec![],
+            }],
             connections: vec![Connection {
                 component: 0,
                 pin: "NC".into(),
                 net: NetId("NET".into()),
             }],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let diags = erc_nc_pin_connected(&board);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:NC_CONNECTED");
@@ -240,7 +244,8 @@ mod tests {
             components: vec![make_comp("U1", vec![Pin::build("GPIO").dio()], vec![])],
             nets: vec![],
             connections: vec![],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let diags = erc_floating_inputs(&board);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:FLOATING_INPUT");

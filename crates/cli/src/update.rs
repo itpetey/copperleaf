@@ -21,7 +21,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
 
     if let Some(ref symbol_path) = args.symbol {
         // Guard against accidentally passing a footprint file as a symbol.
-        if let Some(ext) = std::path::Path::new(symbol_path).extension().and_then(|s| s.to_str()) {
+        if let Some(ext) = std::path::Path::new(symbol_path)
+            .extension()
+            .and_then(|s| s.to_str())
+        {
             if ext.eq_ignore_ascii_case("kicad_mod") {
                 return Err(CliError::Diagnostic(Diagnostic {
                     code: "CLI:FOOTPRINT_AS_SYMBOL".into(),
@@ -174,7 +177,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             pads
         } else {
             // Guard against accidentally passing a symbol file as a footprint.
-            if let Some(ext) = std::path::Path::new(footprint_path).extension().and_then(|s| s.to_str()) {
+            if let Some(ext) = std::path::Path::new(footprint_path)
+                .extension()
+                .and_then(|s| s.to_str())
+            {
                 if ext.eq_ignore_ascii_case("kicad_sym") {
                     return Err(CliError::Diagnostic(Diagnostic {
                         code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
@@ -243,7 +249,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
 
 /// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
 /// bounding box (i.e. it is a thermal via, not an electrical pad).
-fn is_thermal_via(pad: &copperleaf_backend_kicad::PadDef, pins: &[copperleaf_part_codegen::PinDef]) -> bool {
+fn is_thermal_via(
+    pad: &copperleaf_backend_kicad::PadDef,
+    pins: &[copperleaf_part_codegen::PinDef],
+) -> bool {
     for pin in pins {
         let Some((px, py)) = pin.pos else { continue };
         let half_w = pin.width.unwrap_or(0.0) / 2.0;

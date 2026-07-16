@@ -462,7 +462,8 @@ mod tests {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
                 pins: vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
-                constraints: vec![],                symbol: Some("MCU:RP2354a".into()),
+                constraints: vec![],
+                symbol: Some("MCU:RP2354a".into()),
                 footprint: Some("Package_QFP:LQFP-64".into()),
             }],
             nets: vec![Net {
@@ -472,13 +473,15 @@ mod tests {
                     ripple: None,
                 },
                 class: NetClass::default(),
-                constraints: vec![],            }],
+                constraints: vec![],
+            }],
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
                 net: NetId("V3V3".into()),
             }],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let out = emit_schematic(&board);
         assert!(out.starts_with("(kicad_sch"));
         assert!(out.contains("MCU:RP2354a"));

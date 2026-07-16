@@ -10,10 +10,8 @@ use crate::sexpr::Sexpr;
 /// Default body margin added around the pad bounding-box to form the package
 /// outline, in millimetres.
 const BODY_MARGIN: f64 = 0.25;
-
 /// Clearance from body edge to courtyard edge, in millimetres.
 const COURTYARD_CLEARANCE: f64 = 0.25;
-
 /// Silk-screen offset from fab outline, in millimetres.
 const SILK_OFFSET: f64 = 0.205;
 
@@ -33,14 +31,8 @@ pub fn emit_footprint(manifest: &Manifest) -> String {
     // Footprint header.
     children.push(Sexpr::str(name));
     children.push(Sexpr::list([Sexpr::atom("layer"), Sexpr::atom("F.Cu")]));
-    children.push(Sexpr::list([
-        Sexpr::atom("tedit"),
-        Sexpr::atom("00000000"),
-    ]));
-    children.push(Sexpr::list([
-        Sexpr::atom("descr"),
-        Sexpr::str(""),
-    ]));
+    children.push(Sexpr::list([Sexpr::atom("tedit"), Sexpr::atom("00000000")]));
+    children.push(Sexpr::list([Sexpr::atom("descr"), Sexpr::str("")]));
     children.push(Sexpr::list([Sexpr::atom("attr"), Sexpr::atom("smd")]));
 
     // Reference text.
@@ -69,14 +61,8 @@ pub fn emit_footprint(manifest: &Manifest) -> String {
                     Sexpr::atom(fmt_f64(via.size)),
                     Sexpr::atom(fmt_f64(via.size)),
                 ]),
-                Sexpr::list([
-                    Sexpr::atom("drill"),
-                    Sexpr::atom(fmt_f64(via.drill)),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("layers"),
-                    Sexpr::atom("*.Cu"),
-                ]),
+                Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(fmt_f64(via.drill))]),
+                Sexpr::list([Sexpr::atom("layers"), Sexpr::atom("*.Cu")]),
             ]));
         }
     }
@@ -117,10 +103,165 @@ pub fn emit_footprint(manifest: &Manifest) -> String {
         }
     }
 
-    Sexpr::list([Sexpr::atom("footprint").into()].into_iter().chain(children)).to_string()
+    Sexpr::list(
+        [Sexpr::atom("footprint").into()]
+            .into_iter()
+            .chain(children),
+    )
+    .to_string()
 }
 
-// ── helpers ────────────────────────────────────────────────────────────
+/// Compute package body extents from pin positions, returning `(x1, y1, x2, y2)`.
+fn compute_extents(manifest: &Manifest) -> Option<(f64, f64, f64, f64)> {
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+
+    for pin in &manifest.pins {
+        let Some((px, py)) = pin.pos else { continue };
+        let half_w = pin.width.unwrap_or(pin.length.unwrap_or(0.0)) / 2.0;
+        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+        min_x = min_x.min(px - half_w);
+        max_x = max_x.max(px + half_w);
+        min_y = min_y.min(py - half_h);
+        max_y = max_y.max(py + half_h);
+    }
+
+    if min_x == f64::MAX {
+        return None;
+    }
+
+    Some((
+        min_x - BODY_MARGIN,
+        min_y - BODY_MARGIN,
+        max_x + BODY_MARGIN,
+        max_y + BODY_MARGIN,
+    ))
+}
+
+fn fmt_f64(v: f64) -> String {
+    format!("{:?}", v)
+}
+
+fn fp_circle(center: (f64, f64), radius: f64, layer: &str, width: f64) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_circle"),
+        Sexpr::list([
+            Sexpr::atom("center"),
+            Sexpr::atom(fmt_f64(center.0)),
+            Sexpr::atom(fmt_f64(center.1)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("end"),
+            Sexpr::atom(fmt_f64(center.0 + radius)),
+            Sexpr::atom(fmt_f64(center.1)),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
+        Sexpr::list([Sexpr::atom("width"), Sexpr::atom(fmt_f64(width))]),
+    ])
+}
+
+fn fp_line(start: (f64, f64), end: (f64, f64), layer: &str, width: f64) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_line"),
+        Sexpr::list([
+            Sexpr::atom("start"),
+            Sexpr::atom(fmt_f64(start.0)),
+            Sexpr::atom(fmt_f64(start.1)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("end"),
+            Sexpr::atom(fmt_f64(end.0)),
+            Sexpr::atom(fmt_f64(end.1)),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
+        Sexpr::list([Sexpr::atom("width"), Sexpr::atom(fmt_f64(width))]),
+    ])
+}
+
+fn fp_text(kind: &str, value: &str, pos: (f64, f64), layer: &str) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("fp_text"),
+        Sexpr::atom(kind),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(fmt_f64(pos.0)),
+            Sexpr::atom(fmt_f64(pos.1)),
+        ]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
+        Sexpr::list([
+            Sexpr::atom("effects"),
+            Sexpr::list([
+                Sexpr::atom("font"),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("0.64"),
+                    Sexpr::atom("0.64"),
+                ]),
+                Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+            ]),
+        ]),
+    ])
+}
+
+fn mechanical_pad_node(mech: &copperleaf_part_codegen::MechanicalDef) -> Sexpr {
+    let mut children: Vec<Sexpr> = Vec::new();
+
+    children.push(Sexpr::atom("pad"));
+    children.push(Sexpr::str(&mech.number));
+    children.push(Sexpr::atom(&mech.pad_type));
+    children.push(Sexpr::atom(&mech.pad_shape));
+
+    if let Some(rr) = mech.roundrect_rratio {
+        children.push(Sexpr::list([
+            Sexpr::atom("roundrect_rratio"),
+            Sexpr::atom(fmt_f64(rr)),
+        ]));
+    }
+
+    children.push(Sexpr::list([
+        Sexpr::atom("at"),
+        Sexpr::atom(fmt_f64(mech.pos.0)),
+        Sexpr::atom(fmt_f64(mech.pos.1)),
+    ]));
+
+    children.push(Sexpr::list([
+        Sexpr::atom("size"),
+        Sexpr::atom(fmt_f64(mech.width)),
+        Sexpr::atom(fmt_f64(mech.height)),
+    ]));
+
+    if mech.drill > 0.0 {
+        children.push(Sexpr::list([
+            Sexpr::atom("drill"),
+            Sexpr::atom(fmt_f64(mech.drill)),
+        ]));
+    }
+
+    let layers_str = mech.layers.as_deref().unwrap_or("*.Cu *.Mask");
+    let layer_atoms: Vec<Sexpr> = std::iter::once(Sexpr::atom("layers"))
+        .chain(
+            layers_str
+                .split_whitespace()
+                .map(|s| Sexpr::atom(s.to_string())),
+        )
+        .collect();
+    children.push(Sexpr::list(layer_atoms));
+
+    Sexpr::list(children)
+}
+
+/// Four line segments forming a rectangle.
+fn outline_segments(x1: f64, y1: f64, x2: f64, y2: f64) -> [((f64, f64), (f64, f64)); 4] {
+    [
+        ((x1, y1), (x2, y1)),
+        ((x2, y1), (x2, y2)),
+        ((x2, y2), (x1, y2)),
+        ((x1, y2), (x1, y1)),
+    ]
+}
 
 fn pad_node(pin: &PinDef) -> Sexpr {
     let mut children: Vec<Sexpr> = Vec::new();
@@ -132,12 +273,8 @@ fn pad_node(pin: &PinDef) -> Sexpr {
         pin.number.clone()
     };
     children.push(Sexpr::str(&number_str));
-    children.push(Sexpr::atom(
-        pin.pad_type.as_deref().unwrap_or("smd"),
-    ));
-    children.push(Sexpr::atom(
-        pin.pad_shape.as_deref().unwrap_or("rect"),
-    ));
+    children.push(Sexpr::atom(pin.pad_type.as_deref().unwrap_or("smd")));
+    children.push(Sexpr::atom(pin.pad_shape.as_deref().unwrap_or("rect")));
 
     if let Some(rr) = pin.roundrect_rratio {
         children.push(Sexpr::list([
@@ -202,164 +339,6 @@ fn pad_node(pin: &PinDef) -> Sexpr {
     Sexpr::list(children)
 }
 
-fn mechanical_pad_node(mech: &copperleaf_part_codegen::MechanicalDef) -> Sexpr {
-    let mut children: Vec<Sexpr> = Vec::new();
-
-    children.push(Sexpr::atom("pad"));
-    children.push(Sexpr::str(&mech.number));
-    children.push(Sexpr::atom(&mech.pad_type));
-    children.push(Sexpr::atom(&mech.pad_shape));
-
-    if let Some(rr) = mech.roundrect_rratio {
-        children.push(Sexpr::list([
-            Sexpr::atom("roundrect_rratio"),
-            Sexpr::atom(fmt_f64(rr)),
-        ]));
-    }
-
-    children.push(Sexpr::list([
-        Sexpr::atom("at"),
-        Sexpr::atom(fmt_f64(mech.pos.0)),
-        Sexpr::atom(fmt_f64(mech.pos.1)),
-    ]));
-
-    children.push(Sexpr::list([
-        Sexpr::atom("size"),
-        Sexpr::atom(fmt_f64(mech.width)),
-        Sexpr::atom(fmt_f64(mech.height)),
-    ]));
-
-    if mech.drill > 0.0 {
-        children.push(Sexpr::list([
-            Sexpr::atom("drill"),
-            Sexpr::atom(fmt_f64(mech.drill)),
-        ]));
-    }
-
-    let layers_str = mech.layers.as_deref().unwrap_or("*.Cu *.Mask");
-    let layer_atoms: Vec<Sexpr> = std::iter::once(Sexpr::atom("layers"))
-        .chain(layers_str.split_whitespace().map(|s| Sexpr::atom(s.to_string())))
-        .collect();
-    children.push(Sexpr::list(layer_atoms));
-
-    Sexpr::list(children)
-}
-
-fn fp_text(kind: &str, value: &str, pos: (f64, f64), layer: &str) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("fp_text"),
-        Sexpr::atom(kind),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(fmt_f64(pos.0)),
-            Sexpr::atom(fmt_f64(pos.1)),
-        ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
-        Sexpr::list([
-            Sexpr::atom("effects"),
-            Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("0.64"),
-                    Sexpr::atom("0.64"),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("thickness"),
-                    Sexpr::atom("0.15"),
-                ]),
-            ]),
-        ]),
-    ])
-}
-
-fn fp_line(start: (f64, f64), end: (f64, f64), layer: &str, width: f64) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("fp_line"),
-        Sexpr::list([
-            Sexpr::atom("start"),
-            Sexpr::atom(fmt_f64(start.0)),
-            Sexpr::atom(fmt_f64(start.1)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("end"),
-            Sexpr::atom(fmt_f64(end.0)),
-            Sexpr::atom(fmt_f64(end.1)),
-        ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
-        Sexpr::list([
-            Sexpr::atom("width"),
-            Sexpr::atom(fmt_f64(width)),
-        ]),
-    ])
-}
-
-fn fp_circle(center: (f64, f64), radius: f64, layer: &str, width: f64) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("fp_circle"),
-        Sexpr::list([
-            Sexpr::atom("center"),
-            Sexpr::atom(fmt_f64(center.0)),
-            Sexpr::atom(fmt_f64(center.1)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("end"),
-            Sexpr::atom(fmt_f64(center.0 + radius)),
-            Sexpr::atom(fmt_f64(center.1)),
-        ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom(layer)]),
-        Sexpr::list([
-            Sexpr::atom("width"),
-            Sexpr::atom(fmt_f64(width)),
-        ]),
-    ])
-}
-
-/// Compute package body extents from pin positions, returning `(x1, y1, x2, y2)`.
-fn compute_extents(manifest: &Manifest) -> Option<(f64, f64, f64, f64)> {
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-
-    for pin in &manifest.pins {
-        let Some((px, py)) = pin.pos else { continue };
-        let half_w = pin.width.unwrap_or(pin.length.unwrap_or(0.0)) / 2.0;
-        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
-        min_x = min_x.min(px - half_w);
-        max_x = max_x.max(px + half_w);
-        min_y = min_y.min(py - half_h);
-        max_y = max_y.max(py + half_h);
-    }
-
-    if min_x == f64::MAX {
-        return None;
-    }
-
-    Some((
-        min_x - BODY_MARGIN,
-        min_y - BODY_MARGIN,
-        max_x + BODY_MARGIN,
-        max_y + BODY_MARGIN,
-    ))
-}
-
-/// Four line segments forming a rectangle.
-fn outline_segments(
-    x1: f64,
-    y1: f64,
-    x2: f64,
-    y2: f64,
-) -> [((f64, f64), (f64, f64)); 4] {
-    [
-        ((x1, y1), (x2, y1)),
-        ((x2, y1), (x2, y2)),
-        ((x2, y2), (x1, y2)),
-        ((x1, y2), (x1, y1)),
-    ]
-}
-
 /// Position of pin 1 (lowest-numbered pin with a known position).
 fn pin1_pos(manifest: &Manifest) -> Option<(f64, f64)> {
     manifest
@@ -368,10 +347,6 @@ fn pin1_pos(manifest: &Manifest) -> Option<(f64, f64)> {
         .filter(|p| p.pos.is_some())
         .min_by_key(|p| p.num)
         .and_then(|p| p.pos)
-}
-
-fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
 }
 
 #[cfg(test)]
@@ -502,13 +477,11 @@ mod tests {
     #[test]
     fn thermal_vias_emit_extra_pads() {
         let mut manifest = make_manifest();
-        manifest.pins[1].thermal_vias = vec![
-            copperleaf_part_codegen::ThermalViaDef {
-                pos: (0.35, 0.0),
-                drill: 0.2,
-                size: 0.3,
-            },
-        ];
+        manifest.pins[1].thermal_vias = vec![copperleaf_part_codegen::ThermalViaDef {
+            pos: (0.35, 0.0),
+            drill: 0.2,
+            size: 0.3,
+        }];
         let out = emit_footprint(&manifest);
         assert!(out.contains("thru_hole"), "missing via pad");
         assert!(out.contains("*.Cu"), "missing via layers");

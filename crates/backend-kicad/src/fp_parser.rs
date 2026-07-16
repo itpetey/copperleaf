@@ -149,8 +149,7 @@ fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {
                 }
             }
             "layers" => {
-                let layer_strs: Vec<String> =
-                    parts[1..].iter().map(string_value).collect();
+                let layer_strs: Vec<String> = parts[1..].iter().map(string_value).collect();
                 layers = layer_strs.join(" ");
             }
             "drill" => {

@@ -73,6 +73,8 @@ impl Component for JstPh {
 
 build_component!("arjm11d7_502_ab_ew2.toml");
 
+build_component!("usb_c_2340901_1.toml");
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,4 +109,3 @@ mod tests {
         }
     }
 }
-build_component!("usb_c_2340901_1.toml");

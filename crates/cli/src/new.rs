@@ -55,7 +55,10 @@ fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
 
 fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Result<(), CliError> {
     // Guard against accidentally passing a symbol file as a footprint.
-    if let Some(ext) = PathBuf::from(footprint_path).extension().and_then(|s| s.to_str()) {
+    if let Some(ext) = PathBuf::from(footprint_path)
+        .extension()
+        .and_then(|s| s.to_str())
+    {
         if ext.eq_ignore_ascii_case("kicad_sym") {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
@@ -114,7 +117,10 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
 
 fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError> {
     // Guard against accidentally passing a footprint file as a symbol.
-    if let Some(ext) = PathBuf::from(symbol_path).extension().and_then(|s| s.to_str()) {
+    if let Some(ext) = PathBuf::from(symbol_path)
+        .extension()
+        .and_then(|s| s.to_str())
+    {
         if ext.eq_ignore_ascii_case("kicad_mod") {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:FOOTPRINT_AS_SYMBOL".into(),

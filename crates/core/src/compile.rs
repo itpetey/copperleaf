@@ -263,7 +263,8 @@ fn build_nets_and_connections(
             name: name.clone(),
             kind,
             class: crate::net::NetClass::default(),
-            constraints: vec![],        });
+            constraints: vec![],
+        });
 
         for &node_idx in members {
             let (comp_idx, pin_name) = grouping.nodes[node_idx];
@@ -404,7 +405,8 @@ fn ground_net_name_and_fallback(board: &CompiledBoard) -> (String, Option<Net>) 
             ripple: None,
         },
         class: NetClass::default(),
-        constraints: vec![],    };
+        constraints: vec![],
+    };
     ("GND".into(), Some(net))
 }
 
@@ -484,7 +486,8 @@ fn make_capacitor_component(refdes: &str) -> CompiledComponent {
                 .with_id(pin1_id),
             Pin::build("2").gnd().with_id(pin2_id),
         ],
-        constraints: vec![],        symbol: None,
+        constraints: vec![],
+        symbol: None,
         footprint: None,
     }
 }
@@ -807,13 +810,15 @@ mod tests {
                     ripple: None,
                 },
                 class: crate::net::NetClass::default(),
-                constraints: vec![],            }],
+                constraints: vec![],
+            }],
             connections: vec![Connection {
                 component: 0,
                 pin: "VIN".into(),
                 net: NetId("V3V3".into()),
             }],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let (comps, caps, diags, conns, fallback) = synthesise_decoupling(&board);
         assert_eq!(caps.len(), 2);
         assert_eq!(caps[0].refdes, "C1");
@@ -851,7 +856,8 @@ mod tests {
                         ripple: None,
                     },
                     class: crate::net::NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
                 Net {
                     name: "GND".into(),
                     kind: NetKind::Power {
@@ -859,7 +865,8 @@ mod tests {
                         ripple: None,
                     },
                     class: crate::net::NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
             ],
             connections: vec![
                 Connection {
@@ -873,7 +880,8 @@ mod tests {
                     net: NetId("GND".into()),
                 },
             ],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let (comps, caps, _, _, _) = synthesise_decoupling(&board);
         assert_eq!(caps.len(), 1);
         assert_eq!(caps[0].net, "V3V3");
@@ -902,7 +910,8 @@ mod tests {
                         ripple: None,
                     },
                     class: crate::net::NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
                 Net {
                     name: "VDD".into(),
                     kind: NetKind::Power {
@@ -910,7 +919,8 @@ mod tests {
                         ripple: None,
                     },
                     class: crate::net::NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
                 Net {
                     name: "GND".into(),
                     kind: NetKind::Power {
@@ -918,7 +928,8 @@ mod tests {
                         ripple: None,
                     },
                     class: crate::net::NetClass::default(),
-                    constraints: vec![],                },
+                    constraints: vec![],
+                },
             ],
             connections: vec![
                 Connection {
@@ -932,7 +943,8 @@ mod tests {
                     net: NetId("VDD".into()),
                 },
             ],
-            constraints: vec![],        };
+            constraints: vec![],
+        };
         let (comps, caps, _, _, _) = synthesise_decoupling(&board);
         assert_eq!(caps.len(), 2);
         let nets: Vec<&str> = caps.iter().map(|c| c.net.as_str()).collect();

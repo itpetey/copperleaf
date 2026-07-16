@@ -7,17 +7,14 @@ use copperleaf_part_codegen::Manifest;
 
 use crate::sexpr::Sexpr;
 
-/// Grid spacing in millimetres (0.1 inch = 2.54 mm).
-const GRID: f64 = 2.54;
-
-/// Default pin length.
-const PIN_LENGTH: f64 = 2.54;
-
-/// Horizontal offset for left/right-side pins from the body centre.
-const PIN_X_OFFSET: f64 = 5.08;
-
 /// Body margin outside the symbol pin extents.
 const BODY_MARGIN: f64 = 1.27;
+/// Grid spacing in millimetres (0.1 inch = 2.54 mm).
+const GRID: f64 = 2.54;
+/// Default pin length.
+const PIN_LENGTH: f64 = 2.54;
+/// Horizontal offset for left/right-side pins from the body centre.
+const PIN_X_OFFSET: f64 = 5.08;
 
 /// Generate a `.kicad_sym` library S-expression string from a component manifest.
 ///
@@ -39,46 +36,22 @@ pub fn emit_symbol(manifest: &Manifest) -> String {
 
     lib_children.push(symbol_node(manifest, lib_id, title));
 
-    Sexpr::list([Sexpr::atom("kicad_symbol_lib").into()]
-        .into_iter()
-        .chain(lib_children))
+    Sexpr::list(
+        [Sexpr::atom("kicad_symbol_lib").into()]
+            .into_iter()
+            .chain(lib_children),
+    )
     .to_string()
 }
 
-fn symbol_node(manifest: &Manifest, lib_id: &str, title: &str) -> Sexpr {
-    let mut children = vec![Sexpr::atom("symbol"), Sexpr::str(lib_id)];
-
-    // ── properties ──
-    children.push(property("Reference", "U"));
-    children.push(property("Value", title));
-    children.push(property_hidden("Footprint", ""));
-    if let Some(ref ds) = manifest.component.datasheet {
-        children.push(property_hidden("Datasheet", ds));
-    } else {
-        children.push(property_hidden("Datasheet", ""));
+fn atom_str(expr: &Sexpr) -> Option<&str> {
+    match expr {
+        Sexpr::Atom(s) => {
+            let trimmed = s.trim_matches('"');
+            Some(trimmed)
+        }
+        _ => None,
     }
-    if let Some(ref desc) = manifest.component.description {
-        children.push(property_hidden("ki_description", desc));
-    }
-
-    // ── unit sub-symbol ──
-    let unit_name = format!("{}_0_1", lib_id);
-    let mut unit = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(&unit_name),
-    ];
-
-    // Pin layout.
-    let pin_nodes = pin_layout(manifest);
-    let body_rect = symbol_body(&pin_nodes);
-    unit.push(body_rect);
-
-    for pn in pin_nodes {
-        unit.push(pn);
-    }
-
-    children.push(Sexpr::list(unit));
-    Sexpr::list(children)
 }
 
 /// Auto-layout pins on a grid.
@@ -102,6 +75,52 @@ fn classify_pins(manifest: &Manifest) -> (Vec<usize>, Vec<usize>, Vec<usize>) {
         }
     }
     (left, right, bottom)
+}
+
+/// Extract pin (x, y) from a pin s-expression node if present.
+fn extract_pin_pos(node: &Sexpr) -> Option<(f64, f64)> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    // Find the (at x y rot) sub-list.
+    for child in children {
+        if let Sexpr::List(parts) = child
+            && parts.len() >= 3
+            && let Some(Sexpr::Atom(key)) = parts.first()
+            && key == "at"
+        {
+            let xs = parts.get(1).and_then(atom_str)?;
+            let ys = parts.get(2).and_then(atom_str)?;
+            let x: f64 = xs.parse().ok()?;
+            let y: f64 = ys.parse().ok()?;
+            return Some((x, y));
+        }
+    }
+    None
+}
+
+fn fmt_f64(v: f64) -> String {
+    format!("{:?}", v)
+}
+
+fn is_thermal_pad(pin: &copperleaf_part_codegen::PinDef) -> bool {
+    pin.name.eq_ignore_ascii_case("EXP")
+        || pin.name.eq_ignore_ascii_case("EP")
+        || pin.name.eq_ignore_ascii_case("PAD")
+}
+
+/// Map a Copperleaf pin kind to a KiCad electrical type.
+fn kind_to_pin_type(kind: &str) -> &'static str {
+    match kind {
+        "gnd" => "power_in",
+        "pwr" | "pwr_fixed" => "power_in",
+        "pwr_out" => "power_out",
+        "clk" => "input",
+        "spi" => "bidirectional",
+        "dio" => "bidirectional",
+        "analog_in" | "analog_rf" => "input",
+        _ => "passive",
+    }
 }
 
 /// Build pin s-expression nodes and return them in render order.
@@ -131,6 +150,57 @@ fn pin_layout(manifest: &Manifest) -> Vec<Sexpr> {
     }
 
     nodes
+}
+
+fn property(key: &str, value: &str) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("effects"),
+            Sexpr::list([
+                Sexpr::atom("font"),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.27"),
+                    Sexpr::atom("1.27"),
+                ]),
+            ]),
+        ]),
+    ])
+}
+
+fn property_hidden(key: &str, value: &str) -> Sexpr {
+    Sexpr::list([
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+            Sexpr::atom("0"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("effects"),
+            Sexpr::list([
+                Sexpr::atom("font"),
+                Sexpr::list([
+                    Sexpr::atom("size"),
+                    Sexpr::atom("1.27"),
+                    Sexpr::atom("1.27"),
+                ]),
+            ]),
+            Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]),
+        ]),
+    ])
 }
 
 /// Compute a body rectangle that encloses all pin positions with a margin.
@@ -174,48 +244,54 @@ fn symbol_body(pin_nodes: &[Sexpr]) -> Sexpr {
             Sexpr::atom(fmt_f64(x2)),
             Sexpr::atom(fmt_f64(y2)),
         ]),
-        Sexpr::list([
-            Sexpr::atom("fill"),
-            Sexpr::atom("background"),
-        ]),
+        Sexpr::list([Sexpr::atom("fill"), Sexpr::atom("background")]),
     ])
 }
 
-/// Extract pin (x, y) from a pin s-expression node if present.
-fn extract_pin_pos(node: &Sexpr) -> Option<(f64, f64)> {
-    let Sexpr::List(children) = node else { return None };
-    // Find the (at x y rot) sub-list.
-    for child in children {
-        if let Sexpr::List(parts) = child
-            && parts.len() >= 3
-            && let Some(Sexpr::Atom(key)) = parts.first()
-            && key == "at"
-        {
-            let xs = parts.get(1).and_then(atom_str)?;
-            let ys = parts.get(2).and_then(atom_str)?;
-            let x: f64 = xs.parse().ok()?;
-            let y: f64 = ys.parse().ok()?;
-            return Some((x, y));
-        }
-    }
-    None
-}
+fn symbol_node(manifest: &Manifest, lib_id: &str, title: &str) -> Sexpr {
+    let mut children = vec![Sexpr::atom("symbol"), Sexpr::str(lib_id)];
 
-fn atom_str(expr: &Sexpr) -> Option<&str> {
-    match expr {
-        Sexpr::Atom(s) => {
-            let trimmed = s.trim_matches('"');
-            Some(trimmed)
-        }
-        _ => None,
+    // ── properties ──
+    children.push(property("Reference", "U"));
+    children.push(property("Value", title));
+    children.push(property_hidden("Footprint", ""));
+    if let Some(ref ds) = manifest.component.datasheet {
+        children.push(property_hidden("Datasheet", ds));
+    } else {
+        children.push(property_hidden("Datasheet", ""));
     }
+    if let Some(ref desc) = manifest.component.description {
+        children.push(property_hidden("ki_description", desc));
+    }
+
+    // ── unit sub-symbol ──
+    let unit_name = format!("{}_0_1", lib_id);
+    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
+
+    // Pin layout.
+    let pin_nodes = pin_layout(manifest);
+    let body_rect = symbol_body(&pin_nodes);
+    unit.push(body_rect);
+
+    for pn in pin_nodes {
+        unit.push(pn);
+    }
+
+    children.push(Sexpr::list(unit));
+    Sexpr::list(children)
 }
 
 /// Build a single pin s-expression.
 ///
 /// `on_left` controls text offset: names go to the left of left-side pins
 /// and to the right of right-side pins (KiCad convention).
-fn symbol_pin(pin: &copperleaf_part_codegen::PinDef, x: f64, y: f64, rot: f64, on_left: bool) -> Sexpr {
+fn symbol_pin(
+    pin: &copperleaf_part_codegen::PinDef,
+    x: f64,
+    y: f64,
+    rot: f64,
+    on_left: bool,
+) -> Sexpr {
     let pin_type = if is_thermal_pad(pin) {
         "power_in"
     } else {
@@ -234,10 +310,7 @@ fn symbol_pin(pin: &copperleaf_part_codegen::PinDef, x: f64, y: f64, rot: f64, o
             Sexpr::atom(fmt_f64(y)),
             Sexpr::atom(fmt_f64(rot)),
         ]),
-        Sexpr::list([
-            Sexpr::atom("length"),
-            Sexpr::atom(fmt_f64(PIN_LENGTH)),
-        ]),
+        Sexpr::list([Sexpr::atom("length"), Sexpr::atom(fmt_f64(PIN_LENGTH))]),
     ];
 
     // Name with effects.
@@ -298,86 +371,6 @@ fn symbol_pin(pin: &copperleaf_part_codegen::PinDef, x: f64, y: f64, rot: f64, o
     Sexpr::list(children)
 }
 
-/// Map a Copperleaf pin kind to a KiCad electrical type.
-fn kind_to_pin_type(kind: &str) -> &'static str {
-    match kind {
-        "gnd" => "power_in",
-        "pwr" | "pwr_fixed" => "power_in",
-        "pwr_out" => "power_out",
-        "clk" => "input",
-        "spi" => "bidirectional",
-        "dio" => "bidirectional",
-        "analog_in" | "analog_rf" => "input",
-        _ => "passive",
-    }
-}
-
-fn is_thermal_pad(pin: &copperleaf_part_codegen::PinDef) -> bool {
-    pin.name.eq_ignore_ascii_case("EXP")
-        || pin.name.eq_ignore_ascii_case("EP")
-        || pin.name.eq_ignore_ascii_case("PAD")
-}
-
-// ── property helpers ──
-
-fn property(key: &str, value: &str) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("effects"),
-            Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("1.27"),
-                    Sexpr::atom("1.27"),
-                ]),
-            ]),
-        ]),
-    ])
-}
-
-fn property_hidden(key: &str, value: &str) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("effects"),
-            Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("1.27"),
-                    Sexpr::atom("1.27"),
-                ]),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("hide"),
-                Sexpr::atom("yes"),
-            ]),
-        ]),
-    ])
-}
-
-fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,11 +393,25 @@ mod tests {
                     purpose: "Supply".into(),
                     notes: String::new(),
                     kind: "pwr".into(),
-                    bw_mhz: None, v: None, v_min: None, v_max: None, i: None, i_max: None,
-                    pos: None, rotation: None, length: None, nc: None,
-                    width: None, height: None, pad_type: None, pad_shape: None,
-                    roundrect_rratio: None, solder_mask_margin: None, layers: None,
-                    drill: None, thermal_vias: vec![],
+                    bw_mhz: None,
+                    v: None,
+                    v_min: None,
+                    v_max: None,
+                    i: None,
+                    i_max: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
+                    nc: None,
+                    width: None,
+                    height: None,
+                    pad_type: None,
+                    pad_shape: None,
+                    roundrect_rratio: None,
+                    solder_mask_margin: None,
+                    layers: None,
+                    drill: None,
+                    thermal_vias: vec![],
                 },
                 PinDef {
                     num: 2,
@@ -413,11 +420,25 @@ mod tests {
                     purpose: "Ground".into(),
                     notes: String::new(),
                     kind: "gnd".into(),
-                    bw_mhz: None, v: None, v_min: None, v_max: None, i: None, i_max: None,
-                    pos: None, rotation: None, length: None, nc: None,
-                    width: None, height: None, pad_type: None, pad_shape: None,
-                    roundrect_rratio: None, solder_mask_margin: None, layers: None,
-                    drill: None, thermal_vias: vec![],
+                    bw_mhz: None,
+                    v: None,
+                    v_min: None,
+                    v_max: None,
+                    i: None,
+                    i_max: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
+                    nc: None,
+                    width: None,
+                    height: None,
+                    pad_type: None,
+                    pad_shape: None,
+                    roundrect_rratio: None,
+                    solder_mask_margin: None,
+                    layers: None,
+                    drill: None,
+                    thermal_vias: vec![],
                 },
                 PinDef {
                     num: 3,
@@ -426,11 +447,25 @@ mod tests {
                     purpose: "Clock".into(),
                     notes: String::new(),
                     kind: "clk".into(),
-                    bw_mhz: Some(50.0), v: None, v_min: None, v_max: None, i: None, i_max: None,
-                    pos: None, rotation: None, length: None, nc: None,
-                    width: None, height: None, pad_type: None, pad_shape: None,
-                    roundrect_rratio: None, solder_mask_margin: None, layers: None,
-                    drill: None, thermal_vias: vec![],
+                    bw_mhz: Some(50.0),
+                    v: None,
+                    v_min: None,
+                    v_max: None,
+                    i: None,
+                    i_max: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
+                    nc: None,
+                    width: None,
+                    height: None,
+                    pad_type: None,
+                    pad_shape: None,
+                    roundrect_rratio: None,
+                    solder_mask_margin: None,
+                    layers: None,
+                    drill: None,
+                    thermal_vias: vec![],
                 },
                 PinDef {
                     num: 4,
@@ -439,11 +474,25 @@ mod tests {
                     purpose: "I/O".into(),
                     notes: String::new(),
                     kind: "dio".into(),
-                    bw_mhz: None, v: None, v_min: None, v_max: None, i: None, i_max: None,
-                    pos: None, rotation: None, length: None, nc: None,
-                    width: None, height: None, pad_type: None, pad_shape: None,
-                    roundrect_rratio: None, solder_mask_margin: None, layers: None,
-                    drill: None, thermal_vias: vec![],
+                    bw_mhz: None,
+                    v: None,
+                    v_min: None,
+                    v_max: None,
+                    i: None,
+                    i_max: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
+                    nc: None,
+                    width: None,
+                    height: None,
+                    pad_type: None,
+                    pad_shape: None,
+                    roundrect_rratio: None,
+                    solder_mask_margin: None,
+                    layers: None,
+                    drill: None,
+                    thermal_vias: vec![],
                 },
                 PinDef {
                     num: 5,
@@ -452,11 +501,25 @@ mod tests {
                     purpose: "Ground".into(),
                     notes: String::new(),
                     kind: "gnd".into(),
-                    bw_mhz: None, v: None, v_min: None, v_max: None, i: None, i_max: None,
-                    pos: None, rotation: None, length: None, nc: None,
-                    width: None, height: None, pad_type: None, pad_shape: None,
-                    roundrect_rratio: None, solder_mask_margin: None, layers: None,
-                    drill: None, thermal_vias: vec![],
+                    bw_mhz: None,
+                    v: None,
+                    v_min: None,
+                    v_max: None,
+                    i: None,
+                    i_max: None,
+                    pos: None,
+                    rotation: None,
+                    length: None,
+                    nc: None,
+                    width: None,
+                    height: None,
+                    pad_type: None,
+                    pad_shape: None,
+                    roundrect_rratio: None,
+                    solder_mask_margin: None,
+                    layers: None,
+                    drill: None,
+                    thermal_vias: vec![],
                 },
             ],
             constraints: vec![],
@@ -475,7 +538,10 @@ mod tests {
     #[test]
     fn contains_symbol_header() {
         let out = emit_symbol(&make_test_manifest());
-        assert!(out.starts_with("(kicad_symbol_lib"), "missing kicad_symbol_lib header");
+        assert!(
+            out.starts_with("(kicad_symbol_lib"),
+            "missing kicad_symbol_lib header"
+        );
         assert!(out.contains("\"TestPart\""), "missing symbol name");
     }
 
@@ -520,8 +586,8 @@ mod tests {
         let out = emit_symbol(&manifest);
 
         // Parse it back.
-        let symbols = crate::sym_parser::parse_symbol_lib(&out)
-            .expect("should parse generated symbol");
+        let symbols =
+            crate::sym_parser::parse_symbol_lib(&out).expect("should parse generated symbol");
 
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].lib_id, "TestPart");

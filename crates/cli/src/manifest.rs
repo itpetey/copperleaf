@@ -2,7 +2,9 @@
 
 use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{PadDef, sym_parser::PinDef as SymPinDef};
-use copperleaf_part_codegen::{CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef};
+use copperleaf_part_codegen::{
+    CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef,
+};
 
 use crate::kindmap::{KindEntry, KindMap};
 
@@ -210,24 +212,6 @@ pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnost
     diagnostics
 }
 
-/// Return a mutable reference to the first pin whose bounding box contains
-/// `pad`'s centre point, or `None` if no pin contains it.
-fn find_containing_pad<'a>(manifest: &'a mut Manifest, pad: &PadDef) -> Option<&'a mut PinDef> {
-    for pin in &mut manifest.pins {
-        let Some((px, py)) = pin.pos else { continue };
-        let half_w = pin.width.unwrap_or(0.0) / 2.0;
-        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
-        if pad.pos.0 >= px - half_w
-            && pad.pos.0 <= px + half_w
-            && pad.pos.1 >= py - half_h
-            && pad.pos.1 <= py + half_h
-        {
-            return Some(pin);
-        }
-    }
-    None
-}
-
 /// Merge symbol pin data into an existing manifest.
 pub fn merge_symbol(
     existing: &mut Manifest,
@@ -247,21 +231,18 @@ pub fn merge_symbol(
         // Try to find an existing pin whose stored `number` matches.
         // Fall back to matching by `num` when `number` is empty (footprint-only
         // pins created by the `new` command lack a `number` field).
-        let matched = existing
-            .pins
-            .iter_mut()
-            .find(|p| {
-                if p.number == sym_pin.number {
-                    return true;
-                }
-                if p.number.is_empty() {
-                    let Ok(sym_num) = sym_pin.number.parse::<usize>() else {
-                        return false;
-                    };
-                    return p.num == sym_num;
-                }
-                false
-            });
+        let matched = existing.pins.iter_mut().find(|p| {
+            if p.number == sym_pin.number {
+                return true;
+            }
+            if p.number.is_empty() {
+                let Ok(sym_num) = sym_pin.number.parse::<usize>() else {
+                    return false;
+                };
+                return p.num == sym_num;
+            }
+            false
+        });
 
         if let Some(pin) = matched {
             // Found by number string — update in place.
@@ -572,6 +553,24 @@ fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
 
 fn escape_toml_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// Return a mutable reference to the first pin whose bounding box contains
+/// `pad`'s centre point, or `None` if no pin contains it.
+fn find_containing_pad<'a>(manifest: &'a mut Manifest, pad: &PadDef) -> Option<&'a mut PinDef> {
+    for pin in &mut manifest.pins {
+        let Some((px, py)) = pin.pos else { continue };
+        let half_w = pin.width.unwrap_or(0.0) / 2.0;
+        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+        if pad.pos.0 >= px - half_w
+            && pad.pos.0 <= px + half_w
+            && pad.pos.1 >= py - half_h
+            && pad.pos.1 <= py + half_h
+        {
+            return Some(pin);
+        }
+    }
+    None
 }
 
 fn fmt_f64(v: f64) -> String {
