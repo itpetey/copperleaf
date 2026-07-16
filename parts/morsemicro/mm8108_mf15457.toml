@@ -3,25 +3,34 @@ name = "Mm8108Mf15457"
 title = "Morse Micro MM8108-MF15457 Wi-Fi HaLow module (MM8108 SoC)."
 description = "Morse Micro Wi-Fi HaLow module"
 datasheet = "https://www.morsemicro.com/resources/datasheets/modules/MM8108-MF15457_Data_Sheet.pdf"
+lib_id = "MM8108-MF15457"
 
 [[pin]]
 num = 1
 name = "GND_1"
 purpose = "Ground"
 kind = "gnd"
+pos = [0.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 2
 name = "ANT"
 purpose = "Antenna"
-notes = ""
 kind = "analog_rf"
+pos = [1.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 3
 name = "GND_2"
 purpose = "Ground"
 kind = "gnd"
+pos = [2.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 4
@@ -29,6 +38,9 @@ name = "RESET_N"
 purpose = "Reset"
 notes = "Pull low to reset"
 kind = "dio"
+pos = [3.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 5
@@ -36,6 +48,9 @@ name = "WAKE"
 purpose = "Wake"
 notes = "Leave open to disable power-saving"
 kind = "dio"
+pos = [4.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 6
@@ -43,6 +58,9 @@ name = "JTAG_TMS"
 purpose = "JTAG"
 notes = "alt: GPIO15"
 kind = "dio"
+pos = [5.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 7
@@ -51,6 +69,9 @@ purpose = "JTAG"
 notes = "alt: GPIO13"
 kind = "clk"
 bw_mhz = 1.0
+pos = [6.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 8
@@ -58,6 +79,9 @@ name = "JTAG_TDO"
 purpose = "JTAG"
 notes = "alt: GPIO16"
 kind = "dio"
+pos = [7.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 9
@@ -65,6 +89,9 @@ name = "JTAG_TDI"
 purpose = "JTAG"
 notes = "alt: GPIO14"
 kind = "dio"
+pos = [8.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 10
@@ -75,12 +102,18 @@ kind = "pwr"
 v_min = 3.0
 v_max = 3.6
 i_max = 0.3
+pos = [9.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 11
 name = "GND_3"
 purpose = "Ground"
 kind = "gnd"
+pos = [10.0, 0.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 12
@@ -89,6 +122,9 @@ purpose = "SDIO/SPI"
 notes = "alt: SPI_MISO"
 kind = "spi"
 bw_mhz = 50.0
+pos = [10.0, 1.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 13
@@ -97,6 +133,9 @@ purpose = "SDIO/SPI"
 notes = "alt: SPI_CS"
 kind = "spi"
 bw_mhz = 50.0
+pos = [10.0, 2.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 14
@@ -105,6 +144,9 @@ purpose = "SDIO/SPI"
 notes = "alt: SPI_INT"
 kind = "spi"
 bw_mhz = 50.0
+pos = [10.0, 3.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 15
@@ -112,6 +154,9 @@ name = "SDIO_D2"
 purpose = "SDIO/SPI"
 notes = "(unused in SPI mode)"
 kind = "dio"
+pos = [10.0, 4.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 16
@@ -120,6 +165,9 @@ purpose = "SDIO/SPI"
 notes = "alt: SPI_MOSI"
 kind = "spi"
 bw_mhz = 50.0
+pos = [10.0, 5.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 17
@@ -128,30 +176,45 @@ purpose = "SDIO/SPI"
 notes = "alt: SPI_SCK"
 kind = "clk"
 bw_mhz = 50.0
+pos = [10.0, 6.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 18
 name = "GPIO5"
 purpose = "GPIO"
 kind = "dio"
+pos = [10.0, 7.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 19
 name = "GPIO4"
 purpose = "GPIO"
 kind = "dio"
+pos = [10.0, 8.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 20
 name = "GND_4"
 purpose = "Ground"
 kind = "gnd"
+pos = [10.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 21
 name = "GPIO3"
 purpose = "GPIO"
 kind = "dio"
+pos = [9.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 22
@@ -162,12 +225,18 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.6
 i_max = 0.05
+pos = [8.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 23
 name = "GND_5"
 purpose = "Ground"
 kind = "gnd"
+pos = [7.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 24
@@ -178,6 +247,9 @@ kind = "pwr"
 v_min = 3.0
 v_max = 3.6
 i_max = 0.5
+pos = [6.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 25
@@ -188,12 +260,18 @@ kind = "pwr"
 v_min = 3.0
 v_max = 3.6
 i_max = 0.1
+pos = [5.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 26
 name = "GND_6"
 purpose = "Ground"
 kind = "gnd"
+pos = [4.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 27
@@ -201,6 +279,9 @@ name = "USB_D_N"
 purpose = "USB DM"
 notes = "Floating in SPI mode"
 kind = "dio"
+pos = [3.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 28
@@ -208,66 +289,99 @@ name = "USB_D_P"
 purpose = "USB DP"
 notes = "Floating in SPI mode"
 kind = "dio"
+pos = [2.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 29
 name = "BUSY"
 purpose = "Busy signal"
 kind = "dio"
+pos = [1.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 30
 name = "GND_7"
 purpose = "Ground"
 kind = "gnd"
+pos = [0.0, 9.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 31
 name = "GPIO1"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 8.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 32
 name = "GPIO0"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 7.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 33
 name = "GPIO6"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 6.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 34
 name = "GPIO7"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 5.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 35
 name = "GPIO8"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 4.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 36
 name = "GPIO9"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 3.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 37
 name = "GPIO10"
 purpose = "GPIO"
 kind = "dio"
+pos = [0.0, 2.0]
+rotation = 0.0
+length = 0.6
 
 [[pin]]
 num = 38
 name = "GND_8"
 purpose = "Ground"
 kind = "gnd"
+pos = [0.0, 1.0]
+rotation = 0.0
+length = 0.6
 
 [[constraint]]
 type = "Decoupling"

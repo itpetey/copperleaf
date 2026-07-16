@@ -3,14 +3,17 @@ name = "W5500"
 title = "WIZnet W5500 Hardwired TCP/IP Ethernet controller with integrated 10/100 PHY (48-LQFP)."
 description = "WIZnet W5500 Ethernet controller"
 datasheet = "https://docs.wiznet.io/img/products/w5500/W5500_ds_v110e.pdf"
+lib_id = "W5500"
 
-# Ethernet PHY analog differential pairs
 [[pin]]
 num = 1
 name = "TXN"
 purpose = "Ethernet PHY"
 notes = "Differential transmit (negative)"
 kind = "analog_rf"
+pos = [-4.18, -2.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 2
@@ -18,12 +21,18 @@ name = "TXP"
 purpose = "Ethernet PHY"
 notes = "Differential transmit (positive)"
 kind = "analog_rf"
+pos = [-4.18, -2.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 3
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [-4.18, -1.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 4
@@ -34,6 +43,9 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [-4.18, -1.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 5
@@ -41,6 +53,9 @@ name = "RXN"
 purpose = "Ethernet PHY"
 notes = "Differential receive (negative)"
 kind = "analog_rf"
+pos = [-4.18, -0.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 6
@@ -48,6 +63,9 @@ name = "RXP"
 purpose = "Ethernet PHY"
 notes = "Differential receive (positive)"
 kind = "analog_rf"
+pos = [-4.18, -0.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 7
@@ -55,6 +73,9 @@ name = "DNC"
 purpose = "Do not connect"
 notes = "Do not connect"
 kind = "dio"
+pos = [-4.18, 0.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 8
@@ -65,12 +86,18 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [-4.18, 0.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 9
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [-4.18, 1.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 10
@@ -78,6 +105,9 @@ name = "EXRES1"
 purpose = "PHY bias"
 notes = "External reference resistor; 12.4kΩ 1% to AGND"
 kind = "analog_in"
+pos = [-4.18, 1.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 11
@@ -88,6 +118,9 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [-4.18, 2.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 12
@@ -95,6 +128,9 @@ name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
 kind = "dio"
+pos = [-4.18, 2.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 13
@@ -102,12 +138,18 @@ name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
 kind = "dio"
+pos = [-2.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 14
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [-2.25, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 15
@@ -118,12 +160,18 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [-1.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 16
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [-1.25, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 17
@@ -134,6 +182,9 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [-0.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 18
@@ -141,12 +192,18 @@ name = "VBG"
 purpose = "Band gap reference"
 notes = "Band gap output, ~1.2V at 25°C; leave floating"
 kind = "analog_in"
+pos = [-0.25, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 19
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [0.25, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 20
@@ -154,6 +211,9 @@ name = "TOCAP"
 purpose = "Reference capacitor"
 notes = "External reference capacitor; 4.7µF to AGND, keep trace short"
 kind = "analog_in"
+pos = [0.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 21
@@ -164,6 +224,9 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [1.25, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 22
@@ -173,6 +236,9 @@ notes = "1.2V regulator output; 10nF to GND"
 kind = "pwr_out"
 v = 1.2
 i = 0.01
+pos = [1.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 23
@@ -180,14 +246,19 @@ name = "RSVD"
 purpose = "Reserved"
 notes = "Must be tied to GND"
 kind = "dio"
+pos = [2.25, 4.18]
+rotation = 0.0
+length = 1.56
 
-# LED indicator outputs
 [[pin]]
 num = 24
 name = "SPDLED"
 purpose = "Speed LED"
 notes = "Low: 100Mbps, High: 10Mbps"
 kind = "dio"
+pos = [2.75, 4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 25
@@ -195,6 +266,9 @@ name = "LINKLED"
 purpose = "Link LED"
 notes = "Low: link established, High: no link"
 kind = "dio"
+pos = [4.18, 2.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 26
@@ -202,6 +276,9 @@ name = "DUPLED"
 purpose = "Duplex LED"
 notes = "Low: full-duplex, High: half-duplex"
 kind = "dio"
+pos = [4.18, 2.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 27
@@ -209,8 +286,10 @@ name = "ACTLED"
 purpose = "Active LED"
 notes = "Low: carrier sense during TX/RX activity"
 kind = "dio"
+pos = [4.18, 1.75]
+rotation = 0.0
+length = 1.56
 
-# Digital power/ground
 [[pin]]
 num = 28
 name = "VDD"
@@ -220,14 +299,19 @@ kind = "pwr"
 v_min = 2.97
 v_max = 3.63
 i_max = 0.15
+pos = [4.18, 1.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 29
 name = "GND"
 purpose = "Digital ground"
 kind = "gnd"
+pos = [4.18, 0.75]
+rotation = 0.0
+length = 1.56
 
-# Crystal oscillator
 [[pin]]
 num = 30
 name = "XI/CLKIN"
@@ -235,6 +319,9 @@ purpose = "Crystal"
 notes = "25MHz crystal input or external 3.3V clock input"
 kind = "clk"
 bw_mhz = 25.0
+pos = [4.18, 0.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 31
@@ -243,8 +330,10 @@ purpose = "Crystal"
 notes = "25MHz crystal output; float when using external clock on XI/CLKIN"
 kind = "clk"
 bw_mhz = 25.0
+pos = [4.18, -0.25]
+rotation = 0.0
+length = 1.56
 
-# SPI interface (slave; supports Mode 0 and 3, ~33MHz practical)
 [[pin]]
 num = 32
 name = "SCSn"
@@ -252,6 +341,9 @@ purpose = "SPI"
 notes = "Active-low SPI chip select (internal pull-up)"
 kind = "spi"
 bw_mhz = 33.0
+pos = [4.18, -0.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 33
@@ -260,6 +352,9 @@ purpose = "SPI"
 notes = "SPI clock input"
 kind = "clk"
 bw_mhz = 33.0
+pos = [4.18, -1.25]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 34
@@ -268,6 +363,9 @@ purpose = "SPI"
 notes = "SPI master in / slave out; high-Z when SCSn high"
 kind = "spi"
 bw_mhz = 33.0
+pos = [4.18, -1.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 35
@@ -276,14 +374,19 @@ purpose = "SPI"
 notes = "SPI master out / slave in"
 kind = "spi"
 bw_mhz = 33.0
+pos = [4.18, -2.25]
+rotation = 0.0
+length = 1.56
 
-# Control / interrupt
 [[pin]]
 num = 36
 name = "INTn"
 purpose = "Interrupt"
 notes = "Active-low interrupt output"
 kind = "dio"
+pos = [4.18, -2.75]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 37
@@ -291,14 +394,19 @@ name = "RSTn"
 purpose = "Reset"
 notes = "Active-low reset, hold low ≥500µs (internal pull-up)"
 kind = "dio"
+pos = [2.75, -4.18]
+rotation = 0.0
+length = 1.56
 
-# Reserved (internal pull-down, leave unconnected)
 [[pin]]
 num = 38
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
 kind = "dio"
+pos = [2.25, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 39
@@ -306,6 +414,9 @@ name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
 kind = "dio"
+pos = [1.75, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 40
@@ -313,6 +424,9 @@ name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
 kind = "dio"
+pos = [1.25, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 41
@@ -320,6 +434,9 @@ name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
 kind = "dio"
+pos = [0.75, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 42
@@ -327,14 +444,19 @@ name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
 kind = "dio"
+pos = [0.25, -4.18]
+rotation = 0.0
+length = 1.56
 
-# PHY operation mode select (internal pull-ups; 111 = all capable, auto-neg)
 [[pin]]
 num = 43
 name = "PMODE2"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 2 (pull-up)"
 kind = "dio"
+pos = [-0.25, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 44
@@ -342,6 +464,9 @@ name = "PMODE1"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 1 (pull-up)"
 kind = "dio"
+pos = [-0.75, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 45
@@ -349,6 +474,9 @@ name = "PMODE0"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 0 (pull-up)"
 kind = "dio"
+pos = [-1.25, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 46
@@ -356,6 +484,9 @@ name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
 kind = "dio"
+pos = [-1.75, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 47
@@ -363,12 +494,18 @@ name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
 kind = "dio"
+pos = [-2.25, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[pin]]
 num = 48
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
+pos = [-2.75, -4.18]
+rotation = 0.0
+length = 1.56
 
 [[constraint]]
 type = "Decoupling"

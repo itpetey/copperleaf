@@ -3,6 +3,7 @@ name = "Rp2354a"
 title = "Raspberry Pi RP2354A — RP2350 with 2 MB internal flash (QFN-60)."
 description = "Raspberry Pi RP2354A microcontroller"
 datasheet = "https://datasheets.raspberrypi.com/rp2350/rp2350-datasheet.pdf"
+lib_id = "RP2354A"
 
 [[pin]]
 num = 1
@@ -13,30 +14,45 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [-3.45, -2.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 2
 name = "GPIO0"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, -2.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 3
 name = "GPIO1"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, -2.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 4
 name = "GPIO2"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, -1.6]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 5
 name = "GPIO3"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, -1.2]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 6
@@ -47,30 +63,45 @@ kind = "pwr"
 v_min = 1.1
 v_max = 1.1
 i_max = 0.1
+pos = [-3.45, -0.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 7
 name = "GPIO4"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, -0.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 8
 name = "GPIO5"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 0.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 9
 name = "GPIO6"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 0.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 10
 name = "GPIO7"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 0.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 11
@@ -81,54 +112,81 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [-3.45, 1.2]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 12
 name = "GPIO8"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 1.6]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 13
 name = "GPIO9"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 2.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 14
 name = "GPIO10"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 2.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 15
 name = "GPIO11"
 purpose = "GPIO"
 kind = "dio"
+pos = [-3.45, 2.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 16
 name = "GPIO12"
 purpose = "GPIO"
 kind = "dio"
+pos = [-2.8, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 17
 name = "GPIO13"
 purpose = "GPIO"
 kind = "dio"
+pos = [-2.4, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 18
 name = "GPIO14"
 purpose = "GPIO"
 kind = "dio"
+pos = [-2.0, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 19
 name = "GPIO15"
 purpose = "GPIO"
 kind = "dio"
+pos = [-1.6, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 20
@@ -139,6 +197,9 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [-1.2, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 21
@@ -147,6 +208,9 @@ purpose = "Crystal"
 notes = "12 MHz crystal input"
 kind = "clk"
 bw_mhz = 12.0
+pos = [-0.8, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 22
@@ -155,6 +219,9 @@ purpose = "Crystal"
 notes = "12 MHz crystal output"
 kind = "clk"
 bw_mhz = 12.0
+pos = [-0.4, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 23
@@ -165,6 +232,9 @@ kind = "pwr"
 v_min = 1.1
 v_max = 1.1
 i_max = 0.1
+pos = [0.0, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 24
@@ -172,36 +242,54 @@ name = "SWCLK"
 purpose = "SWD"
 kind = "clk"
 bw_mhz = 1.0
+pos = [0.4, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 25
 name = "SWDIO"
 purpose = "SWD"
 kind = "dio"
+pos = [0.8, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 26
 name = "RUN"
 purpose = "Reset"
 kind = "dio"
+pos = [1.2, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 27
 name = "GPIO16"
 purpose = "GPIO"
 kind = "dio"
+pos = [1.6, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 28
 name = "GPIO17"
 purpose = "GPIO"
 kind = "dio"
+pos = [2.0, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 29
 name = "GPIO18"
 purpose = "GPIO"
 kind = "dio"
+pos = [2.4, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 30
@@ -212,48 +300,72 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [2.8, 3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 31
 name = "GPIO19"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 2.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 32
 name = "GPIO20"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 2.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 33
 name = "GPIO21"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 2.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 34
 name = "GPIO22"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 1.6]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 35
 name = "GPIO23"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 1.2]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 36
 name = "GPIO24"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 0.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 37
 name = "GPIO25"
 purpose = "GPIO"
 kind = "dio"
+pos = [3.45, 0.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 38
@@ -264,6 +376,9 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [3.45, 0.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 39
@@ -274,30 +389,45 @@ kind = "pwr"
 v_min = 1.1
 v_max = 1.1
 i_max = 0.1
+pos = [3.45, -0.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 40
 name = "GPIO26_ADC0"
 purpose = "GPIO/ADC"
 kind = "dio"
+pos = [3.45, -0.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 41
 name = "GPIO27_ADC1"
 purpose = "GPIO/ADC"
 kind = "dio"
+pos = [3.45, -1.2]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 42
 name = "GPIO28_ADC2"
 purpose = "GPIO/ADC"
 kind = "dio"
+pos = [3.45, -1.6]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 43
 name = "GPIO29_ADC3"
 purpose = "GPIO/ADC"
 kind = "dio"
+pos = [3.45, -2.0]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 44
@@ -307,6 +437,9 @@ notes = "ADC supply"
 kind = "pwr_fixed"
 v = 3.3
 i = 0.1
+pos = [3.45, -2.4]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 45
@@ -317,6 +450,9 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [3.45, -2.8]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 46
@@ -327,12 +463,18 @@ kind = "pwr"
 v_min = 1.1
 v_max = 1.1
 i_max = 0.0
+pos = [2.8, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 47
 name = "VREG_PGND"
 purpose = "Ground"
 kind = "gnd"
+pos = [2.4, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 48
@@ -343,6 +485,9 @@ kind = "pwr"
 v_min = 0.0
 v_max = 0.0
 i_max = 0.0
+pos = [2.0, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 49
@@ -353,6 +498,9 @@ kind = "pwr"
 v_min = 2.7
 v_max = 5.5
 i_max = 0.0
+pos = [1.6, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 50
@@ -363,18 +511,27 @@ kind = "pwr"
 v_min = 0.0
 v_max = 0.0
 i_max = 0.0
+pos = [1.2, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 51
 name = "USB_DM"
 purpose = "USB"
 kind = "dio"
+pos = [0.8, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 52
 name = "USB_DP"
 purpose = "USB"
 kind = "dio"
+pos = [0.4, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 53
@@ -384,6 +541,9 @@ notes = "USB OTP supply"
 kind = "pwr_fixed"
 v = 3.3
 i = 0.1
+pos = [0.0, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 54
@@ -394,12 +554,18 @@ kind = "pwr"
 v_min = 1.8
 v_max = 3.3
 i_max = 0.1
+pos = [-0.4, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 55
 name = "QSPI_SD3"
 purpose = "QSPI"
 kind = "dio"
+pos = [-0.8, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 56
@@ -407,30 +573,54 @@ name = "QSPI_SCLK"
 purpose = "QSPI"
 kind = "clk"
 bw_mhz = 50.0
+pos = [-1.2, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 57
 name = "QSPI_SD0"
 purpose = "QSPI"
 kind = "dio"
+pos = [-1.6, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 58
 name = "QSPI_SD2"
 purpose = "QSPI"
 kind = "dio"
+pos = [-2.0, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 59
 name = "QSPI_SD1"
 purpose = "QSPI"
 kind = "dio"
+pos = [-2.4, -3.45]
+rotation = 0.0
+length = 0.8
 
 [[pin]]
 num = 60
 name = "QSPI_SS"
 purpose = "QSPI"
 kind = "dio"
+pos = [-2.8, -3.45]
+rotation = 0.0
+length = 0.8
+
+[[pin]]
+num = 61
+name = "GND"
+purpose = "Ground"
+kind = "gnd"
+pos = [0.0, 0.0]
+rotation = 0.0
+length = 3.4
 
 [[constraint]]
 type = "LengthMatch"
