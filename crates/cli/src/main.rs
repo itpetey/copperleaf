@@ -1,12 +1,13 @@
 //! Parts-creation CLI for Copperleaf.
 //!
-//! Provides `new` and `update` commands for creating and enriching part TOML
-//! definitions from KiCad symbols and footprints.
+//! Provides `new`, `update`, and `generate` commands for creating, enriching,
+//! and exporting part definitions.
 
 use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use copperleaf::{Diagnostic, Severity};
 
+mod generate;
 mod kindmap;
 mod llm;
 mod manifest;
@@ -92,12 +93,43 @@ struct UpdateArgs {
     default_kind: String,
 }
 
+/// Arguments for `generate footprint`.
+#[derive(Parser)]
+struct GenerateFootprintArgs {
+    /// Part TOML file.
+    part_toml: String,
+    /// Output file path (defaults to <lib_id>.kicad_mod beside the TOML).
+    #[arg(long, short)]
+    out: Option<String>,
+}
+
+/// Arguments for `generate symbol`.
+#[derive(Parser)]
+struct GenerateSymbolArgs {
+    /// Part TOML file.
+    part_toml: String,
+    /// Output file path (defaults to <lib_id>.kicad_sym beside the TOML).
+    #[arg(long, short)]
+    out: Option<String>,
+}
+
+#[derive(Subcommand)]
+enum GenerateCommand {
+    /// Generate a .kicad_mod footprint file from a part TOML.
+    Footprint(GenerateFootprintArgs),
+    /// Generate a .kicad_sym symbol library file from a part TOML.
+    Symbol(GenerateSymbolArgs),
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Create a new part TOML from a source.
     New(NewArgs),
     /// Update an existing part TOML from a source.
     Update(UpdateArgs),
+    /// Generate output files from a part TOML.
+    #[command(subcommand)]
+    Generate(GenerateCommand),
 }
 
 #[derive(Parser)]
@@ -140,5 +172,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::New(args) => new::run(args),
         Command::Update(args) => update::run(args),
+        Command::Generate(cmd) => match cmd {
+            GenerateCommand::Footprint(args) => generate::footprint(args),
+            GenerateCommand::Symbol(args) => generate::symbol(args),
+        },
     }
 }

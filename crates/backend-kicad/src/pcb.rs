@@ -414,8 +414,7 @@ mod tests {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
                 pins: vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
-                constraints: vec![],
-                symbol: None,
+                constraints: vec![],                symbol: None,
                 footprint: None,
             }],
             nets: vec![Net {
@@ -425,15 +424,13 @@ mod tests {
                     ripple: None,
                 },
                 class: NetClass::default(),
-                constraints: vec![],
-            }],
+                constraints: vec![],            }],
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
                 net: NetId("V3V3".into()),
             }],
-            constraints: vec![],
-        };
+            constraints: vec![],        };
         let out = emit_pcb(&board);
         assert!(out.starts_with("(kicad_pcb"));
         assert!(out.contains("(net_class \"Default\""));

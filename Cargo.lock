@@ -170,6 +170,7 @@ name = "copperleaf-backend-kicad"
 version = "0.1.0"
 dependencies = [
  "copperleaf",
+ "copperleaf-part-codegen",
  "serde_json",
  "tempfile",
  "thiserror",
@@ -223,6 +224,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "copperleaf-parts-microchip"
+version = "0.1.0"
+dependencies = [
+ "copperleaf",
+ "copperleaf-part-macro",
+]
+
+[[package]]
 name = "copperleaf-parts-morsemicro"
 version = "0.1.0"
 dependencies = [
@@ -239,6 +248,14 @@ dependencies = [
 
 [[package]]
 name = "copperleaf-parts-raspberrypi"
+version = "0.1.0"
+dependencies = [
+ "copperleaf",
+ "copperleaf-part-macro",
+]
+
+[[package]]
+name = "copperleaf-parts-texas-instruments"
 version = "0.1.0"
 dependencies = [
  "copperleaf",

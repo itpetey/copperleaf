@@ -7,33 +7,55 @@ lib_id = "MM8108-MF15457"
 
 [[pin]]
 num = 1
-name = "GND_1"
+number = "1"
+name = "GND_8"
 purpose = "Ground"
 kind = "gnd"
 pos = [0.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 2
+number = "2"
 name = "ANT"
 purpose = "Antenna"
 kind = "analog_rf"
 pos = [1.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 3
-name = "GND_2"
+number = "3"
+name = "GND_3"
 purpose = "Ground"
 kind = "gnd"
 pos = [2.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 4
+number = "4"
 name = "RESET_N"
 purpose = "Reset"
 notes = "Pull low to reset"
@@ -41,9 +63,16 @@ kind = "dio"
 pos = [3.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 5
+number = "5"
 name = "WAKE"
 purpose = "Wake"
 notes = "Leave open to disable power-saving"
@@ -51,9 +80,16 @@ kind = "dio"
 pos = [4.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 6
+number = "6"
 name = "JTAG_TMS"
 purpose = "JTAG"
 notes = "alt: GPIO15"
@@ -61,9 +97,16 @@ kind = "dio"
 pos = [5.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 7
+number = "7"
 name = "JTAG_TCK"
 purpose = "JTAG"
 notes = "alt: GPIO13"
@@ -72,9 +115,16 @@ bw_mhz = 1.0
 pos = [6.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 8
+number = "8"
 name = "JTAG_TDO"
 purpose = "JTAG"
 notes = "alt: GPIO16"
@@ -82,9 +132,16 @@ kind = "dio"
 pos = [7.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 9
+number = "9"
 name = "JTAG_TDI"
 purpose = "JTAG"
 notes = "alt: GPIO14"
@@ -92,10 +149,17 @@ kind = "dio"
 pos = [8.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 10
-name = "VBAT"
+number = "10"
+name = "VDD"
 purpose = "Supply"
 notes = "3V3 battery power"
 kind = "pwr"
@@ -105,19 +169,33 @@ i_max = 0.3
 pos = [9.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 11
-name = "GND_3"
+number = "11"
+name = "GND_7"
 purpose = "Ground"
 kind = "gnd"
 pos = [10.0, 0.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 12
-name = "SDIO_D0"
+number = "12"
+name = "SDIO_D0/SPI_MISO"
 purpose = "SDIO/SPI"
 notes = "alt: SPI_MISO"
 kind = "spi"
@@ -125,10 +203,17 @@ bw_mhz = 50.0
 pos = [10.0, 1.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 13
-name = "SDIO_D3"
+number = "13"
+name = "SDIO_D3/SPI_CS"
 purpose = "SDIO/SPI"
 notes = "alt: SPI_CS"
 kind = "spi"
@@ -136,10 +221,17 @@ bw_mhz = 50.0
 pos = [10.0, 2.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 14
-name = "SDIO_D1"
+number = "14"
+name = "SDIO_D1/SPI_INT"
 purpose = "SDIO/SPI"
 notes = "alt: SPI_INT"
 kind = "spi"
@@ -147,9 +239,16 @@ bw_mhz = 50.0
 pos = [10.0, 3.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 15
+number = "15"
 name = "SDIO_D2"
 purpose = "SDIO/SPI"
 notes = "(unused in SPI mode)"
@@ -157,10 +256,17 @@ kind = "dio"
 pos = [10.0, 4.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 16
-name = "SDIO_CMD"
+number = "16"
+name = "SDIO_CMD/SPI_MOSI"
 purpose = "SDIO/SPI"
 notes = "alt: SPI_MOSI"
 kind = "spi"
@@ -168,10 +274,17 @@ bw_mhz = 50.0
 pos = [10.0, 5.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 17
-name = "SDIO_CLK"
+number = "17"
+name = "SDIO_CLK/SPI_SCK"
 purpose = "SDIO/SPI"
 notes = "alt: SPI_SCK"
 kind = "clk"
@@ -179,45 +292,80 @@ bw_mhz = 50.0
 pos = [10.0, 6.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 18
+number = "18"
 name = "GPIO5"
 purpose = "GPIO"
 kind = "dio"
 pos = [10.0, 7.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 19
+number = "19"
 name = "GPIO4"
 purpose = "GPIO"
 kind = "dio"
 pos = [10.0, 8.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 20
-name = "GND_4"
+number = "20"
+name = "GND_6"
 purpose = "Ground"
 kind = "gnd"
 pos = [10.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 21
+number = "21"
 name = "GPIO3"
 purpose = "GPIO"
 kind = "dio"
 pos = [9.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 22
+number = "22"
 name = "VDDIO"
 purpose = "Supply"
 notes = "Host power for I/O"
@@ -228,19 +376,33 @@ i_max = 0.05
 pos = [8.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 23
+number = "23"
 name = "GND_5"
 purpose = "Ground"
 kind = "gnd"
 pos = [7.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 24
-name = "VBAT_TX"
+number = "24"
+name = "VDD_TX"
 purpose = "Supply"
 notes = "3V3 TX power"
 kind = "pwr"
@@ -250,9 +412,16 @@ i_max = 0.5
 pos = [6.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 25
+number = "25"
 name = "VDD_USB"
 purpose = "Supply"
 notes = "USB power"
@@ -263,125 +432,222 @@ i_max = 0.1
 pos = [5.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 26
-name = "GND_6"
+number = "26"
+name = "GND_4"
 purpose = "Ground"
 kind = "gnd"
 pos = [4.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 27
-name = "USB_D_N"
+number = "27"
+name = "USB_N"
 purpose = "USB DM"
 notes = "Floating in SPI mode"
 kind = "dio"
 pos = [3.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 28
-name = "USB_D_P"
+number = "28"
+name = "USB_P"
 purpose = "USB DP"
 notes = "Floating in SPI mode"
 kind = "dio"
 pos = [2.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 29
-name = "BUSY"
-purpose = "Busy signal"
+number = "29"
+name = "GPIO2"
+purpose = "GPIO"
 kind = "dio"
 pos = [1.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 30
-name = "GND_7"
+number = "30"
+name = "GND_2"
 purpose = "Ground"
 kind = "gnd"
 pos = [0.0, 9.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 31
+number = "31"
 name = "GPIO1"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 8.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 32
+number = "32"
 name = "GPIO0"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 7.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 33
+number = "33"
 name = "GPIO6"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 6.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 34
+number = "34"
 name = "GPIO7"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 5.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 35
+number = "35"
 name = "GPIO8"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 4.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 36
+number = "36"
 name = "GPIO9"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 3.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 37
+number = "37"
 name = "GPIO10"
 purpose = "GPIO"
 kind = "dio"
 pos = [0.0, 2.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 38
-name = "GND_8"
+number = "38"
+name = "GND_1"
 purpose = "Ground"
 kind = "gnd"
 pos = [0.0, 1.0]
 rotation = 0.0
 length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[constraint]]
 type = "Decoupling"

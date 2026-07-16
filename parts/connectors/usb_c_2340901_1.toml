@@ -1,0 +1,266 @@
+[component]
+name = "UsbC23409011"
+title = "2340901-1 USB Type C 2.0 Conn Rec Mid-Mount One Ro"
+lib_id = "2340901-1"
+
+[[pin]]
+num = 1
+number = "A1/B12"
+name = "GND_A"
+purpose = "Ground"
+kind = "gnd"
+pos = [-3.2, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.6
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "A4/B9"
+name = "VBUS_A"
+purpose = "Supply"
+kind = "pwr"
+v_min = 4.75
+v_max = 5.25
+i_max = 3.0
+pos = [-2.4, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.6
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 3
+number = "A6"
+name = "DP1"
+purpose = "I/O"
+kind = "dio"
+pos = [-0.25, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 4
+number = "A5"
+name = "CC1"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.25, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 5
+number = "A8"
+name = "SBU1"
+purpose = "I/O"
+kind = "dio"
+pos = [1.25, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 6
+number = "A7"
+name = "DN1"
+purpose = "I/O"
+kind = "dio"
+pos = [0.25, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 7
+number = "SH1"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [-5.62, -4.0]
+rotation = 0.0
+length = 1.85
+width = 1.05
+height = 1.85
+pad_type = "thru_hole"
+pad_shape = "oval"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+
+[[pin]]
+num = 8
+number = "SH2"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [5.62, -4.0]
+rotation = 0.0
+length = 1.85
+width = 1.05
+height = 1.85
+pad_type = "thru_hole"
+pad_shape = "oval"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+
+[[pin]]
+num = 9
+number = "SH3"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [-5.62, 0.0]
+rotation = 0.0
+length = 2.25
+width = 1.05
+height = 2.25
+pad_type = "thru_hole"
+pad_shape = "oval"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+
+[[pin]]
+num = 10
+number = "SH4"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [5.62, 0.0]
+rotation = 0.0
+length = 2.25
+width = 1.05
+height = 2.25
+pad_type = "thru_hole"
+pad_shape = "oval"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+
+[[pin]]
+num = 11
+number = "B1/A12"
+name = "GND_B"
+purpose = "Ground"
+kind = "gnd"
+pos = [3.2, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.6
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 12
+number = "B4/AP"
+name = "VBUS_B"
+purpose = "Supply"
+kind = "pwr"
+v_min = 4.75
+v_max = 5.25
+i_max = 3.0
+pos = [2.4, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.6
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 13
+number = "B6"
+name = "DP2"
+purpose = "I/O"
+kind = "dio"
+pos = [0.75, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 14
+number = "B5"
+name = "CC2"
+purpose = "I/O"
+kind = "dio"
+pos = [1.75, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 15
+number = "B8"
+name = "SBU2"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.75, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 16
+number = "B7"
+name = "DN2"
+purpose = "I/O"
+kind = "dio"
+pos = [-0.75, -5.275]
+rotation = 0.0
+length = 1.15
+width = 0.3
+height = 1.15
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"

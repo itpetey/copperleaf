@@ -7,6 +7,7 @@ lib_id = "W5500"
 
 [[pin]]
 num = 1
+number = "1"
 name = "TXN"
 purpose = "Ethernet PHY"
 notes = "Differential transmit (negative)"
@@ -14,9 +15,16 @@ kind = "analog_rf"
 pos = [-4.18, -2.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 2
+number = "2"
 name = "TXP"
 purpose = "Ethernet PHY"
 notes = "Differential transmit (positive)"
@@ -24,18 +32,32 @@ kind = "analog_rf"
 pos = [-4.18, -2.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 3
+number = "3"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [-4.18, -1.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 4
+number = "4"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -46,9 +68,16 @@ i_max = 0.15
 pos = [-4.18, -1.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 5
+number = "5"
 name = "RXN"
 purpose = "Ethernet PHY"
 notes = "Differential receive (negative)"
@@ -56,9 +85,16 @@ kind = "analog_rf"
 pos = [-4.18, -0.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 6
+number = "6"
 name = "RXP"
 purpose = "Ethernet PHY"
 notes = "Differential receive (positive)"
@@ -66,9 +102,16 @@ kind = "analog_rf"
 pos = [-4.18, -0.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 7
+number = "7"
 name = "DNC"
 purpose = "Do not connect"
 notes = "Do not connect"
@@ -76,9 +119,16 @@ kind = "dio"
 pos = [-4.18, 0.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 8
+number = "8"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -89,18 +139,32 @@ i_max = 0.15
 pos = [-4.18, 0.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 9
+number = "9"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [-4.18, 1.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 10
+number = "10"
 name = "EXRES1"
 purpose = "PHY bias"
 notes = "External reference resistor; 12.4kΩ 1% to AGND"
@@ -108,9 +172,16 @@ kind = "analog_in"
 pos = [-4.18, 1.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 11
+number = "11"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -121,9 +192,16 @@ i_max = 0.15
 pos = [-4.18, 2.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 12
+number = "12"
 name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
@@ -131,9 +209,16 @@ kind = "dio"
 pos = [-4.18, 2.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 13
+number = "13"
 name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
@@ -141,18 +226,32 @@ kind = "dio"
 pos = [-2.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 14
+number = "14"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [-2.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 15
+number = "15"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -163,18 +262,32 @@ i_max = 0.15
 pos = [-1.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 16
+number = "16"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [-1.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 17
+number = "17"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -185,9 +298,16 @@ i_max = 0.15
 pos = [-0.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 18
+number = "18"
 name = "VBG"
 purpose = "Band gap reference"
 notes = "Band gap output, ~1.2V at 25°C; leave floating"
@@ -195,18 +315,32 @@ kind = "analog_in"
 pos = [-0.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 19
+number = "19"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [0.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 20
+number = "20"
 name = "TOCAP"
 purpose = "Reference capacitor"
 notes = "External reference capacitor; 4.7µF to AGND, keep trace short"
@@ -214,9 +348,16 @@ kind = "analog_in"
 pos = [0.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 21
+number = "21"
 name = "AVDD"
 purpose = "Analog supply"
 notes = "Analog 3.3V power"
@@ -227,9 +368,16 @@ i_max = 0.15
 pos = [1.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 22
+number = "22"
 name = "1V2O"
 purpose = "Regulator output"
 notes = "1.2V regulator output; 10nF to GND"
@@ -239,9 +387,16 @@ i = 0.01
 pos = [1.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 23
+number = "23"
 name = "RSVD"
 purpose = "Reserved"
 notes = "Must be tied to GND"
@@ -249,9 +404,16 @@ kind = "dio"
 pos = [2.25, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 24
+number = "24"
 name = "SPDLED"
 purpose = "Speed LED"
 notes = "Low: 100Mbps, High: 10Mbps"
@@ -259,9 +421,16 @@ kind = "dio"
 pos = [2.75, 4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 25
+number = "25"
 name = "LINKLED"
 purpose = "Link LED"
 notes = "Low: link established, High: no link"
@@ -269,9 +438,16 @@ kind = "dio"
 pos = [4.18, 2.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 26
+number = "26"
 name = "DUPLED"
 purpose = "Duplex LED"
 notes = "Low: full-duplex, High: half-duplex"
@@ -279,9 +455,16 @@ kind = "dio"
 pos = [4.18, 2.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 27
+number = "27"
 name = "ACTLED"
 purpose = "Active LED"
 notes = "Low: carrier sense during TX/RX activity"
@@ -289,9 +472,16 @@ kind = "dio"
 pos = [4.18, 1.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 28
+number = "28"
 name = "VDD"
 purpose = "Digital supply"
 notes = "Digital 3.3V power"
@@ -302,18 +492,32 @@ i_max = 0.15
 pos = [4.18, 1.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 29
+number = "29"
 name = "GND"
 purpose = "Digital ground"
 kind = "gnd"
 pos = [4.18, 0.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 30
+number = "30"
 name = "XI/CLKIN"
 purpose = "Crystal"
 notes = "25MHz crystal input or external 3.3V clock input"
@@ -322,9 +526,16 @@ bw_mhz = 25.0
 pos = [4.18, 0.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 31
+number = "31"
 name = "XO"
 purpose = "Crystal"
 notes = "25MHz crystal output; float when using external clock on XI/CLKIN"
@@ -333,9 +544,16 @@ bw_mhz = 25.0
 pos = [4.18, -0.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 32
+number = "32"
 name = "SCSn"
 purpose = "SPI"
 notes = "Active-low SPI chip select (internal pull-up)"
@@ -344,9 +562,16 @@ bw_mhz = 33.0
 pos = [4.18, -0.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 33
+number = "33"
 name = "SCLK"
 purpose = "SPI"
 notes = "SPI clock input"
@@ -355,9 +580,16 @@ bw_mhz = 33.0
 pos = [4.18, -1.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 34
+number = "34"
 name = "MISO"
 purpose = "SPI"
 notes = "SPI master in / slave out; high-Z when SCSn high"
@@ -366,9 +598,16 @@ bw_mhz = 33.0
 pos = [4.18, -1.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 35
+number = "35"
 name = "MOSI"
 purpose = "SPI"
 notes = "SPI master out / slave in"
@@ -377,9 +616,16 @@ bw_mhz = 33.0
 pos = [4.18, -2.25]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 36
+number = "36"
 name = "INTn"
 purpose = "Interrupt"
 notes = "Active-low interrupt output"
@@ -387,9 +633,16 @@ kind = "dio"
 pos = [4.18, -2.75]
 rotation = 0.0
 length = 1.56
+width = 1.56
+height = 0.28
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 37
+number = "37"
 name = "RSTn"
 purpose = "Reset"
 notes = "Active-low reset, hold low ≥500µs (internal pull-up)"
@@ -397,9 +650,16 @@ kind = "dio"
 pos = [2.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 38
+number = "38"
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
@@ -407,9 +667,16 @@ kind = "dio"
 pos = [2.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 39
+number = "39"
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
@@ -417,9 +684,16 @@ kind = "dio"
 pos = [1.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 40
+number = "40"
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
@@ -427,9 +701,16 @@ kind = "dio"
 pos = [1.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 41
+number = "41"
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
@@ -437,9 +718,16 @@ kind = "dio"
 pos = [0.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 42
+number = "42"
 name = "RSVD"
 purpose = "Reserved"
 notes = "NC, internal pull-down"
@@ -447,9 +735,16 @@ kind = "dio"
 pos = [0.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 43
+number = "43"
 name = "PMODE2"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 2 (pull-up)"
@@ -457,9 +752,16 @@ kind = "dio"
 pos = [-0.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 44
+number = "44"
 name = "PMODE1"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 1 (pull-up)"
@@ -467,9 +769,16 @@ kind = "dio"
 pos = [-0.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 45
+number = "45"
 name = "PMODE0"
 purpose = "PHY mode"
 notes = "PHY operation mode select bit 0 (pull-up)"
@@ -477,9 +786,16 @@ kind = "dio"
 pos = [-1.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 46
+number = "46"
 name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
@@ -487,9 +803,16 @@ kind = "dio"
 pos = [-1.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 47
+number = "47"
 name = "NC"
 purpose = "No connect"
 notes = "Do not connect"
@@ -497,15 +820,28 @@ kind = "dio"
 pos = [-2.25, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 48
+number = "48"
 name = "AGND"
 purpose = "Analog ground"
 kind = "gnd"
 pos = [-2.75, -4.18]
 rotation = 0.0
 length = 1.56
+width = 0.28
+height = 1.56
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
 
 [[constraint]]
 type = "Decoupling"

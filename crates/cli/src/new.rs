@@ -54,6 +54,21 @@ fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
 }
 
 fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Result<(), CliError> {
+    // Guard against accidentally passing a symbol file as a footprint.
+    if let Some(ext) = PathBuf::from(footprint_path).extension().and_then(|s| s.to_str()) {
+        if ext.eq_ignore_ascii_case("kicad_sym") {
+            return Err(CliError::Diagnostic(Diagnostic {
+                code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "'{}' is a symbol file, not a footprint — use --symbol instead",
+                    footprint_path
+                ),
+                entities: vec![],
+                hint: None,
+            }));
+        }
+    }
     let lib_id = args.lib_id.clone().unwrap_or_default();
     let pads = if std::fs::metadata(footprint_path)?.is_dir() {
         let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
@@ -98,6 +113,21 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
 }
 
 fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError> {
+    // Guard against accidentally passing a footprint file as a symbol.
+    if let Some(ext) = PathBuf::from(symbol_path).extension().and_then(|s| s.to_str()) {
+        if ext.eq_ignore_ascii_case("kicad_mod") {
+            return Err(CliError::Diagnostic(Diagnostic {
+                code: "CLI:FOOTPRINT_AS_SYMBOL".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "'{}' is a footprint file, not a symbol — use --footprint instead",
+                    symbol_path
+                ),
+                entities: vec![],
+                hint: None,
+            }));
+        }
+    }
     let source = std::fs::read_to_string(symbol_path)?;
     let symbols = parse_symbol_lib(&source)?;
 
@@ -167,6 +197,8 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
         },
         pins: vec![],
         constraints: vec![],
+
+        mechanical: vec![],
     };
 
     let diags = manifest::merge_symbol(&mut manifest, &symbol.pins, kindmap, &args.default_kind);

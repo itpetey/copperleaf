@@ -107,3 +107,4 @@ mod tests {
         }
     }
 }
+build_component!("usb_c_2340901_1.toml");

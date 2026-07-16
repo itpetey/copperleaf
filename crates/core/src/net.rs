@@ -82,8 +82,7 @@ impl Net {
                 ripple: None,
             },
             class: NetClass::default(),
-            constraints: vec![],
-        }
+            constraints: vec![],        }
     }
 
     /// Convenience constructor for a ground net named `GND`.

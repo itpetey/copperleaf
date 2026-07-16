@@ -6,11 +6,13 @@ members = [
   "crates/core",
   "crates/part-codegen",
   "crates/part-macro",
+  "parts/connectors",
+  "parts/microchip",
   "parts/morsemicro",
   "parts/passives",
   "parts/raspberrypi",
-  "parts/wiznet",
-  "parts/connectors"
+  "parts/texas-instruments",
+  "parts/wiznet"
 ]
 
 [workspace.package]

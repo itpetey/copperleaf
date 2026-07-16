@@ -1,0 +1,196 @@
+[component]
+name = "Tps63031dskr"
+title = "TPS63031DSKR"
+lib_id = "TPS63031DSKR"
+
+[[pin]]
+num = 1
+number = "1"
+name = "VOUT"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.195, -1.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "2"
+name = "L2"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.195, -0.5]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 3
+number = "3"
+name = "PGND"
+purpose = "Ground"
+kind = "gnd"
+pos = [-1.195, 0.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 4
+number = "4"
+name = "L1"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.195, 0.5]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 5
+number = "5"
+name = "VIN"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.195, 1.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 6
+number = "6"
+name = "EN"
+purpose = "I/O"
+kind = "dio"
+pos = [1.195, 1.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 7
+number = "7"
+name = "PS/SYNC"
+purpose = "I/O"
+kind = "dio"
+pos = [1.195, 0.5]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 8
+number = "8"
+name = "VINA"
+purpose = "I/O"
+kind = "dio"
+pos = [1.195, 0.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 9
+number = "9"
+name = "GND"
+purpose = "Ground"
+kind = "gnd"
+pos = [1.195, -0.5]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 10
+number = "10"
+name = "FB"
+purpose = "I/O"
+kind = "dio"
+pos = [1.195, -1.0]
+rotation = 0.0
+length = 0.84
+width = 0.84
+height = 0.27
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.125
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 11
+number = "11"
+name = "EXP"
+purpose = "I/O"
+kind = "dio"
+pos = [0.0, 0.0]
+rotation = 0.0
+length = 2.0
+width = 1.2
+height = 2.0
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask"
+thermal_vias = [
+  { pos = [0.35, 0.0], drill = 0.2, size = 0.3 },
+  { pos = [-0.35, 0.0], drill = 0.2, size = 0.3 },
+  { pos = [0.0, -0.75], drill = 0.2, size = 0.3 },
+  { pos = [0.0, 0.75], drill = 0.2, size = 0.3 },
+]

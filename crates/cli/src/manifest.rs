@@ -2,7 +2,7 @@
 
 use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{PadDef, sym_parser::PinDef as SymPinDef};
-use copperleaf_part_codegen::{CodegenError, ComponentMeta, Manifest, PinDef};
+use copperleaf_part_codegen::{CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef};
 
 use crate::kindmap::{KindEntry, KindMap};
 
@@ -21,8 +21,30 @@ pub fn manifest_from_footprint(
     default_kind: &str,
 ) -> Manifest {
     let mut pins = Vec::new();
+    let mut mechanical = Vec::new();
     let mut next_num = 1;
     for pad in pads {
+        if pad.number.eq_ignore_ascii_case("none")
+            || pad.number.is_empty()
+            || pad.pad_type == "np_thru_hole"
+        {
+            mechanical.push(MechanicalDef {
+                number: pad.number.clone(),
+                pos: pad.pos,
+                width: pad.width,
+                height: pad.height,
+                pad_type: pad.pad_type.clone(),
+                pad_shape: pad.shape.clone(),
+                roundrect_rratio: pad.roundrect_rratio,
+                layers: if pad.layers.is_empty() {
+                    None
+                } else {
+                    Some(pad.layers.clone())
+                },
+                drill: pad.drill.unwrap_or(0.0),
+            });
+            continue;
+        }
         let num = pin_number(&pad.number, &mut next_num);
         pins.push(PinDef {
             num,
@@ -41,6 +63,27 @@ pub fn manifest_from_footprint(
             rotation: Some(pad.rotation),
             length: Some(pad.width.max(pad.height)),
             nc: None,
+            width: Some(pad.width),
+            height: Some(pad.height),
+            pad_type: if pad.pad_type.is_empty() {
+                None
+            } else {
+                Some(pad.pad_type.clone())
+            },
+            pad_shape: if pad.shape.is_empty() {
+                None
+            } else {
+                Some(pad.shape.clone())
+            },
+            roundrect_rratio: pad.roundrect_rratio,
+            solder_mask_margin: pad.solder_mask_margin,
+            layers: if pad.layers.is_empty() {
+                None
+            } else {
+                Some(pad.layers.clone())
+            },
+            drill: pad.drill,
+            thermal_vias: vec![],
         });
     }
     pins.sort_by_key(|p| p.num);
@@ -48,18 +91,108 @@ pub fn manifest_from_footprint(
         component,
         pins,
         constraints: vec![],
+        mechanical,
     }
 }
 
 /// Merge footprint pad data into an existing manifest.
+///
+/// Matched pads update pin geometry in-place. Unmatched pads that are small
+/// through-holes inside an existing pad's area are reclassified as thermal
+/// vias of that pad. Mechanical pads (np_thru_hole or "None"-numbered) are
+/// captured separately. All other unmatched pads produce a warning.
 pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
+    // Footprint is authoritative for mechanical pads — replace on every merge.
+    existing.mechanical.clear();
+
+    // Clear all thermal vias — they're rebuilt from the footprint each time.
+    for pin in &mut existing.pins {
+        pin.thermal_vias.clear();
+    }
+
     for pad in pads {
-        if let Some(pin) = existing.pins.iter_mut().find(|p| p.number == pad.number) {
+        // Mechanical-only pads (KiCad number "None"/"none", unnamed paste
+        // apertures, or np_thru_hole).
+        if pad.number.eq_ignore_ascii_case("none")
+            || pad.number.is_empty()
+            || pad.pad_type == "np_thru_hole"
+        {
+            existing.mechanical.push(MechanicalDef {
+                number: pad.number.clone(),
+                pos: pad.pos,
+                width: pad.width,
+                height: pad.height,
+                pad_type: pad.pad_type.clone(),
+                pad_shape: pad.shape.clone(),
+                roundrect_rratio: pad.roundrect_rratio,
+                layers: if pad.layers.is_empty() {
+                    None
+                } else {
+                    Some(pad.layers.clone())
+                },
+                drill: pad.drill.unwrap_or(0.0),
+            });
+            continue;
+        }
+        // Fall back to matching by `num` when `number` is empty (pins created
+        // by the `new` command from symbols lack a `number` field).
+        if let Some(pin) = existing.pins.iter_mut().find(|p| {
+            if p.number == pad.number {
+                return true;
+            }
+            if p.number.is_empty() {
+                let Ok(pad_num) = pad.number.parse::<usize>() else {
+                    return false;
+                };
+                return p.num == pad_num;
+            }
+            false
+        }) {
+            // Update geometry from pad.
+            if pin.number.is_empty() {
+                pin.number = pad.number.clone();
+            }
             pin.pos = Some(pad.pos);
             pin.rotation = Some(pad.rotation);
             pin.length = Some(pad.width.max(pad.height));
+            pin.width = Some(pad.width);
+            pin.height = Some(pad.height);
+            if !pad.pad_type.is_empty() {
+                pin.pad_type = Some(pad.pad_type.clone());
+            }
+            if !pad.shape.is_empty() {
+                pin.pad_shape = Some(pad.shape.clone());
+            }
+            pin.roundrect_rratio = pad.roundrect_rratio;
+            pin.solder_mask_margin = pad.solder_mask_margin;
+            if !pad.layers.is_empty() {
+                pin.layers = Some(pad.layers.clone());
+            }
+            pin.drill = pad.drill;
+        } else if pad.pad_type == "thru_hole" {
+            // This pad is a through-hole not matching any pin. Check if it
+            // sits inside any existing pad's bounding box — if so, treat it
+            // as a thermal via.
+            if let Some(parent) = find_containing_pad(existing, pad) {
+                parent.thermal_vias.push(ThermalViaDef {
+                    pos: pad.pos,
+                    drill: pad.drill.unwrap_or(0.3),
+                    size: pad.width.max(pad.height),
+                });
+                continue;
+            }
+            diagnostics.push(Diagnostic {
+                code: "CLI:UNMATCHED_PAD".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "Footprint pad {} has no matching pin in the existing TOML",
+                    pad.number
+                ),
+                entities: vec![pad.number.clone()],
+                hint: None,
+            });
         } else {
             diagnostics.push(Diagnostic {
                 code: "CLI:UNMATCHED_PAD".into(),
@@ -75,6 +208,24 @@ pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnost
     }
 
     diagnostics
+}
+
+/// Return a mutable reference to the first pin whose bounding box contains
+/// `pad`'s centre point, or `None` if no pin contains it.
+fn find_containing_pad<'a>(manifest: &'a mut Manifest, pad: &PadDef) -> Option<&'a mut PinDef> {
+    for pin in &mut manifest.pins {
+        let Some((px, py)) = pin.pos else { continue };
+        let half_w = pin.width.unwrap_or(0.0) / 2.0;
+        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+        if pad.pos.0 >= px - half_w
+            && pad.pos.0 <= px + half_w
+            && pad.pos.1 >= py - half_h
+            && pad.pos.1 <= py + half_h
+        {
+            return Some(pin);
+        }
+    }
+    None
 }
 
 /// Merge symbol pin data into an existing manifest.
@@ -94,10 +245,23 @@ pub fn merge_symbol(
         let (entry, fallback) = kindmap.resolve(&sym_pin.name, &sym_pin.pin_type, default_kind);
 
         // Try to find an existing pin whose stored `number` matches.
+        // Fall back to matching by `num` when `number` is empty (footprint-only
+        // pins created by the `new` command lack a `number` field).
         let matched = existing
             .pins
             .iter_mut()
-            .find(|p| p.number == sym_pin.number);
+            .find(|p| {
+                if p.number == sym_pin.number {
+                    return true;
+                }
+                if p.number.is_empty() {
+                    let Ok(sym_num) = sym_pin.number.parse::<usize>() else {
+                        return false;
+                    };
+                    return p.num == sym_num;
+                }
+                false
+            });
 
         if let Some(pin) = matched {
             // Found by number string — update in place.
@@ -126,6 +290,15 @@ pub fn merge_symbol(
                 rotation: Some(sym_pin.rotation),
                 length: Some(sym_pin.length),
                 nc: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
             };
             apply_entry(&mut pin, &entry);
             existing.pins.push(pin);
@@ -241,6 +414,43 @@ pub fn serialise(manifest: &Manifest) -> String {
         if let Some(l) = pin.length {
             out.push_str(&format!("length = {}\n", fmt_f64(l)));
         }
+        if let Some(w) = pin.width {
+            out.push_str(&format!("width = {}\n", fmt_f64(w)));
+        }
+        if let Some(h) = pin.height {
+            out.push_str(&format!("height = {}\n", fmt_f64(h)));
+        }
+        if let Some(ref pt) = pin.pad_type {
+            out.push_str(&format!("pad_type = \"{}\"\n", pt));
+        }
+        if let Some(ref ps) = pin.pad_shape {
+            out.push_str(&format!("pad_shape = \"{}\"\n", ps));
+        }
+        if let Some(rr) = pin.roundrect_rratio {
+            out.push_str(&format!("roundrect_rratio = {}\n", fmt_f64(rr)));
+        }
+        if let Some(smm) = pin.solder_mask_margin {
+            out.push_str(&format!("solder_mask_margin = {}\n", fmt_f64(smm)));
+        }
+        if let Some(ref layers) = pin.layers {
+            out.push_str(&format!("layers = \"{}\"\n", escape_toml_string(layers)));
+        }
+        if let Some(drill) = pin.drill {
+            out.push_str(&format!("drill = {}\n", fmt_f64(drill)));
+        }
+        if !pin.thermal_vias.is_empty() {
+            out.push_str("thermal_vias = [\n");
+            for via in &pin.thermal_vias {
+                out.push_str(&format!(
+                    "  {{ pos = [{}, {}], drill = {}, size = {} }},\n",
+                    fmt_f64(via.pos.0),
+                    fmt_f64(via.pos.1),
+                    fmt_f64(via.drill),
+                    fmt_f64(via.size)
+                ));
+            }
+            out.push_str("]\n");
+        }
 
         let missing = missing_power_fields(pin);
         if !missing.is_empty() {
@@ -297,6 +507,35 @@ pub fn serialise(manifest: &Manifest) -> String {
         }
         if let Some(max) = constraint.max {
             out.push_str(&format!("max = {}\n", fmt_f64(max)));
+        }
+        out.push('\n');
+    }
+
+    for mech in &manifest.mechanical {
+        out.push_str("[[mechanical]]\n");
+        if mech.number != "None" {
+            out.push_str(&format!(
+                "number = \"{}\"\n",
+                escape_toml_string(&mech.number)
+            ));
+        }
+        out.push_str(&format!(
+            "pos = [{}, {}]\n",
+            fmt_f64(mech.pos.0),
+            fmt_f64(mech.pos.1)
+        ));
+        out.push_str(&format!("width = {}\n", fmt_f64(mech.width)));
+        out.push_str(&format!("height = {}\n", fmt_f64(mech.height)));
+        out.push_str(&format!("pad_type = \"{}\"\n", mech.pad_type));
+        out.push_str(&format!("pad_shape = \"{}\"\n", mech.pad_shape));
+        if let Some(rr) = mech.roundrect_rratio {
+            out.push_str(&format!("roundrect_rratio = {}\n", fmt_f64(rr)));
+        }
+        if let Some(ref layers) = mech.layers {
+            out.push_str(&format!("layers = \"{}\"\n", escape_toml_string(layers)));
+        }
+        if mech.drill > 0.0 {
+            out.push_str(&format!("drill = {}\n", fmt_f64(mech.drill)));
         }
         out.push('\n');
     }
@@ -411,8 +650,19 @@ mod tests {
                 rotation: None,
                 length: None,
                 nc: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
             }],
             constraints: vec![],
+
+            mechanical: vec![],
         }
     }
 
@@ -486,6 +736,11 @@ mod tests {
             width: 0.5,
             height: 0.25,
             pad_type: "smd".into(),
+            shape: "rect".into(),
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: "F.Cu F.Mask F.Paste".into(),
+            drill: None,
         }];
         let diags = merge_footprint(&mut manifest, &pads);
         assert!(diags.is_empty());
@@ -524,6 +779,8 @@ mod tests {
             },
             pins: vec![],
             constraints: vec![],
+
+            mechanical: vec![],
         };
         let sym = vec![
             SymPinDef {

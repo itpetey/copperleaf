@@ -7,6 +7,7 @@ lib_id = "RP2354A"
 
 [[pin]]
 num = 1
+number = "1"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -17,45 +18,80 @@ i_max = 0.1
 pos = [-3.45, -2.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 2
+number = "2"
 name = "GPIO0"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, -2.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 3
+number = "3"
 name = "GPIO1"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, -2.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 4
+number = "4"
 name = "GPIO2"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, -1.6]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 5
+number = "5"
 name = "GPIO3"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, -1.2]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 6
+number = "6"
 name = "DVDD"
 purpose = "Supply"
 notes = "Core supply"
@@ -66,45 +102,80 @@ i_max = 0.1
 pos = [-3.45, -0.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 7
+number = "7"
 name = "GPIO4"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, -0.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 8
+number = "8"
 name = "GPIO5"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 0.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 9
+number = "9"
 name = "GPIO6"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 0.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 10
+number = "10"
 name = "GPIO7"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 0.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 11
+number = "11"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -115,81 +186,144 @@ i_max = 0.1
 pos = [-3.45, 1.2]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 12
+number = "12"
 name = "GPIO8"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 1.6]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 13
+number = "13"
 name = "GPIO9"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 2.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 14
+number = "14"
 name = "GPIO10"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 2.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 15
+number = "15"
 name = "GPIO11"
 purpose = "GPIO"
 kind = "dio"
 pos = [-3.45, 2.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 16
+number = "16"
 name = "GPIO12"
 purpose = "GPIO"
 kind = "dio"
 pos = [-2.8, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 17
+number = "17"
 name = "GPIO13"
 purpose = "GPIO"
 kind = "dio"
 pos = [-2.4, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 18
+number = "18"
 name = "GPIO14"
 purpose = "GPIO"
 kind = "dio"
 pos = [-2.0, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 19
+number = "19"
 name = "GPIO15"
 purpose = "GPIO"
 kind = "dio"
 pos = [-1.6, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 20
+number = "20"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -200,9 +334,16 @@ i_max = 0.1
 pos = [-1.2, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 21
+number = "21"
 name = "XIN"
 purpose = "Crystal"
 notes = "12 MHz crystal input"
@@ -211,9 +352,16 @@ bw_mhz = 12.0
 pos = [-0.8, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 22
+number = "22"
 name = "XOUT"
 purpose = "Crystal"
 notes = "12 MHz crystal output"
@@ -222,9 +370,16 @@ bw_mhz = 12.0
 pos = [-0.4, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 23
+number = "23"
 name = "DVDD"
 purpose = "Supply"
 notes = "Core supply"
@@ -235,9 +390,16 @@ i_max = 0.1
 pos = [0.0, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 24
+number = "24"
 name = "SWCLK"
 purpose = "SWD"
 kind = "clk"
@@ -245,54 +407,96 @@ bw_mhz = 1.0
 pos = [0.4, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 25
+number = "25"
 name = "SWDIO"
 purpose = "SWD"
 kind = "dio"
 pos = [0.8, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 26
+number = "26"
 name = "RUN"
 purpose = "Reset"
 kind = "dio"
 pos = [1.2, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 27
+number = "27"
 name = "GPIO16"
 purpose = "GPIO"
 kind = "dio"
 pos = [1.6, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 28
+number = "28"
 name = "GPIO17"
 purpose = "GPIO"
 kind = "dio"
 pos = [2.0, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 29
+number = "29"
 name = "GPIO18"
 purpose = "GPIO"
 kind = "dio"
 pos = [2.4, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 30
+number = "30"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -303,72 +507,128 @@ i_max = 0.1
 pos = [2.8, 3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 31
+number = "31"
 name = "GPIO19"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 2.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 32
+number = "32"
 name = "GPIO20"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 2.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 33
+number = "33"
 name = "GPIO21"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 2.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 34
+number = "34"
 name = "GPIO22"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 1.6]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 35
+number = "35"
 name = "GPIO23"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 1.2]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 36
+number = "36"
 name = "GPIO24"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 0.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 37
+number = "37"
 name = "GPIO25"
 purpose = "GPIO"
 kind = "dio"
 pos = [3.45, 0.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 38
+number = "38"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -379,9 +639,16 @@ i_max = 0.1
 pos = [3.45, 0.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 39
+number = "39"
 name = "DVDD"
 purpose = "Supply"
 notes = "Core supply"
@@ -392,45 +659,80 @@ i_max = 0.1
 pos = [3.45, -0.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 40
+number = "40"
 name = "GPIO26_ADC0"
 purpose = "GPIO/ADC"
 kind = "dio"
 pos = [3.45, -0.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 41
+number = "41"
 name = "GPIO27_ADC1"
 purpose = "GPIO/ADC"
 kind = "dio"
 pos = [3.45, -1.2]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 42
+number = "42"
 name = "GPIO28_ADC2"
 purpose = "GPIO/ADC"
 kind = "dio"
 pos = [3.45, -1.6]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 43
+number = "43"
 name = "GPIO29_ADC3"
 purpose = "GPIO/ADC"
 kind = "dio"
 pos = [3.45, -2.0]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 44
+number = "44"
 name = "ADC_AVDD"
 purpose = "Supply"
 notes = "ADC supply"
@@ -440,9 +742,16 @@ i = 0.1
 pos = [3.45, -2.4]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 45
+number = "45"
 name = "IOVDD"
 purpose = "Supply"
 notes = "I/O supply"
@@ -453,9 +762,16 @@ i_max = 0.1
 pos = [3.45, -2.8]
 rotation = 0.0
 length = 0.8
+width = 0.8
+height = 0.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 46
+number = "46"
 name = "VREG_AVDD"
 purpose = "Supply"
 notes = "Voltage regulator supply"
@@ -466,18 +782,32 @@ i_max = 0.0
 pos = [2.8, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 47
+number = "47"
 name = "VREG_PGND"
 purpose = "Ground"
 kind = "gnd"
 pos = [2.4, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 48
+number = "48"
 name = "VREG_LX"
 purpose = "Supply"
 notes = "Voltage regulator switch node"
@@ -488,9 +818,16 @@ i_max = 0.0
 pos = [2.0, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 49
+number = "49"
 name = "VREG_VIN"
 purpose = "Supply"
 notes = "Voltage regulator input"
@@ -501,9 +838,16 @@ i_max = 0.0
 pos = [1.6, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 50
+number = "50"
 name = "VREG_FB"
 purpose = "Supply"
 notes = "Voltage regulator feedback"
@@ -514,27 +858,48 @@ i_max = 0.0
 pos = [1.2, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 51
+number = "51"
 name = "USB_DM"
 purpose = "USB"
 kind = "dio"
 pos = [0.8, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 52
+number = "52"
 name = "USB_DP"
 purpose = "USB"
 kind = "dio"
 pos = [0.4, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 53
+number = "53"
 name = "USB_OTP_VDD"
 purpose = "Supply"
 notes = "USB OTP supply"
@@ -544,9 +909,16 @@ i = 0.1
 pos = [0.0, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 54
+number = "54"
 name = "QSPI_IOVDD"
 purpose = "Supply"
 notes = "QSPI I/O supply"
@@ -557,18 +929,32 @@ i_max = 0.1
 pos = [-0.4, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 55
+number = "55"
 name = "QSPI_SD3"
 purpose = "QSPI"
 kind = "dio"
 pos = [-0.8, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 56
+number = "56"
 name = "QSPI_SCLK"
 purpose = "QSPI"
 kind = "clk"
@@ -576,51 +962,91 @@ bw_mhz = 50.0
 pos = [-1.2, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 57
+number = "57"
 name = "QSPI_SD0"
 purpose = "QSPI"
 kind = "dio"
 pos = [-1.6, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 58
+number = "58"
 name = "QSPI_SD2"
 purpose = "QSPI"
 kind = "dio"
 pos = [-2.0, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 59
+number = "59"
 name = "QSPI_SD1"
 purpose = "QSPI"
 kind = "dio"
 pos = [-2.4, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 60
+number = "60"
 name = "QSPI_SS"
 purpose = "QSPI"
 kind = "dio"
 pos = [-2.8, -3.45]
 rotation = 0.0
 length = 0.8
+width = 0.2
+height = 0.8
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Cu F.Mask F.Paste"
 
 [[pin]]
 num = 61
+number = "61"
 name = "GND"
 purpose = "Ground"
 kind = "gnd"
 pos = [0.0, 0.0]
 rotation = 0.0
 length = 3.4
+width = 3.4
+height = 3.4
+pad_type = "smd"
+pad_shape = "rect"
+layers = "F.Cu F.Mask"
 
 [[constraint]]
 type = "LengthMatch"
@@ -635,3 +1061,93 @@ skew_ps = 500.0
 [[constraint]]
 type = "MaxJunction"
 temp = "85.0.celsius()"
+
+[[mechanical]]
+number = ""
+pos = [-1.13, -1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [-1.13, 0.0]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [-1.13, 1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [0.0, -1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [0.0, 0.0]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [0.0, 1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [1.13, -1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [1.13, 0.0]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"
+
+[[mechanical]]
+number = ""
+pos = [1.13, 1.13]
+width = 0.91
+height = 0.91
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+layers = "F.Paste"

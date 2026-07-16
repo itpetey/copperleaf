@@ -20,6 +20,21 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     let mut diags = Vec::new();
 
     if let Some(ref symbol_path) = args.symbol {
+        // Guard against accidentally passing a footprint file as a symbol.
+        if let Some(ext) = std::path::Path::new(symbol_path).extension().and_then(|s| s.to_str()) {
+            if ext.eq_ignore_ascii_case("kicad_mod") {
+                return Err(CliError::Diagnostic(Diagnostic {
+                    code: "CLI:FOOTPRINT_AS_SYMBOL".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "'{}' is a footprint file, not a symbol — use --footprint instead",
+                        symbol_path
+                    ),
+                    entities: vec![],
+                    hint: None,
+                }));
+            }
+        }
         let sym_source = std::fs::read_to_string(symbol_path)?;
         let symbols = parse_symbol_lib(&sym_source)?;
 
@@ -158,16 +173,50 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             };
             pads
         } else {
+            // Guard against accidentally passing a symbol file as a footprint.
+            if let Some(ext) = std::path::Path::new(footprint_path).extension().and_then(|s| s.to_str()) {
+                if ext.eq_ignore_ascii_case("kicad_sym") {
+                    return Err(CliError::Diagnostic(Diagnostic {
+                        code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "'{}' is a symbol file, not a footprint — use --symbol instead",
+                            footprint_path
+                        ),
+                        entities: vec![],
+                        hint: None,
+                    }));
+                }
+            }
             copperleaf_backend_kicad::parse_footprint(footprint_path)?
         };
         // Idiot check: warn if pad count doesn't match pin count.
-        if !manifest.pins.is_empty() && pads.len() != manifest.pins.len() {
+        // Exclude mechanical pads (np_thru_hole, "None"-numbered, unnamed
+        // paste-only stencil apertures, and thru_hole thermal vias that sit
+        // inside an existing pad's bounding box).
+        let electrical_pad_count = pads
+            .iter()
+            .filter(|p| {
+                if p.pad_type.eq_ignore_ascii_case("np_thru_hole")
+                    || p.number.eq_ignore_ascii_case("none")
+                    || p.number.is_empty()
+                {
+                    return false;
+                }
+                // Thru-hole pads inside an existing pad are thermal vias.
+                if p.pad_type.eq_ignore_ascii_case("thru_hole") {
+                    return !is_thermal_via(p, &manifest.pins);
+                }
+                true
+            })
+            .count();
+        if !manifest.pins.is_empty() && electrical_pad_count != manifest.pins.len() {
             diags.push(Diagnostic {
                 code: "CLI:PAD_COUNT_MISMATCH".into(),
                 severity: Severity::Warning,
                 message: format!(
-                    "Footprint has {} pads, but part TOML has {} pins",
-                    pads.len(),
+                    "Footprint has {} electrical pads, but part TOML has {} pins",
+                    electrical_pad_count,
                     manifest.pins.len()
                 ),
                 entities: vec![],
@@ -190,4 +239,22 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
 
     std::fs::write(&out_path, output)?;
     Ok(())
+}
+
+/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
+/// bounding box (i.e. it is a thermal via, not an electrical pad).
+fn is_thermal_via(pad: &copperleaf_backend_kicad::PadDef, pins: &[copperleaf_part_codegen::PinDef]) -> bool {
+    for pin in pins {
+        let Some((px, py)) = pin.pos else { continue };
+        let half_w = pin.width.unwrap_or(0.0) / 2.0;
+        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+        if pad.pos.0 >= px - half_w
+            && pad.pos.0 <= px + half_w
+            && pad.pos.1 >= py - half_h
+            && pad.pos.1 <= py + half_h
+        {
+            return true;
+        }
+    }
+    false
 }

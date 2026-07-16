@@ -151,12 +151,51 @@ pub struct PinDef {
     /// Pin rotation in degrees.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<f64>,
-    /// Pin length in millimetres.
+    /// Pin length in millimetres (largest dimension of the pad, for codegen).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub length: Option<f64>,
     /// True if the pin is a no-connect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nc: Option<bool>,
+    // ── pad geometry (from footprint) ──
+    /// Pad width in millimetres (X dimension from KiCad `(size W H)`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    /// Pad height in millimetres (Y dimension from KiCad `(size W H)`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    /// KiCad pad type: `smd`, `thru_hole`, `connect`, or `np_thru_hole`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pad_type: Option<String>,
+    /// Pad shape: `rect`, `roundrect`, `circle`, `oval`, `custom`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pad_shape: Option<String>,
+    /// Roundrect corner radius ratio (only meaningful for `roundrect`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roundrect_rratio: Option<f64>,
+    /// Solder mask margin in millimetres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solder_mask_margin: Option<f64>,
+    /// Copper layers for this pad, e.g. `"F.Cu F.Mask F.Paste"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layers: Option<String>,
+    /// Drill diameter in millimetres (thru_hole pads only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drill: Option<f64>,
+    /// Thermal vias embedded within this pad.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thermal_vias: Vec<ThermalViaDef>,
+}
+
+/// A thermal via that lives inside a pad (e.g. exposed thermal pad).
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ThermalViaDef {
+    /// Position relative to the footprint origin, in millimetres.
+    pub pos: (f64, f64),
+    /// Drill diameter in millimetres.
+    pub drill: f64,
+    /// Finished pad diameter in millimetres.
+    pub size: f64,
 }
 
 /// A constraint definition from the TOML `[[constraint]]` table.
@@ -201,6 +240,53 @@ pub struct Manifest {
     pub pins: Vec<PinDef>,
     #[serde(rename = "constraint", default)]
     pub constraints: Vec<ConstraintDef>,
+    /// Mechanical-only pads (mounting holes, fiducials, etc.) that are not
+    /// electrical pins.
+    #[serde(rename = "mechanical", default, skip_serializing_if = "Vec::is_empty")]
+    pub mechanical: Vec<MechanicalDef>,
+}
+
+/// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
+/// or paste-only stencil aperture on an exposed pad.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MechanicalDef {
+    /// KiCad pad number. `"None"` for mounting holes / fiducials, `""` for
+    /// unnamed pads (e.g. paste stencil apertures).
+    #[serde(default = "default_mech_number")]
+    pub number: String,
+    /// Position in millimetres.
+    pub pos: (f64, f64),
+    /// Pad width in millimetres (X dimension).
+    pub width: f64,
+    /// Pad height in millimetres (Y dimension).
+    pub height: f64,
+    /// KiCad pad type: `np_thru_hole`, `thru_hole`, `smd`.
+    #[serde(default = "default_mech_pad_type")]
+    pub pad_type: String,
+    /// Pad shape: `circle`, `rect`, `oval`, `roundrect`.
+    #[serde(default = "default_mech_shape")]
+    pub pad_shape: String,
+    /// Roundrect corner radius ratio (only for `roundrect` shape).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roundrect_rratio: Option<f64>,
+    /// Copper layers, e.g. `"*.Cu *.Mask"` or `"F.Paste"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layers: Option<String>,
+    /// Drill diameter in millimetres.
+    #[serde(default)]
+    pub drill: f64,
+}
+
+fn default_mech_number() -> String {
+    "None".into()
+}
+
+fn default_mech_pad_type() -> String {
+    "np_thru_hole".into()
+}
+
+fn default_mech_shape() -> String {
+    "circle".into()
 }
 
 #[derive(Serialize)]
@@ -675,6 +761,15 @@ mod tests {
             rotation: Some(90.0),
             length: Some(2.54),
             nc: None,
+            width: None,
+            height: None,
+            pad_type: None,
+            pad_shape: None,
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: None,
+            drill: None,
+            thermal_vias: vec![],
         }
     }
 
@@ -724,8 +819,18 @@ mod tests {
                 rotation: None,
                 length: None,
                 nc: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
             }],
             constraints: vec![],
+            mechanical: vec![],
         };
         let diags = validate(&manifest);
         assert!(diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
@@ -758,8 +863,19 @@ mod tests {
                 rotation: None,
                 length: None,
                 nc: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
             }],
             constraints: vec![],
+
+            mechanical: vec![],
         };
         let diags = validate(&manifest);
         assert!(!diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));

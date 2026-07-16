@@ -9,9 +9,16 @@ number = "P3"
 name = "TD2+"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 22.86]
+pos = [3.175, -6.35]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 2
@@ -19,9 +26,16 @@ number = "P1"
 name = "TD1+"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 30.48]
+pos = [5.715, -6.35]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 3
@@ -29,9 +43,16 @@ number = "P8"
 name = "TD3-"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 5.08]
+pos = [-3.175, -8.89]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 4
@@ -39,9 +60,16 @@ number = "P5"
 name = "CT_1"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 15.24]
+pos = [0.635, -6.35]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 5
@@ -49,9 +77,16 @@ number = "P12"
 name = "~"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -15.24]
+pos = [-6.785, 4.57]
 rotation = 0.0
-length = 5.08
+length = 1.605
+width = 1.605
+height = 1.605
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.07
 
 [[pin]]
 num = 6
@@ -59,9 +94,16 @@ number = "P11"
 name = "~"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -7.62]
+pos = [-6.785, 2.54]
 rotation = 0.0
-length = 5.08
+length = 1.605
+width = 1.605
+height = 1.605
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.07
 
 [[pin]]
 num = 7
@@ -69,9 +111,16 @@ number = "P2"
 name = "TD1-"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 27.94]
+pos = [4.445, -8.89]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 8
@@ -79,9 +128,16 @@ number = "S1"
 name = "SHIELD"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -30.48]
+pos = [7.75, -3.05]
 rotation = 0.0
-length = 5.08
+length = 2.475
+width = 2.475
+height = 2.475
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.65
 
 [[pin]]
 num = 9
@@ -89,9 +145,16 @@ number = "S2"
 name = "SHIELD"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -30.48]
+pos = [-7.75, -3.05]
 rotation = 0.0
-length = 5.08
+length = 2.475
+width = 2.475
+height = 2.475
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.65
 
 [[pin]]
 num = 10
@@ -99,9 +162,16 @@ number = "P7"
 name = "TD3+"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 7.62]
+pos = [-1.905, -6.35]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 11
@@ -109,9 +179,16 @@ number = "P14"
 name = "~"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -25.4]
+pos = [6.785, 4.57]
 rotation = 0.0
-length = 5.08
+length = 1.605
+width = 1.605
+height = 1.605
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.07
 
 [[pin]]
 num = 12
@@ -119,9 +196,16 @@ number = "P13"
 name = "~"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -17.78]
+pos = [6.785, 2.54]
 rotation = 0.0
-length = 5.08
+length = 1.605
+width = 1.605
+height = 1.605
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 1.07
 
 [[pin]]
 num = 13
@@ -129,9 +213,16 @@ number = "P9"
 name = "TD4+"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 0.0]
+pos = [-4.445, -6.35]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 14
@@ -139,9 +230,16 @@ number = "P10"
 name = "TD4-"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, -2.54]
+pos = [-5.715, -8.89]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 15
@@ -149,9 +247,16 @@ number = "P4"
 name = "TD2-"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 20.32]
+pos = [1.905, -8.89]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
 
 [[pin]]
 num = 16
@@ -159,6 +264,31 @@ number = "P6"
 name = "CT_2"
 purpose = "I/O"
 kind = "dio"
-pos = [-12.7, 12.7]
+pos = [-0.635, -8.89]
 rotation = 0.0
-length = 5.08
+length = 1.458
+width = 1.458
+height = 1.458
+pad_type = "thru_hole"
+pad_shape = "circle"
+solder_mask_margin = 0.102
+layers = "*.Cu *.Mask"
+drill = 0.95
+
+[[mechanical]]
+pos = [5.715, 0.0]
+width = 3.3
+height = 3.3
+pad_type = "np_thru_hole"
+pad_shape = "circle"
+layers = "*.Cu *.Mask"
+drill = 3.3
+
+[[mechanical]]
+pos = [-5.715, 0.0]
+width = 3.3
+height = 3.3
+pad_type = "np_thru_hole"
+pad_shape = "circle"
+layers = "*.Cu *.Mask"
+drill = 3.3

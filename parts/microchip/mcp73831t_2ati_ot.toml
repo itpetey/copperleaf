@@ -1,0 +1,94 @@
+[component]
+name = "Mcp73831t2atiOt"
+title = "MCP73831T-2ATI_OT"
+lib_id = "MCP73831T-2ATI_OT"
+
+[[pin]]
+num = 1
+number = "1"
+name = "STAT"
+purpose = "I/O"
+kind = "dio"
+pos = [-1.245, -0.95]
+rotation = 0.0
+length = 1.22
+width = 1.22
+height = 0.6
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "2"
+name = "VSS"
+purpose = "Ground"
+kind = "gnd"
+pos = [-1.245, 0.0]
+rotation = 0.0
+length = 1.22
+width = 1.22
+height = 0.6
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 3
+number = "3"
+name = "VBAT"
+purpose = "Battery output"
+kind = "pwr_out"
+v = 4.2
+i = 0.5
+pos = [-1.245, 0.95]
+rotation = 0.0
+length = 1.22
+width = 1.22
+height = 0.6
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 4
+number = "4"
+name = "VDD"
+purpose = "Supply"
+kind = "pwr"
+v_min = 4.5
+v_max = 6.0
+i_max = 1.0
+pos = [1.245, 0.95]
+rotation = 0.0
+length = 1.22
+width = 1.22
+height = 0.6
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 5
+number = "5"
+name = "PROG"
+purpose = "I/O"
+kind = "dio"
+pos = [1.245, -0.95]
+rotation = 0.0
+length = 1.22
+width = 1.22
+height = 0.6
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
