@@ -191,6 +191,27 @@ fn builtin_entries() -> Vec<(&'static str, KindEntry)> {
             },
         ),
         (
+            "open_collector",
+            KindEntry {
+                kind: "dio".into(),
+                ..Default::default()
+            },
+        ),
+        (
+            "open_emitter",
+            KindEntry {
+                kind: "dio".into(),
+                ..Default::default()
+            },
+        ),
+        (
+            "free",
+            KindEntry {
+                kind: "dio".into(),
+                ..Default::default()
+            },
+        ),
+        (
             "clock",
             KindEntry {
                 kind: "clk".into(),
@@ -249,7 +270,7 @@ mod tests {
     #[test]
     fn unknown_type_falls_back_to_default() {
         let map = KindMap::load(None).unwrap();
-        let (entry, fallback) = map.resolve("X", "free", "dio");
+        let (entry, fallback) = map.resolve("X", "non_existent_pin_type", "dio");
         assert_eq!(entry.kind, "dio");
         assert!(fallback);
     }
