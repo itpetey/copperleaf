@@ -6,6 +6,21 @@ use copperleaf_part_codegen::{CodegenError, ComponentMeta, Manifest, PinDef};
 
 use crate::kindmap::{KindEntry, KindMap};
 
+/// Parse a KiCad pin/pad number string into a numeric `usize`.
+///
+/// Purely numeric strings are parsed directly. Non-numeric strings (common in
+/// connectors, e.g. `"TD2+"`) get an auto-incrementing number starting at 1
+/// so that every pin receives a unique identity.
+pub fn pin_number(number: &str, counter: &mut usize) -> usize {
+    if let Ok(n) = number.parse::<usize>() {
+        n
+    } else {
+        let n = *counter;
+        *counter += 1;
+        n
+    }
+}
+
 /// Deserialise a TOML string into a manifest.
 pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
     toml::from_str(input).map_err(|e| CodegenError::Toml {
@@ -21,10 +36,12 @@ pub fn manifest_from_footprint(
     default_kind: &str,
 ) -> Manifest {
     let mut pins = Vec::new();
+    let mut next_num = 1;
     for pad in pads {
-        let num = pad.number.parse::<usize>().unwrap_or(0);
+        let num = pin_number(&pad.number, &mut next_num);
         pins.push(PinDef {
             num,
+            number: pad.number.clone(),
             name: format!("PAD_{}", pad.number),
             purpose: "Pad".into(),
             notes: String::new(),
@@ -54,8 +71,7 @@ pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnost
     let mut diagnostics = Vec::new();
 
     for pad in pads {
-        let num = pad.number.parse::<usize>().unwrap_or(0);
-        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
+        if let Some(pin) = existing.pins.iter_mut().find(|p| p.number == pad.number) {
             pin.pos = Some(pad.pos);
             pin.rotation = Some(pad.rotation);
             pin.length = Some(pad.width.max(pad.height));
@@ -85,11 +101,24 @@ pub fn merge_symbol(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
+    // Start auto-increment counter past the highest existing num so that
+    // auto-assigned numbers never collide with numeric pins.
+    let mut next_num = existing
+        .pins
+        .iter()
+        .map(|p| p.num)
+        .max()
+        .unwrap_or(0)
+        + 1;
+
     for sym_pin in symbol {
-        let num = sym_pin.number.parse::<usize>().unwrap_or(0);
         let (entry, fallback) = kindmap.resolve(&sym_pin.name, &sym_pin.pin_type, default_kind);
 
-        if let Some(pin) = existing.pins.iter_mut().find(|p| p.num == num) {
+        // Try to find an existing pin whose stored `number` matches.
+        let matched = existing.pins.iter_mut().find(|p| p.number == sym_pin.number);
+
+        if let Some(pin) = matched {
+            // Found by number string — update in place.
             if is_placeholder_name(&pin.name) && !sym_pin.name.is_empty() {
                 pin.name = sym_pin.name.clone();
             }
@@ -97,8 +126,10 @@ pub fn merge_symbol(
                 apply_entry(pin, &entry);
             }
         } else {
+            let num = pin_number(&sym_pin.number, &mut next_num);
             let mut pin = PinDef {
                 num,
+                number: sym_pin.number.clone(),
                 name: sym_pin.name.clone(),
                 purpose: purpose_for_kind(&entry.kind).into(),
                 notes: String::new(),
@@ -121,9 +152,9 @@ pub fn merge_symbol(
                 severity: Severity::Warning,
                 message: format!(
                     "Pin {} ({}) from source is not in the existing TOML; appending",
-                    num, sym_pin.name
+                    sym_pin.number, sym_pin.name
                 ),
-                entities: vec![format!("{}", num), sym_pin.name.clone()],
+                entities: vec![sym_pin.number.clone(), sym_pin.name.clone()],
                 hint: None,
             });
         }
@@ -168,6 +199,9 @@ pub fn serialise(manifest: &Manifest) -> String {
     for pin in &manifest.pins {
         out.push_str("[[pin]]\n");
         out.push_str(&format!("num = {}\n", pin.num));
+        if !pin.number.is_empty() {
+            out.push_str(&format!("number = \"{}\"\n", escape_toml_string(&pin.number)));
+        }
         out.push_str(&format!("name = \"{}\"\n", pin.name));
         if !pin.purpose.is_empty() {
             out.push_str(&format!("purpose = \"{}\"\n", pin.purpose));
@@ -362,6 +396,7 @@ mod tests {
             },
             pins: vec![CodegenPinDef {
                 num: 1,
+                number: String::new(),
                 name: "PAD_1".into(),
                 purpose: "Pad".into(),
                 notes: String::new(),
@@ -398,6 +433,7 @@ mod tests {
     #[test]
     fn merge_symbol_replaces_placeholder_name() {
         let mut manifest = make_manifest();
+        manifest.pins[0].number = "1".into();
         let sym = vec![SymPinDef {
             name: "VDD".into(),
             number: "1".into(),
@@ -416,6 +452,7 @@ mod tests {
     #[test]
     fn merge_symbol_preserves_manual_voltage() {
         let mut manifest = make_manifest();
+        manifest.pins[0].number = "1".into();
         manifest.pins[0].name = "VDD".into();
         manifest.pins[0].kind = "pwr".into();
         manifest.pins[0].v_min = Some(1.8);
@@ -439,6 +476,7 @@ mod tests {
     #[test]
     fn merge_footprint_sets_pos_without_clobbering_kind() {
         let mut manifest = make_manifest();
+        manifest.pins[0].number = "1".into();
         manifest.pins[0].name = "VDD".into();
         manifest.pins[0].kind = "pwr".into();
         let pads = vec![PadDef {
@@ -455,5 +493,91 @@ mod tests {
         assert_eq!(manifest.pins[0].pos, Some((10.0, 20.0)));
         assert_eq!(manifest.pins[0].rotation, Some(45.0));
         assert_eq!(manifest.pins[0].length, Some(0.5));
+    }
+
+    #[test]
+    fn pin_number_parses_numeric() {
+        let mut c = 1;
+        assert_eq!(pin_number("1", &mut c), 1);
+        assert_eq!(pin_number("42", &mut c), 42);
+        assert_eq!(c, 1); // counter unchanged for numeric pins
+    }
+
+    #[test]
+    fn pin_number_auto_increments_non_numeric() {
+        let mut c = 1;
+        assert_eq!(pin_number("TD2+", &mut c), 1);
+        assert_eq!(pin_number("TD3-", &mut c), 2);
+        assert_eq!(pin_number("RD2+", &mut c), 3);
+        assert_eq!(c, 4);
+    }
+
+    #[test]
+    fn merge_symbol_auto_increments_stringy_pins() {
+        let mut manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+            },
+            pins: vec![],
+            constraints: vec![],
+        };
+        let sym = vec![
+            SymPinDef {
+                name: "TD2+".into(),
+                number: "TD2+".into(),
+                pos: (0.0, 0.0),
+                rotation: 0.0,
+                pin_type: "input".into(),
+                length: 2.54,
+            },
+            SymPinDef {
+                name: "TD3-".into(),
+                number: "TD3-".into(),
+                pos: (0.0, 2.54),
+                rotation: 0.0,
+                pin_type: "input".into(),
+                length: 2.54,
+            },
+            SymPinDef {
+                name: "RD2+".into(),
+                number: "RD2+".into(),
+                pos: (0.0, 5.08),
+                rotation: 0.0,
+                pin_type: "output".into(),
+                length: 2.54,
+            },
+        ];
+        let kindmap = KindMap::load(None).unwrap();
+        let diags = merge_symbol(&mut manifest, &sym, &kindmap, "dio");
+        assert_eq!(manifest.pins.len(), 3, "all three pins should be present");
+        assert_eq!(manifest.pins[0].num, 1);
+        assert_eq!(manifest.pins[0].number, "TD2+");
+        assert_eq!(manifest.pins[0].name, "TD2+");
+        assert_eq!(manifest.pins[1].num, 2);
+        assert_eq!(manifest.pins[1].number, "TD3-");
+        assert_eq!(manifest.pins[1].name, "TD3-");
+        assert_eq!(manifest.pins[2].num, 3);
+        assert_eq!(manifest.pins[2].number, "RD2+");
+        assert_eq!(manifest.pins[2].name, "RD2+");
+        // All three should have produced NEW_PIN diagnostics.
+        let new_pin_diags: Vec<_> = diags.iter().filter(|d| d.code == "CLI:NEW_PIN").collect();
+        assert_eq!(new_pin_diags.len(), 3);
+
+        // Re-merging the same symbol should be idempotent.
+        let diags2 = merge_symbol(&mut manifest, &sym, &kindmap, "dio");
+        assert_eq!(
+            manifest.pins.len(),
+            3,
+            "re-merge should not add duplicate pins"
+        );
+        let new_pin_diags2: Vec<_> = diags2.iter().filter(|d| d.code == "CLI:NEW_PIN").collect();
+        assert!(
+            new_pin_diags2.is_empty(),
+            "re-merge should produce no NEW_PIN diagnostics"
+        );
     }
 }

@@ -98,18 +98,51 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
 }
 
 fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError> {
-    let lib_id = args.lib_id.as_deref().ok_or_else(|| {
-        CliError::Diagnostic(Diagnostic {
-            code: "CLI:MISSING_LIB_ID".into(),
-            severity: Severity::Error,
-            message: "--lib-id is required when using --symbol".into(),
-            entities: vec![],
-            hint: Some("Provide the symbol name within the library".into()),
-        })
-    })?;
-
     let source = std::fs::read_to_string(symbol_path)?;
     let symbols = parse_symbol_lib(&source)?;
+
+    // Resolve lib-id: use the provided value, or auto-detect from the file.
+    let owned_lib_id;
+    let lib_id = match args.lib_id.as_deref() {
+        Some(id) => id,
+        None => {
+            if symbols.len() == 1 {
+                owned_lib_id = symbols[0].lib_id.clone();
+                &owned_lib_id
+            } else if symbols.is_empty() {
+                return Err(CliError::Diagnostic(Diagnostic {
+                    code: "CLI:NO_SYMBOLS".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "No symbols found in '{}'",
+                        symbol_path
+                    ),
+                    entities: vec![],
+                    hint: None,
+                }));
+            } else {
+                let names: Vec<&str> = symbols.iter().map(|s| s.lib_id.as_str()).collect();
+                return Err(CliError::Diagnostic(Diagnostic {
+                    code: "CLI:MISSING_LIB_ID".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "Multiple symbols found in '{}', --lib-id is required",
+                        symbol_path
+                    ),
+                    entities: names.into_iter().map(String::from).collect(),
+                    hint: Some(format!(
+                        "Available symbols: {}",
+                        symbols
+                            .iter()
+                            .map(|s| s.lib_id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                }));
+            }
+        }
+    };
+
     let Some(symbol) = find_symbol(&symbols, lib_id) else {
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:SYMBOL_NOT_FOUND".into(),

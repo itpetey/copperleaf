@@ -112,8 +112,12 @@ pub struct ComponentMeta {
 /// A single pin definition from the TOML `[[pin]]` table.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PinDef {
-    /// Physical pin number.
+    /// Physical pin number (auto-assigned for non-numeric KiCad pin numbers).
     pub num: usize,
+    /// Original KiCad pin number string (e.g. `"1"` or `"TD2+"`).
+    /// Preserved so that non-numeric pin numbers can be matched across runs.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub number: String,
     /// Pin name as it appears on the schematic and in `PinRef` constants.
     pub name: String,
     /// Short purpose summary for the documentation table.
@@ -480,7 +484,7 @@ fn const_name(pin_name: &str) -> String {
             out.push('_');
         }
     }
-    if out.is_empty() {
+    if out.is_empty() || out.chars().all(|c| c == '_') {
         out.push_str("PIN");
     }
     out
@@ -576,15 +580,24 @@ fn render_component(
     let struct_name = &manifest.component.name;
     let title = &manifest.component.title;
 
-    let mut seen: HashSet<&str> = HashSet::new();
+    let mut seen_names: HashSet<&str> = HashSet::new();
+    let mut seen_consts: HashSet<String> = HashSet::new();
     let mut constants = Vec::new();
     let mut builders = Vec::new();
     let mut pin_rows = Vec::new();
 
     for pin in &manifest.pins {
-        if seen.insert(&pin.name) {
+        if seen_names.insert(&pin.name) {
+            let base = const_name(&pin.name);
+            let name = if seen_consts.insert(base.clone()) {
+                base
+            } else {
+                // Disambiguate with pin number when names collide
+                // (e.g. TD1+ and TD1- both map to TD1_).
+                format!("{}_{}", base, pin.num)
+            };
             constants.push(ConstantRow {
-                name: const_name(&pin.name),
+                name,
                 pin_name: pin.name.clone(),
             });
         }
@@ -647,6 +660,7 @@ mod tests {
     fn pin_with_physical() -> PinDef {
         PinDef {
             num: 1,
+            number: String::new(),
             name: "TXN".into(),
             purpose: "Test".into(),
             notes: String::new(),
@@ -695,6 +709,7 @@ mod tests {
             },
             pins: vec![PinDef {
                 num: 1,
+                number: String::new(),
                 name: "VDD".into(),
                 purpose: "Supply".into(),
                 notes: String::new(),
@@ -728,6 +743,7 @@ mod tests {
             },
             pins: vec![PinDef {
                 num: 1,
+                number: String::new(),
                 name: "VDD".into(),
                 purpose: "Supply".into(),
                 notes: String::new(),

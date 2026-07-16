@@ -279,6 +279,88 @@ fn two_pad_footprint() -> &'static str {
 )"#
 }
 
+fn multi_symbol_lib() -> &'static str {
+    r#"(kicad_symbol_lib
+  (symbol "ALPHA"
+    (pin power_in line (at -5.08 2.54 0) (length 2.54) (name "VDD") (number "1"))
+    (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
+  )
+  (symbol "BETA"
+    (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "1"))
+    (pin output line (at 5.08 -2.54 180) (length 2.54) (name "Q0") (number "2"))
+  )
+)"#
+}
+
+#[test]
+fn new_symbol_auto_detects_lib_id_single_symbol() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    // No --lib-id provided; should auto-detect "TEST" from the single symbol.
+    let status = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
+}
+
+#[test]
+fn new_symbol_multiple_symbols_without_lib_id_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("multi.kicad_sym");
+    std::fs::write(&sym, multi_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    let output = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
+    assert!(stderr.contains("Multiple symbols found"));
+    assert!(stderr.contains("ALPHA"));
+    assert!(stderr.contains("BETA"));
+}
+
+#[test]
+fn new_symbol_multiple_symbols_with_lib_id_succeeds() {
+    let dir = tempfile::tempdir().unwrap();
+    let sym = dir.path().join("multi.kicad_sym");
+    std::fs::write(&sym, multi_symbol_lib()).unwrap();
+    let out = dir.path().join("test.toml");
+
+    let status = copperleaf()
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("BETA")
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"BETA\""));
+}
+
 #[test]
 fn update_symbol_wrong_lib_id_fails() {
     let dir = tempfile::tempdir().unwrap();

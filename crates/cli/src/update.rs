@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use copperleaf::{Diagnostic, Severity};
-use copperleaf_backend_kicad::{find_symbol, flatten_extends, parse_symbol_lib};
+use copperleaf_backend_kicad::{find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib};
 
 use crate::{CliError, UpdateArgs, kindmap::KindMap, manifest};
 
@@ -18,22 +18,50 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     let mut diags = Vec::new();
 
     if let Some(ref symbol_path) = args.symbol {
-        let lib_id = args
+        let sym_source = std::fs::read_to_string(symbol_path)?;
+        let symbols = parse_symbol_lib(&sym_source)?;
+
+        // Resolve lib-id: CLI arg -> existing TOML -> auto-detect from single-symbol file.
+        let owned_lib_id;
+        let lib_id = match args
             .lib_id
             .as_deref()
             .or(manifest.component.lib_id.as_deref())
-            .ok_or_else(|| {
-                CliError::Diagnostic(Diagnostic {
-                    code: "CLI:MISSING_LIB_ID".into(),
-                    severity: Severity::Error,
-                    message: "--lib-id is required when using --symbol for the first time".into(),
-                    entities: vec![],
-                    hint: Some(
-                        "Provide the symbol name within the library, or add lib_id to the TOML"
-                            .into(),
-                    ),
-            })
-        })?;
+        {
+            Some(id) => id,
+            None => {
+                if symbols.len() == 1 {
+                    owned_lib_id = symbols[0].lib_id.clone();
+                    &owned_lib_id
+                } else if symbols.is_empty() {
+                    return Err(CliError::Diagnostic(Diagnostic {
+                        code: "CLI:NO_SYMBOLS".into(),
+                        severity: Severity::Error,
+                        message: format!("No symbols found in '{}'", symbol_path),
+                        entities: vec![],
+                        hint: None,
+                    }));
+                } else {
+                    return Err(CliError::Diagnostic(Diagnostic {
+                        code: "CLI:MISSING_LIB_ID".into(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "Multiple symbols found in '{}', --lib-id is required",
+                            symbol_path
+                        ),
+                        entities: symbols.iter().map(|s| s.lib_id.clone()).collect(),
+                        hint: Some(format!(
+                            "Available symbols: {}",
+                            symbols
+                                .iter()
+                                .map(|s| s.lib_id.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )),
+                    }));
+                }
+            }
+        };
         // Idiot check: verify the source matches this part.
         if let Some(ref existing) = manifest.component.lib_id
             && existing != lib_id
@@ -51,8 +79,6 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                 ),
             }));
         }
-        let sym_source = std::fs::read_to_string(symbol_path)?;
-        let symbols = parse_symbol_lib(&sym_source)?;
         let Some(symbol) = find_symbol(&symbols, lib_id) else {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:SYMBOL_NOT_FOUND".into(),
@@ -62,15 +88,21 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                 hint: None,
             }));
         };
-        let _flattened = flatten_extends(symbol, &symbols);
+        // Flatten inheritance so pins from parent symbols (possibly in a
+        // different file) are included.  Re-parse the flattened S-expression
+        // to extract the complete pin set.
+        let flattened = flatten_extends(symbol, &symbols);
+        let flat_pins = parse_single_symbol(&flattened)
+            .map(|s| s.pins)
+            .unwrap_or_else(|| symbol.pins.clone());
         // Idiot check: warn if pin counts don't match.
-        if !manifest.pins.is_empty() && symbol.pins.len() != manifest.pins.len() {
+        if !manifest.pins.is_empty() && flat_pins.len() != manifest.pins.len() {
             diags.push(Diagnostic {
                 code: "CLI:PIN_COUNT_MISMATCH".into(),
                 severity: Severity::Warning,
                 message: format!(
                     "Symbol has {} pins, but part TOML has {}",
-                    symbol.pins.len(),
+                    flat_pins.len(),
                     manifest.pins.len()
                 ),
                 entities: vec![],
@@ -79,7 +111,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         }
         diags.extend(manifest::merge_symbol(
             &mut manifest,
-            &symbol.pins,
+            &flat_pins,
             &kindmap,
             &args.default_kind,
         ));
