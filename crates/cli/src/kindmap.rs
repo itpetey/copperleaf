@@ -88,6 +88,9 @@ impl KindMap {
         for (ty, entry) in builtin_entries() {
             self.by_type.entry(ty.into()).or_insert(entry);
         }
+        for (name, entry) in builtin_name_entries() {
+            self.by_name.entry(name.into()).or_insert(entry);
+        }
     }
 
     fn builtin(&self, pin_type: &str) -> Option<KindEntry> {
@@ -96,6 +99,16 @@ impl KindMap {
             .find(|(ty, _)| *ty == pin_type)
             .map(|(_, e)| e.clone())
     }
+}
+
+/// Built-in name-based overrides for common pin names that KiCad classifies
+/// as `power_in` but should map to `gnd` in Copperleaf.
+fn builtin_name_entries() -> Vec<(&'static str, KindEntry)> {
+    let gnd = KindEntry {
+        kind: "gnd".into(),
+        ..Default::default()
+    };
+    vec![("GND", gnd.clone()), ("VSS", gnd.clone()), ("PGND", gnd)]
 }
 
 fn builtin_entries() -> Vec<(&'static str, KindEntry)> {
@@ -212,6 +225,14 @@ mod tests {
     fn gnd_maps_to_gnd() {
         let map = KindMap::load(None).unwrap();
         let (entry, fallback) = map.resolve("GND", "gnd", "dio");
+        assert_eq!(entry.kind, "gnd");
+        assert!(!fallback);
+    }
+
+    #[test]
+    fn gnd_name_overrides_power_in_type() {
+        let map = KindMap::load(None).unwrap();
+        let (entry, fallback) = map.resolve("GND", "power_in", "dio");
         assert_eq!(entry.kind, "gnd");
         assert!(!fallback);
     }

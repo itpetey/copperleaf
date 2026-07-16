@@ -6,7 +6,7 @@ description = "Parts-creation CLI for Copperleaf"
 license.workspace = true
 
 [[bin]]
-name = "copperleaf"
+name = "cl"
 path = "src/main.rs"
 
 [dependencies]

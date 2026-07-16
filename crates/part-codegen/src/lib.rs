@@ -104,6 +104,9 @@ pub struct ComponentMeta {
     /// Optional URL pointing to the component datasheet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub datasheet: Option<String>,
+    /// Library identifier for the symbol/footprint within the source file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lib_id: Option<String>,
 }
 
 /// A single pin definition from the TOML `[[pin]]` table.
@@ -688,6 +691,7 @@ mod tests {
                 title: "Test".into(),
                 description: None,
                 datasheet: None,
+                lib_id: None,
             },
             pins: vec![PinDef {
                 num: 1,
@@ -720,6 +724,7 @@ mod tests {
                 title: "Test".into(),
                 description: None,
                 datasheet: None,
+                lib_id: None,
             },
             pins: vec![PinDef {
                 num: 1,

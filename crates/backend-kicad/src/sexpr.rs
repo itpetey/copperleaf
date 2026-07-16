@@ -211,7 +211,11 @@ pub fn parse(input: &str) -> Result<Sexpr, ParseError> {
 }
 
 fn escape_str(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t")
+        .replace('\r', "\\r")
 }
 
 fn fnv1a_64(seed: &str, salt: u64) -> u64 {
@@ -241,6 +245,9 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                         Some((_, '\\')) => match chars.next() {
                             Some((_, '\\')) => s.push('\\'),
                             Some((_, '"')) => s.push('"'),
+                            Some((_, 'n')) => s.push('\n'),
+                            Some((_, 't')) => s.push('\t'),
+                            Some((_, 'r')) => s.push('\r'),
                             Some((pos, _)) => return Err(ParseError::BadEscape { pos }),
                             None => return Err(ParseError::UnexpectedEof),
                         },

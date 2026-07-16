@@ -160,6 +160,9 @@ pub fn serialise(manifest: &Manifest) -> String {
     if let Some(ds) = &manifest.component.datasheet {
         out.push_str(&format!("datasheet = \"{}\"\n", ds));
     }
+    if let Some(lib_id) = &manifest.component.lib_id {
+        out.push_str(&format!("lib_id = \"{}\"\n", escape_toml_string(lib_id)));
+    }
     out.push('\n');
 
     for pin in &manifest.pins {
@@ -353,6 +356,7 @@ mod tests {
                 title: "Test".into(),
                 description: None,
                 datasheet: None,
+                lib_id: None,
             },
             pins: vec![CodegenPinDef {
                 num: 1,

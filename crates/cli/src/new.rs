@@ -51,6 +51,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
             title,
             description,
             datasheet: None,
+            lib_id: Some(lib_id.clone()),
         },
         &args.default_kind,
     );
@@ -103,6 +104,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
             title,
             description,
             datasheet: symbol.datasheet.clone(),
+            lib_id: Some(lib_id.to_string()),
         },
         pins: vec![],
         constraints: vec![],
