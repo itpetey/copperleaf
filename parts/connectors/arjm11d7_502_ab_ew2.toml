@@ -1,0 +1,164 @@
+[component]
+name = "Arjm11d7502AbEw2"
+title = "ARJM11D7-502-AB-EW2"
+lib_id = "ARJM11D7-502-AB-EW2"
+
+[[pin]]
+num = 1
+number = "P3"
+name = "TD2+"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 22.86]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 2
+number = "P1"
+name = "TD1+"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 30.48]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 3
+number = "P8"
+name = "TD3-"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 5.08]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 4
+number = "P5"
+name = "CT_1"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 15.24]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 5
+number = "P12"
+name = "~"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -15.24]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 6
+number = "P11"
+name = "~"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -7.62]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 7
+number = "P2"
+name = "TD1-"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 27.94]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 8
+number = "S1"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -30.48]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 9
+number = "S2"
+name = "SHIELD"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -30.48]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 10
+number = "P7"
+name = "TD3+"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 7.62]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 11
+number = "P14"
+name = "~"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -25.4]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 12
+number = "P13"
+name = "~"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -17.78]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 13
+number = "P9"
+name = "TD4+"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 0.0]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 14
+number = "P10"
+name = "TD4-"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, -2.54]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 15
+number = "P4"
+name = "TD2-"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 20.32]
+rotation = 0.0
+length = 5.08
+
+[[pin]]
+num = 16
+number = "P6"
+name = "CT_2"
+purpose = "I/O"
+kind = "dio"
+pos = [-12.7, 12.7]
+rotation = 0.0
+length = 5.08
