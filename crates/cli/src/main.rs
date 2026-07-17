@@ -60,6 +60,9 @@ struct NewArgs {
     /// Component description.
     #[arg(long)]
     description: Option<String>,
+    /// LLM model for datasheet processing (provider/model format).
+    #[arg(long, default_value = "opencode/big-pickle")]
+    model: String,
     /// Create or use a vendor parts crate.
     #[arg(long)]
     crate_: Option<String>,
@@ -91,6 +94,9 @@ struct UpdateArgs {
     /// Default kind for unrecognised pin types.
     #[arg(long, default_value = "dio")]
     default_kind: String,
+    /// LLM model for datasheet processing (provider/model format).
+    #[arg(long, default_value = "opencode/big-pickle")]
+    model: String,
 }
 
 /// Arguments for `generate footprint`.

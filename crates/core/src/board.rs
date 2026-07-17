@@ -44,6 +44,7 @@ pub struct ComponentHandle(pub usize);
 
 /// Top level structure representing the PCB being designed.
 pub struct Board {
+    name: String,
     pub(crate) components: Vec<ComponentEntry>,
     pub(crate) connections: Vec<RawConnection>,
     pub(crate) net_overrides: Vec<RawNetOverride>,
@@ -72,25 +73,10 @@ impl ComponentHandle {
 }
 
 impl Board {
-    /// Set an explicit voltage override for a net returned by [`Board::connect`].
-    pub fn set_net_voltage(&mut self, handle: NetHandle, v: Qty<Volt>) {
-        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
-            ov.voltage = Some(v);
-        }
-    }
-
-    /// Set an explicit name override for a net returned by [`Board::connect`].
-    pub fn set_net_name(&mut self, handle: NetHandle, name: &str) {
-        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
-            ov.name = Some(name.to_owned());
-        }
-    }
-}
-
-impl Board {
     /// Creates a new, unpopulated [`Board`].
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
+            name: name.into(),
             components: Vec::new(),
             connections: Vec::new(),
             net_overrides: Vec::new(),
@@ -135,6 +121,24 @@ impl Board {
         crate::compile::run(self)
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Set an explicit voltage override for a net returned by [`Board::connect`].
+    pub fn set_net_voltage(&mut self, handle: NetHandle, v: Qty<Volt>) {
+        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+            ov.voltage = Some(v);
+        }
+    }
+
+    /// Set an explicit name override for a net returned by [`Board::connect`].
+    pub fn set_net_name(&mut self, handle: NetHandle, name: &str) {
+        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+            ov.name = Some(name.to_owned());
+        }
+    }
+
     fn validate_pin(&self, handle: &PinHandle) -> Option<Diagnostic> {
         let Some(entry) = self.components.get(handle.component) else {
             return Some(Diagnostic {
@@ -172,11 +176,5 @@ impl Board {
             }
         }
         Ok(())
-    }
-}
-
-impl Default for Board {
-    fn default() -> Self {
-        Self::new()
     }
 }

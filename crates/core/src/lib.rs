@@ -1,5 +1,8 @@
+use std::path::Path;
+
 // Re-export all public types at crate root for backward compatibility.
 pub use board::{Board, CompiledBoard, CompiledComponent, ComponentHandle, Connection};
+pub use compile::CompileError;
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
 pub use pin::{Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec};
 pub use units::{
@@ -10,6 +13,7 @@ pub use util::deterministic_id;
 pub mod board;
 pub(crate) mod compile;
 pub mod erc;
+pub mod helpers;
 pub mod net;
 pub mod pin;
 pub mod units;
@@ -18,7 +22,7 @@ pub(crate) mod util;
 /// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
 pub trait Backend {
     type Error;
-    fn emit(&self, output_dir: &str, board: &CompiledBoard) -> Result<(), Self::Error>;
+    fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error>;
 }
 
 /// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
@@ -137,7 +141,7 @@ mod tests {
 
     #[test]
     fn board_add_returns_handle() {
-        let mut board = Board::new();
+        let mut board = Board::new("test");
         let h = board.add("U1", TestPart);
         assert_eq!(h.0, 0);
     }
@@ -161,7 +165,7 @@ mod tests {
             pub const B: PinRef = PinRef("B");
         }
 
-        let mut board = Board::new();
+        let mut board = Board::new("test");
         let u1 = board.add("U1", TwoPins);
         let _ = board.connect(u1.pin(TwoPins::A), u1.pin(TwoPins::B));
         let compiled = board.compile().unwrap();
@@ -170,7 +174,7 @@ mod tests {
 
     #[test]
     fn empty_board_compiles() {
-        let board = Board::new();
+        let board = Board::new("test");
         let compiled = board.compile().unwrap();
         assert_eq!(compiled.board.components.len(), 0);
         assert_eq!(compiled.board.nets.len(), 0);

@@ -3,7 +3,7 @@
 //! Emits `.kicad_pro`, `.kicad_sch`, `.kicad_pcb`, and `.net` files from a
 //! [`CompiledBoard`].
 
-use std::{fs, path::PathBuf};
+use std::{fs, path::Path};
 
 use copperleaf::{Backend, BackendError, CompiledBoard};
 
@@ -50,8 +50,8 @@ impl KiCad {
 impl Backend for KiCad {
     type Error = BackendError;
 
-    fn emit(&self, output_dir: &str, board: &CompiledBoard) -> Result<(), Self::Error> {
-        let out = PathBuf::from(output_dir);
+    fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error> {
+        let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
 
         let pro = project::emit_project(&self.project_name);
@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn emits_all_project_files() {
-        let mut board = Board::new();
+        let mut board = Board::new("test");
         let u1 = board.add("U1", TwoPinPart::new());
         let _ = board.connect(u1.pin(TwoPinPart::A), u1.pin(TwoPinPart::B));
         let report = board.compile().unwrap();

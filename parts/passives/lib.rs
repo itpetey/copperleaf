@@ -1,7 +1,8 @@
 //! Library of common parts used in examples and tests.
 
 use copperleaf::{
-    Component, Farad, Henry, Hertz, Ohm, Pin, PinBuilder, PinRef, PowerSpec, Qty, Role, UnitExt,
+    Board, CompileError, Component, Farad, Henry, Hertz, Ohm, Pin, PinBuilder, PinHandle, PinRef,
+    PowerSpec, Qty, Role, UnitExt,
 };
 
 /// Standard two-pin capacitor.
@@ -233,6 +234,32 @@ impl Component for Inductor {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
+}
+
+/// Add a pull-down resistor from `pin` to the given ground pin.
+pub fn pulldown(
+    board: &mut Board,
+    refdes: &str,
+    pin: PinHandle,
+    gnd: PinHandle,
+) -> Result<(), CompileError> {
+    let r = board.add(refdes, Resistor::new(10.0.kohm()));
+    board.connect(pin, r.pin(Resistor::PIN1))?;
+    board.connect(gnd, r.pin(Resistor::PIN2))?;
+    Ok(())
+}
+
+/// Add a pull-up resistor from `pin` to the `vdd_pin` power pin.
+pub fn pullup(
+    board: &mut Board,
+    refdes: &str,
+    pin: PinHandle,
+    vdd_pin: PinHandle,
+) -> Result<(), CompileError> {
+    let r = board.add(refdes, Resistor::new(10.0.kohm()));
+    board.connect(pin, r.pin(Resistor::PIN1))?;
+    board.connect(vdd_pin, r.pin(Resistor::PIN2))?;
+    Ok(())
 }
 
 #[cfg(test)]

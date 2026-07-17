@@ -1,0 +1,75 @@
+[component]
+name = "Conmhf4SmdGT"
+title = "TE Connectivity MHF4 Coaxial Connector, 50 Ohm Snap-On, 6 GHz (SMD)"
+lib_id = "CONMHF4-SMD-G-T"
+datasheet = "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=conmhf4-smd-g-t-ds&DocType=Data%20Sheet&DocLang=English&DocFormat=pdf&PartCntxt=CONMHF4-SMD-G-T"
+
+[[pin]]
+num = 1
+number = "1"
+name = "Signal"
+purpose = "RF Signal"
+notes = "Center contact (male pin), gold-plated brass. Contact resistance 20.0 mohm max. Insertion loss: 0.33 dB (400-960 MHz), 0.43 dB (1164-1609 MHz), 0.58 dB (2.4 GHz), 1.60 dB (1427-5000 MHz)."
+kind = "analog_rf"
+v = 60.0
+bw_mhz = 6000.0
+pos = [0.0, 0.95]
+rotation = 0.0
+length = 0.6
+width = 0.6
+height = 0.6
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "2"
+name = "GND1"
+purpose = "Ground"
+notes = "Outer contact, gold-plated brass. Contact resistance 20.0 mohm max."
+kind = "gnd"
+pos = [-0.96, 0.0]
+rotation = 0.0
+length = 1.58
+width = 0.58
+height = 1.58
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 3
+number = "3"
+name = "GND2"
+purpose = "Ground"
+notes = "Outer contact, gold-plated brass. Contact resistance 20.0 mohm max."
+kind = "gnd"
+pos = [0.96, 0.0]
+rotation = 0.0
+length = 1.58
+width = 0.58
+height = 1.58
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 4
+number = "4"
+name = "GND3"
+purpose = "Ground"
+notes = "Outer contact, gold-plated brass. Contact resistance 20.0 mohm max."
+kind = "gnd"
+pos = [0.0, -1.0]
+rotation = 0.0
+length = 0.5
+width = 0.5
+height = 0.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"

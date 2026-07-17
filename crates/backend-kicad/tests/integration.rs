@@ -74,7 +74,7 @@ fn build_two_component_board(
     src_v: f64,
     load_v_max: f64,
 ) -> (Board, ComponentHandle, ComponentHandle) {
-    let mut board = Board::new();
+    let mut board = Board::new("test");
     let src = board.add("SRC", PwrSource::new(src_v));
     let load = board.add("U1", Load::new(load_v_max));
     board
@@ -85,7 +85,7 @@ fn build_two_component_board(
 
 #[test]
 fn decoupling_caps_appear_in_summary() {
-    let mut board = Board::new();
+    let mut board = Board::new("test");
     let src = board.add("SRC", PwrSource::new(3.3));
     let part = board.add("U1", DecoupledPart::new());
     board

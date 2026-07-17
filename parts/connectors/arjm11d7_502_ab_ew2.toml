@@ -1,7 +1,8 @@
 [component]
 name = "Arjm11d7502AbEw2"
-title = "ARJM11D7-502-AB-EW2"
+title = "Abracon ARJM11 RJ45 Ethernet Connector with Magnetics, 10/100/1000 Base-T, PoE"
 lib_id = "ARJM11D7-502-AB-EW2"
+datasheet = "https://abracon.com/Magnetics/ARJM11.pdf"
 
 [[pin]]
 num = 1

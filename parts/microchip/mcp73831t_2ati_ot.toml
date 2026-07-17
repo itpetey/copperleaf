@@ -1,7 +1,8 @@
 [component]
 name = "Mcp73831t2atiOt"
-title = "MCP73831T-2ATI_OT"
+title = "Microchip MCP73831 Single Cell Li-Ion/Li-Polymer Charge Controller (SOT-23-5)"
 lib_id = "MCP73831T-2ATI_OT"
+datasheet = "https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP73831-Family-Data-Sheet-DS20001984H.pdf"
 
 [[pin]]
 num = 1

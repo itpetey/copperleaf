@@ -29,7 +29,7 @@ struct OpencodeEvent {
 pub fn new_from_datasheet(path: &str, args: &NewArgs) -> Result<Manifest, CliError> {
     let text = extract_pdf_text(path)?;
     let prompt = new_prompt(args.title.as_deref(), args.description.as_deref());
-    let raw = call_opencode(&prompt, &[&text])?;
+    let raw = call_opencode(&prompt, &[&text], &args.model)?;
     let toml = extract_toml(&raw, path)?;
     let manifest = crate::manifest::deserialise(&toml)?;
     Ok(manifest)
@@ -45,7 +45,7 @@ pub fn update_from_datasheet(
     let text = extract_pdf_text(path)?;
     let existing_toml = crate::manifest::serialise(existing);
     let prompt = update_prompt();
-    let raw = call_opencode(&prompt, &[&existing_toml, &text])?;
+    let raw = call_opencode(&prompt, &[&existing_toml, &text], &args.model)?;
     let toml = extract_toml(&raw, path)?;
     let manifest = crate::manifest::deserialise(&toml)?;
     Ok(manifest)
@@ -56,7 +56,7 @@ pub fn update_from_datasheet(
 /// The files are written to a temporary directory which is also passed as
 /// `--dir` so that `opencode` does not attempt to index the project
 /// workspace (which produces noisy progress output and can be slow).
-fn call_opencode(prompt: &str, file_contents: &[&str]) -> Result<String, CliError> {
+fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<String, CliError> {
     let dir = tempfile::tempdir()?;
 
     let mut file_paths = Vec::new();
@@ -76,7 +76,8 @@ fn call_opencode(prompt: &str, file_contents: &[&str]) -> Result<String, CliErro
         .arg(prompt)
         .arg("--format")
         .arg("json")
-        .arg("--no-replay")
+        .arg("--model")
+        .arg(model)
         .arg("--dangerously-skip-permissions")
         .arg("--dir")
         .arg(dir.path());
@@ -95,23 +96,6 @@ fn call_opencode(prompt: &str, file_contents: &[&str]) -> Result<String, CliErro
         })
     })?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(CliError::Diagnostic(Diagnostic {
-            code: "CLI:LLM_FAILED".into(),
-            severity: Severity::Error,
-            message: format!(
-                "`opencode` exited with status {}: {}",
-                output.status, stderr
-            ),
-            entities: vec![],
-            hint: Some(
-                "Check that `opencode` is configured with a provider and the prompt is valid"
-                    .into(),
-            ),
-        }));
-    }
-
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut text = String::new();
     for line in stdout.lines() {
@@ -129,12 +113,24 @@ fn call_opencode(prompt: &str, file_contents: &[&str]) -> Result<String, CliErro
     }
 
     if text.trim().is_empty() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let message = if !output.status.success() {
+            format!(
+                "`opencode` exited with status {}: {}",
+                output.status, stderr
+            )
+        } else {
+            format!("`opencode` succeeded but returned no text output")
+        };
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:LLM_EMPTY".into(),
             severity: Severity::Error,
-            message: "The LLM returned an empty response".into(),
+            message,
             entities: vec![],
-            hint: Some("Try again or check the `opencode` provider/model".into()),
+            hint: Some(
+                "Check that `opencode` is configured with a provider and the prompt is valid"
+                    .into(),
+            ),
         }));
     }
 
@@ -205,9 +201,9 @@ Schema:
 
 [component]
 name = "PascalCaseName"        # Rust struct name for the generated code
-title = "..."                  # Short human-readable title
+title = "Manufacturer PartType Description (Package)"  # e.g. "Texas Instruments TPS63031 Buck-Boost Converter with 1-A Switches (QFN-10)"
 description = "..."            # Optional one-line summary
-datasheet = "..."              # Optional URL or path to the datasheet
+datasheet = "..."              # URL to the component datasheet
 lib_id = "..."                 # Library identifier used in KiCad
 
 [[pin]]
@@ -225,11 +221,17 @@ i_max = 0.1                      # Required for kind=pwr
 nc = false                       # Optional: true if this pin must not be connected
 
 [[constraint]]
-type = "..."                   # Optional: Decoupling, Impedance, LengthMatching, PowerRail, etc.
+type = "..."                   # Exactly one of: Decoupling, LengthMatch, MaxJunction
+values = ["100nF"]              # Required for Decoupling: capacitor values as unit strings
+per_pin = false                 # Optional for Decoupling: true if each pin needs its own cap
+group = "..."                   # Required for LengthMatch: net group name
+skew_ps = 0.0                   # Required for LengthMatch: max skew in picoseconds
+temp = "125C"                   # Required for MaxJunction: max junction temperature
 
 Rules:
 1. Use the exact pin numbering and names from the datasheet.
-2. Choose the correct kind for each pin:
+2. Format the title as "Manufacturer PartNumber Description (Package)" using the manufacturer name, part number, functional description, and package type from the datasheet. Include the datasheet URL in the datasheet field.
+3. Choose the correct kind for each pin:
    - gnd: ground / VSS pins
    - pwr: supply input with a voltage range (requires v_min, v_max, i_max)
    - pwr_fixed: fixed-voltage regulator output or fixed supply (requires v, i)
@@ -239,12 +241,16 @@ Rules:
    - analog_rf: RF / high-speed analog differential pairs
    - clk: clock input/output (requires bw_mhz)
    - spi: SPI bus pins (requires bw_mhz)
-3. For power pins include the required electrical fields; never leave them blank.
-4. For clocks and SPI set a sensible bw_mhz based on the datasheet max frequency.
-5. Add brief notes for ambiguous pins (e.g. "do not connect", "analog 3.3V", "active-low reset").
-6. Add [[constraint]] entries for decoupling, impedance, length-matching, or power-rail rules if the datasheet states them.
-7. Do NOT invent pins or values not present in the datasheet.
-8. Output ONLY the TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text.{title_hint}{description_hint}"#,
+4. For power pins include the required electrical fields; never leave them blank.
+5. For clocks and SPI set a sensible bw_mhz based on the datasheet max frequency.
+6. Add brief notes for ambiguous pins (e.g. "do not connect", "analog 3.3V", "active-low reset").
+7. Only use these constraint types with their exact fields:
+   - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
+   - LengthMatch: group (string), skew_ps (number)
+   - MaxJunction: temp (string like "125C")
+   Do NOT invent constraint types or fields not listed above.
+8. Do NOT invent pins or values not present in the datasheet.
+9. Output ONLY the TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text.{title_hint}{description_hint}"#,
         title_hint = title_hint,
         description_hint = description_hint,
     )
@@ -262,14 +268,20 @@ Read both files and produce an updated, valid TOML manifest.
 
 Rules:
 1. Preserve every pin and every existing field unless the datasheet clearly contradicts it.
-2. Enrich pins with purpose, notes, and electrical specs (v_min, v_max, i_max, v, i, bw_mhz) where the datasheet provides them.
-3. Preserve the existing pin kind unless the datasheet clearly contradicts it.
-4. Only add new pins if the datasheet explicitly lists them and they are missing from the existing manifest.
-5. Use the Copperleaf pin kinds: gnd, dio, analog_in, analog_rf, clk, spi, pwr, pwr_fixed, pwr_out.
-6. For kind=pwr include v_min, v_max, i_max. For kind=pwr_fixed or pwr_out include v and i. For kind=clk or spi include bw_mhz.
-7. Add or update [[constraint]] entries for decoupling, impedance, length-matching, or power-rail rules stated in the datasheet.
-8. Do NOT invent information not present in the datasheet.
-9. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#
+2. Enrich the title with manufacturer name, part number, functional description, and package type if not already descriptive. Format: "Manufacturer PartNumber Description (Package)".
+3. Add the datasheet URL in the datasheet field if missing.
+4. Enrich pins with purpose, notes, and electrical specs (v_min, v_max, i_max, v, i, bw_mhz) where the datasheet provides them.
+5. Preserve the existing pin kind unless the datasheet clearly contradicts it.
+6. Only add new pins if the datasheet explicitly lists them and they are missing from the existing manifest.
+7. Use the Copperleaf pin kinds: gnd, dio, analog_in, analog_rf, clk, spi, pwr, pwr_fixed, pwr_out.
+8. For kind=pwr include v_min, v_max, i_max. For kind=pwr_fixed or pwr_out include v and i. For kind=clk or spi include bw_mhz.
+9. Only use these constraint types with their exact fields:
+   - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
+   - LengthMatch: group (string), skew_ps (number)
+   - MaxJunction: temp (string like "125C")
+   Do NOT invent constraint types or fields not listed above.
+10. Do NOT invent information not present in the datasheet.
+11. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#
         .to_string()
 }
 

@@ -1,7 +1,8 @@
 [component]
 name = "Tps63031dskr"
-title = "TPS63031DSKR"
+title = "Texas Instruments TPS63031 Buck-Boost Converter with 1-A Switches (QFN-10)"
 lib_id = "TPS63031DSKR"
+datasheet = "https://www.ti.com/lit/gpn/TPS63031"
 
 [[pin]]
 num = 1

@@ -1,7 +1,8 @@
 [component]
 name = "UsbC23409011"
-title = "2340901-1 USB Type C 2.0 Conn Rec Mid-Mount One Ro"
+title = "TE Connectivity USB Type C 2.0 Receptacle, Mid-Mount, Right Angle"
 lib_id = "2340901-1"
+datasheet = "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=2340901&DocType=Customer+Drawing&DocLang=English&PartCntxt=2340901-1&DocFormat=pdf"
 
 [[pin]]
 num = 1
