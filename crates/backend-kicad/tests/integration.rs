@@ -162,4 +162,32 @@ fn valid_board_compiles_and_emits() {
         .collect();
     assert!(names.contains(&"test.kicad_sch".to_string()));
     assert!(names.contains(&"test.net".to_string()));
+    assert!(names.contains(&"symbols".to_string()));
+    assert!(names.contains(&"footprints".to_string()));
+
+    // Verify symbols/ directory contains at least one .kicad_sym file.
+    let sym_dir = dir.path().join("symbols");
+    let sym_files: Vec<_> = fs::read_dir(&sym_dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect();
+    assert!(!sym_files.is_empty(), "symbols/ should not be empty");
+    assert!(
+        sym_files.iter().any(|f| f.ends_with(".kicad_sym")),
+        "should contain .kicad_sym files, got: {:?}",
+        sym_files
+    );
+
+    // Verify footprints/ directory contains at least one .kicad_mod file.
+    let fp_dir = dir.path().join("footprints");
+    let fp_files: Vec<_> = fs::read_dir(&fp_dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect();
+    assert!(!fp_files.is_empty(), "footprints/ should not be empty");
+    assert!(
+        fp_files.iter().any(|f| f.ends_with(".kicad_mod")),
+        "should contain .kicad_mod files, got: {:?}",
+        fp_files
+    );
 }

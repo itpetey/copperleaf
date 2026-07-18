@@ -1,10 +1,12 @@
 use std::path::Path;
 
 // Re-export all public types at crate root for backward compatibility.
-pub use board::{Board, CompiledBoard, CompiledComponent, ComponentHandle, Connection};
+pub use board::{Board, CompiledBoard, CompiledComponent, ComponentHandle, Connection, MechanicalPad};
 pub use compile::CompileError;
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
-pub use pin::{Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec};
+pub use pin::{
+    Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec, ThermalVia,
+};
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
@@ -45,13 +47,33 @@ pub trait Component {
         vec![]
     }
 
-    /// Embedded symbol S-expression, if any.
+    /// Symbol library identifier for this part (e.g. `"RP2354A"` or
+    /// `"MCU_RaspberryPi:RP2354A"`).  Identifiers without a library prefix are
+    /// emitted into the project's own symbol library.
     fn symbol(&self) -> Option<&'static str> {
         None
     }
 
-    /// Embedded footprint S-expression, if any.
+    /// Footprint name for this part.  Names without a library prefix are
+    /// generated into the project's own footprint library; names containing a
+    /// `':'` are treated as external library references.
     fn footprint(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// Mechanical (non-electrical) pads belonging to this component's
+    /// footprint — mounting holes, fiducials, paste apertures, etc.
+    fn mechanical(&self) -> &[MechanicalPad] {
+        &[]
+    }
+
+    /// Datasheet URL carried through to the symbol library.
+    fn datasheet(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// Human-readable description carried through to library metadata.
+    fn description(&self) -> Option<&'static str> {
         None
     }
 }

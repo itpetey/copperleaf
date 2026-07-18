@@ -17,6 +17,7 @@
 {{/pins}}
 pub struct {{{struct_name}}} {
     pins: Vec<copperleaf::Pin>,
+    mechanical: Vec<copperleaf::MechanicalPad>,
 }
 
 impl {{{struct_name}}} {
@@ -32,6 +33,11 @@ impl {{{struct_name}}} {
                 {{#builders}}
                 {{{.}}},
                 {{/builders}}
+            ],
+            mechanical: vec![
+                {{#mechanicals}}
+                {{{.}}},
+                {{/mechanicals}}
             ],
         }
     }
@@ -54,6 +60,32 @@ impl copperleaf::Component for {{{struct_name}}} {
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
     }
+
+    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+        &self.mechanical
+    }
+    {{#symbol_id}}
+
+    fn symbol(&self) -> Option<&'static str> {
+        Some("{{{symbol_id}}}")
+    }
+
+    fn footprint(&self) -> Option<&'static str> {
+        Some("{{{symbol_id}}}")
+    }
+    {{/symbol_id}}
+    {{#datasheet_lit}}
+
+    fn datasheet(&self) -> Option<&'static str> {
+        Some({{{datasheet_lit}}})
+    }
+    {{/datasheet_lit}}
+    {{#description_lit}}
+
+    fn description(&self) -> Option<&'static str> {
+        Some({{{description_lit}}})
+    }
+    {{/description_lit}}
 }
 
 impl Default for {{{struct_name}}} {

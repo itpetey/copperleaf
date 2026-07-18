@@ -304,6 +304,13 @@ struct TemplateData {
     constants: Vec<ConstantRow>,
     builders: Vec<String>,
     constraints: Vec<String>,
+    mechanicals: Vec<String>,
+    /// Library identifier emitted by `symbol()`/`footprint()`, if any.
+    symbol_id: Option<String>,
+    /// Datasheet URL as a Rust string literal (e.g. `"https://..."`).
+    datasheet_lit: Option<String>,
+    /// Description as a Rust string literal.
+    description_lit: Option<String>,
 }
 
 impl SourceProvider for TemplateProvider {
@@ -646,6 +653,14 @@ fn module_name(path: &Path) -> Result<String, CodegenError> {
 
 fn physical_suffix(pin: &PinDef) -> String {
     let mut suffix = String::new();
+    // Physical pad number: the original KiCad pin number when present,
+    // otherwise the auto-assigned physical pin number.
+    let number = if pin.number.is_empty() {
+        pin.num.to_string()
+    } else {
+        pin.number.clone()
+    };
+    suffix.push_str(&format!(".number({:?})", number));
     if let Some((x, y)) = pin.pos {
         suffix.push_str(&format!(".pos({}, {})", fmt_f64(x), fmt_f64(y)));
     }
@@ -655,7 +670,65 @@ fn physical_suffix(pin: &PinDef) -> String {
     if let Some(l) = pin.length {
         suffix.push_str(&format!(".length({})", fmt_f64(l)));
     }
+    if let Some(w) = pin.width {
+        suffix.push_str(&format!(".width({})", fmt_f64(w)));
+    }
+    if let Some(h) = pin.height {
+        suffix.push_str(&format!(".height({})", fmt_f64(h)));
+    }
+    if let Some(ref t) = pin.pad_type {
+        suffix.push_str(&format!(".pad_type({:?})", t));
+    }
+    if let Some(ref s) = pin.pad_shape {
+        suffix.push_str(&format!(".pad_shape({:?})", s));
+    }
+    if let Some(rr) = pin.roundrect_rratio {
+        suffix.push_str(&format!(".roundrect_rratio({})", fmt_f64(rr)));
+    }
+    if let Some(smm) = pin.solder_mask_margin {
+        suffix.push_str(&format!(".solder_mask_margin({})", fmt_f64(smm)));
+    }
+    if let Some(ref l) = pin.layers {
+        suffix.push_str(&format!(".layers({:?})", l));
+    }
+    if let Some(d) = pin.drill {
+        suffix.push_str(&format!(".drill({})", fmt_f64(d)));
+    }
+    for via in &pin.thermal_vias {
+        suffix.push_str(&format!(
+            ".thermal_via(({}, {}), {}, {})",
+            fmt_f64(via.pos.0),
+            fmt_f64(via.pos.1),
+            fmt_f64(via.drill),
+            fmt_f64(via.size)
+        ));
+    }
     suffix
+}
+
+/// Build the Rust expression constructing a [`copperleaf::MechanicalPad`].
+fn mechanical_expr(mech: &MechanicalDef) -> String {
+    let rratio = match mech.roundrect_rratio {
+        Some(rr) => format!("Some({})", fmt_f64(rr)),
+        None => "None".to_string(),
+    };
+    let layers = match &mech.layers {
+        Some(l) => format!("Some({:?}.into())", l),
+        None => "None".to_string(),
+    };
+    format!(
+        "copperleaf::MechanicalPad {{ number: {:?}.into(), pos: ({}, {}), width: {}, height: {}, pad_type: {:?}.into(), pad_shape: {:?}.into(), roundrect_rratio: {}, layers: {}, drill: {} }}",
+        mech.number,
+        fmt_f64(mech.pos.0),
+        fmt_f64(mech.pos.1),
+        fmt_f64(mech.width),
+        fmt_f64(mech.height),
+        mech.pad_type,
+        mech.pad_shape,
+        rratio,
+        layers,
+        fmt_f64(mech.drill),
+    )
 }
 
 fn render_component(
@@ -703,6 +776,8 @@ fn render_component(
     let constraints: Result<Vec<String>, CodegenError> =
         manifest.constraints.iter().map(constraint_expr).collect();
 
+    let mechanicals: Vec<String> = manifest.mechanical.iter().map(mechanical_expr).collect();
+
     let data = TemplateData {
         title: title.clone(),
         description: manifest.component.description.clone(),
@@ -719,6 +794,18 @@ fn render_component(
         constants,
         builders,
         constraints: constraints?,
+        mechanicals,
+        symbol_id: manifest.component.lib_id.clone(),
+        datasheet_lit: manifest
+            .component
+            .datasheet
+            .as_ref()
+            .map(|s| format!("{s:?}")),
+        description_lit: manifest
+            .component
+            .description
+            .as_ref()
+            .map(|s| format!("{s:?}")),
     };
 
     let mut out = String::new();

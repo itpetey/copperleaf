@@ -47,11 +47,23 @@ pub struct SigSpec {
     pub target_impedance: Option<Qty<Ohm>>,
 }
 
+/// A thermal via embedded within a pad (e.g. inside an exposed thermal pad).
+#[derive(Clone, Copy, Debug)]
+pub struct ThermalVia {
+    /// Position relative to the footprint origin, in millimetres.
+    pub pos: (f64, f64),
+    /// Drill diameter in millimetres.
+    pub drill: f64,
+    /// Finished pad diameter in millimetres.
+    pub size: f64,
+}
+
 /// A logical pin on a component footprint.
 #[derive(Clone, Debug)]
 pub struct Pin {
     id: PinId,
     name: String,
+    number: Option<String>,
     role: Role,
     power_spec: PowerSpec,
     decouple: bool,
@@ -59,10 +71,20 @@ pub struct Pin {
     pos: Option<(f64, f64)>,
     rotation: Option<f64>,
     length: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+    pad_type: Option<String>,
+    pad_shape: Option<String>,
+    roundrect_rratio: Option<f64>,
+    solder_mask_margin: Option<f64>,
+    layers: Option<String>,
+    drill: Option<f64>,
+    thermal_vias: Vec<ThermalVia>,
 }
 
 pub struct PinBuilder {
     name: String,
+    number: Option<String>,
     role: Option<Role>,
     power_spec: Option<PowerSpec>,
     decouple: bool,
@@ -70,6 +92,15 @@ pub struct PinBuilder {
     pos: Option<(f64, f64)>,
     rotation: Option<f64>,
     length: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+    pad_type: Option<String>,
+    pad_shape: Option<String>,
+    roundrect_rratio: Option<f64>,
+    solder_mask_margin: Option<f64>,
+    layers: Option<String>,
+    drill: Option<f64>,
+    thermal_vias: Vec<ThermalVia>,
 }
 
 /// Typed reference to a pin name constant on a component.
@@ -162,6 +193,11 @@ impl Pin {
     pub fn name(&self) -> &str {
         &self.name
     }
+    /// Physical pad/pin number as it appears in the package (e.g. `"1"` or
+    /// `"A1"`).  Defaults to the 1-based pin index when unset.
+    pub fn number(&self) -> Option<&str> {
+        self.number.as_deref()
+    }
     pub fn role(&self) -> Role {
         self.role
     }
@@ -183,12 +219,49 @@ impl Pin {
     pub fn length(&self) -> Option<f64> {
         self.length
     }
+    /// Pad width in millimetres (X dimension from KiCad `(size W H)`).
+    pub fn width(&self) -> Option<f64> {
+        self.width
+    }
+    /// Pad height in millimetres (Y dimension from KiCad `(size W H)`).
+    pub fn height(&self) -> Option<f64> {
+        self.height
+    }
+    /// KiCad pad type: `smd`, `thru_hole`, `connect`, or `np_thru_hole`.
+    pub fn pad_type(&self) -> Option<&str> {
+        self.pad_type.as_deref()
+    }
+    /// Pad shape: `rect`, `roundrect`, `circle`, `oval`, or `custom`.
+    pub fn pad_shape(&self) -> Option<&str> {
+        self.pad_shape.as_deref()
+    }
+    /// Roundrect corner radius ratio (only meaningful for `roundrect` pads).
+    pub fn roundrect_rratio(&self) -> Option<f64> {
+        self.roundrect_rratio
+    }
+    /// Solder mask margin in millimetres.
+    pub fn solder_mask_margin(&self) -> Option<f64> {
+        self.solder_mask_margin
+    }
+    /// Copper layers for this pad, e.g. `"F.Cu F.Mask F.Paste"`.
+    pub fn layers(&self) -> Option<&str> {
+        self.layers.as_deref()
+    }
+    /// Drill diameter in millimetres (thru-hole pads only).
+    pub fn drill(&self) -> Option<f64> {
+        self.drill
+    }
+    /// Thermal vias embedded within this pad.
+    pub fn thermal_vias(&self) -> &[ThermalVia] {
+        &self.thermal_vias
+    }
 }
 
 impl PinBuilder {
     fn new(name: &str) -> Self {
         Self {
             name: name.to_owned(),
+            number: None,
             role: None,
             power_spec: None,
             decouple: false,
@@ -196,11 +269,27 @@ impl PinBuilder {
             pos: None,
             rotation: None,
             length: None,
+            width: None,
+            height: None,
+            pad_type: None,
+            pad_shape: None,
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: None,
+            drill: None,
+            thermal_vias: Vec::new(),
         }
     }
 
     pub fn name(mut self, name: &str) -> Self {
         self.name = name.to_owned();
+        self
+    }
+
+    /// Physical pad/pin number as it appears in the package (e.g. `"1"` or
+    /// `"A1"`).
+    pub fn number(mut self, number: &str) -> Self {
+        self.number = Some(number.to_owned());
         self
     }
 
@@ -236,6 +325,60 @@ impl PinBuilder {
 
     pub fn length(mut self, mm: f64) -> Self {
         self.length = Some(mm);
+        self
+    }
+
+    /// Pad width in millimetres (X dimension from KiCad `(size W H)`).
+    pub fn width(mut self, mm: f64) -> Self {
+        self.width = Some(mm);
+        self
+    }
+
+    /// Pad height in millimetres (Y dimension from KiCad `(size W H)`).
+    pub fn height(mut self, mm: f64) -> Self {
+        self.height = Some(mm);
+        self
+    }
+
+    /// KiCad pad type: `smd`, `thru_hole`, `connect`, or `np_thru_hole`.
+    pub fn pad_type(mut self, pad_type: &str) -> Self {
+        self.pad_type = Some(pad_type.to_owned());
+        self
+    }
+
+    /// Pad shape: `rect`, `roundrect`, `circle`, `oval`, or `custom`.
+    pub fn pad_shape(mut self, shape: &str) -> Self {
+        self.pad_shape = Some(shape.to_owned());
+        self
+    }
+
+    /// Roundrect corner radius ratio (only for `roundrect` pads).
+    pub fn roundrect_rratio(mut self, ratio: f64) -> Self {
+        self.roundrect_rratio = Some(ratio);
+        self
+    }
+
+    /// Solder mask margin in millimetres.
+    pub fn solder_mask_margin(mut self, mm: f64) -> Self {
+        self.solder_mask_margin = Some(mm);
+        self
+    }
+
+    /// Copper layers for this pad, e.g. `"F.Cu F.Mask F.Paste"`.
+    pub fn layers(mut self, layers: &str) -> Self {
+        self.layers = Some(layers.to_owned());
+        self
+    }
+
+    /// Drill diameter in millimetres (thru-hole pads only).
+    pub fn drill(mut self, mm: f64) -> Self {
+        self.drill = Some(mm);
+        self
+    }
+
+    /// Add a thermal via embedded within this pad.
+    pub fn thermal_via(mut self, pos: (f64, f64), drill: f64, size: f64) -> Self {
+        self.thermal_vias.push(ThermalVia { pos, drill, size });
         self
     }
 
@@ -340,6 +483,7 @@ impl PinBuilder {
         Pin {
             id: PinId(String::new()),
             name: self.name,
+            number: self.number,
             role: self.role.unwrap(),
             power_spec: self.power_spec.unwrap(),
             decouple: self.decouple,
@@ -347,6 +491,15 @@ impl PinBuilder {
             pos: self.pos,
             rotation: self.rotation,
             length: self.length,
+            width: self.width,
+            height: self.height,
+            pad_type: self.pad_type,
+            pad_shape: self.pad_shape,
+            roundrect_rratio: self.roundrect_rratio,
+            solder_mask_margin: self.solder_mask_margin,
+            layers: self.layers,
+            drill: self.drill,
+            thermal_vias: self.thermal_vias,
         }
     }
 }

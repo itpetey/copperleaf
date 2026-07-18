@@ -2,15 +2,23 @@
 
 use std::collections::HashMap;
 
-use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Pin};
+use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind};
 
 use crate::{
-    common::{format_float, refdes_prefix, role_to_pin_type},
+    common::{footprint_ref, format_float, refdes_prefix, symbol_lib_id},
+    fp_geom,
+    lib_emitter::symbol_def_sexpr,
     sexpr::{Sexpr, deterministic_uuid, kv},
+    sym_layout::{self, LayoutPin, SymbolLayout},
 };
 
 /// Emit a minimal structurally-valid KiCad 10 schematic.
 pub fn emit_schematic(board: &CompiledBoard) -> String {
+    // One deterministic symbol layout per component, shared by the embedded
+    // `lib_symbols` and the wire-tip computation so they always agree.
+    let layouts: Vec<SymbolLayout> = board.components.iter().map(layout_for_comp).collect();
+    let positions = symbol_positions(&layouts);
+
     let mut children: Vec<Sexpr> = vec![
         Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260306")]),
         kv("generator", "copperleaf"),
@@ -25,7 +33,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
     ];
 
     for (idx, comp) in board.components.iter().enumerate() {
-        children.push(symbol_instance_node(idx, comp));
+        children.push(symbol_instance_node(comp, &layouts[idx], positions[idx]));
     }
 
     let mut net_conns: HashMap<&str, Vec<&Connection>> = HashMap::new();
@@ -36,7 +44,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
     for (net_name, conns) in &net_conns {
         let tips: Vec<((f64, f64), f64)> = conns
             .iter()
-            .filter_map(|conn| pin_tip_and_label(board, conn))
+            .filter_map(|conn| pin_tip_and_label(board, &layouts, &positions, conn))
             .collect();
         if tips.is_empty() {
             continue;
@@ -68,6 +76,21 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
 
     let sch = Sexpr::list(std::iter::once(Sexpr::atom("kicad_sch")).chain(children));
     format!("{}\n", sch)
+}
+
+/// Compute the symbol layout for a component from its pin roles.
+fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
+    let pins: Vec<LayoutPin> = comp
+        .pins
+        .iter()
+        .enumerate()
+        .map(|(i, p)| LayoutPin {
+            name: p.name().to_string(),
+            number: fp_geom::pin_number(p, i),
+            role: p.role(),
+        })
+        .collect();
+    sym_layout::layout_symbol(&pins)
 }
 
 fn is_power_net(board: &CompiledBoard, net_name: &str) -> bool {
@@ -108,140 +131,20 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
     ])
 }
 
-fn lib_pin_node(pin: &Pin, index: usize, total_pins: usize) -> Sexpr {
-    let pin_type = role_to_pin_type(pin.role());
-    let (x, y, rotation) = match pin.pos() {
-        Some((px, py)) => (px, py, pin.rotation().unwrap_or(180.0)),
-        None => (7.62, pin_y_offset(index, total_pins), 180.0),
-    };
-
-    Sexpr::list([
-        Sexpr::atom("pin"),
-        Sexpr::atom(pin_type),
-        Sexpr::atom("line"),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom(format_float(rotation, 0)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("length"),
-            Sexpr::atom(format_float(pin.length().unwrap_or(2.54), 2)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("name"),
-            Sexpr::str(pin.name()),
-            Sexpr::list([
-                Sexpr::atom("effects"),
-                Sexpr::list([
-                    Sexpr::atom("font"),
-                    Sexpr::list([
-                        Sexpr::atom("size"),
-                        Sexpr::atom("1.27"),
-                        Sexpr::atom("1.27"),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("number"),
-            Sexpr::str((index + 1).to_string()),
-            Sexpr::list([
-                Sexpr::atom("effects"),
-                Sexpr::list([
-                    Sexpr::atom("font"),
-                    Sexpr::list([
-                        Sexpr::atom("size"),
-                        Sexpr::atom("1.27"),
-                        Sexpr::atom("1.27"),
-                    ]),
-                ]),
-            ]),
-        ]),
-    ])
-}
-
-fn lib_property_node(key: &str, value: &str, hide: bool) -> Sexpr {
-    let mut effects_children = vec![Sexpr::list([
-        Sexpr::atom("font"),
-        Sexpr::list([
-            Sexpr::atom("size"),
-            Sexpr::atom("1.27"),
-            Sexpr::atom("1.27"),
-        ]),
-    ])];
-    if hide {
-        effects_children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    Sexpr::list([
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list(std::iter::once(Sexpr::atom("effects")).chain(effects_children)),
-    ])
-}
-
-fn lib_symbol_for_component(comp: &CompiledComponent) -> Sexpr {
-    let fallback = format!("copperleaf:{}", comp.refdes);
-    let symbol_name = comp.symbol.as_deref().unwrap_or(&fallback);
-    let fp_default = comp.footprint.as_deref().unwrap_or("");
-    let mut body = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(symbol_name),
-        Sexpr::list([
-            Sexpr::atom("pin_names"),
-            Sexpr::list([Sexpr::atom("offset"), Sexpr::atom("0")]),
-        ]),
-        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        lib_property_node("Reference", "U", false),
-        lib_property_node("Value", "Box", false),
-        lib_property_node("Footprint", fp_default, true),
-        lib_property_node("Datasheet", "", true),
-        Sexpr::list([
-            Sexpr::atom("symbol"),
-            Sexpr::str(format!("{}_0_1", comp.refdes)),
-            Sexpr::list([
-                Sexpr::atom("rectangle"),
-                Sexpr::list([
-                    Sexpr::atom("start"),
-                    Sexpr::atom("-5.08"),
-                    Sexpr::atom("-5.08"),
-                ]),
-                Sexpr::list([Sexpr::atom("end"), Sexpr::atom("5.08"), Sexpr::atom("5.08")]),
-                Sexpr::list([
-                    Sexpr::atom("stroke"),
-                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.1524")]),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("fill"),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("none")]),
-                ]),
-            ]),
-        ]),
-    ];
-
-    for (i, pin) in comp.pins.iter().enumerate() {
-        body.push(lib_pin_node(pin, i, comp.pins.len()));
-    }
-
-    Sexpr::list(body)
-}
-
+/// Embedded `lib_symbols` section: one entry per unique symbol identifier.
 fn lib_symbols_node(board: &CompiledBoard) -> Sexpr {
+    let mut seen = std::collections::HashSet::new();
     let symbols: Vec<_> = board
         .components
         .iter()
-        .map(lib_symbol_for_component)
+        .filter_map(|comp| {
+            let id = symbol_lib_id(comp);
+            if seen.insert(id.clone()) {
+                Some(symbol_def_sexpr(comp, &id))
+            } else {
+                None
+            }
+        })
         .collect();
     Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
 }
@@ -258,38 +161,20 @@ fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexp
     }
 }
 
+/// Locate the sheet position and rotation of a connected pin's tip using the
+/// same layout that produced the embedded `lib_symbols`.
 fn pin_tip_and_label(
     board: &CompiledBoard,
+    layouts: &[SymbolLayout],
+    positions: &[(f64, f64)],
     conn: &copperleaf::Connection,
 ) -> Option<((f64, f64), f64)> {
-    let comp = board.components.get(conn.component)?;
-    let pin = comp.pins.iter().find(|p| p.name() == conn.pin)?;
-    let (sym_x, sym_y) = symbol_position(conn.component);
-    let (tip_x, tip_y) = match pin.pos() {
-        Some((px, py)) => (sym_x + px, sym_y - py),
-        None => {
-            let y_off = pin_y_offset(
-                comp.pins
-                    .iter()
-                    .position(|p| p.name() == pin.name())
-                    .unwrap_or(0),
-                comp.pins.len(),
-            );
-            (sym_x + 7.62, sym_y + y_off)
-        }
-    };
-    let rotation = pin.rotation().unwrap_or(180.0);
-    Some(((tip_x, tip_y), rotation))
-}
-
-fn pin_y_offset(index: usize, total_pins: usize) -> f64 {
-    if total_pins <= 1 {
-        0.0
-    } else {
-        let spacing = 2.54;
-        let total_height = (total_pins as f64 - 1.0) * spacing;
-        -total_height / 2.0 + index as f64 * spacing
-    }
+    let layout = layouts.get(conn.component)?;
+    let (sym_x, sym_y) = positions.get(conn.component)?;
+    let _ = board;
+    let pin = layout.pins.iter().find(|p| p.name == conn.pin)?;
+    // Symbol coordinates have Y up; the sheet has Y down.
+    Some(((sym_x + pin.x, sym_y - pin.y), pin.rotation))
 }
 
 fn property_node(key: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
@@ -342,24 +227,32 @@ fn stub_end((tip_x, tip_y): (f64, f64), rotation: f64) -> (f64, f64) {
     }
 }
 
-fn symbol_instance_node(idx: usize, comp: &CompiledComponent) -> Sexpr {
-    let (x, y) = symbol_position(idx);
-    let fallback = format!("copperleaf:{}", comp.refdes);
-    let lib_id = comp.symbol.as_deref().unwrap_or(&fallback);
+fn symbol_instance_node(
+    comp: &CompiledComponent,
+    layout: &SymbolLayout,
+    pos: (f64, f64),
+) -> Sexpr {
+    let (x, y) = pos;
+    let lib_id = symbol_lib_id(comp);
+    let fp_value = footprint_ref(comp);
 
-    let mut properties = vec![
-        property_node("Reference", &comp.refdes, x, y - 6.35, false),
-        property_node("Value", &refdes_prefix(&comp.refdes), x, y + 6.35, false),
+    let properties = vec![
+        property_node("Reference", &comp.refdes, x, y - layout.y1 - 1.27, false),
+        property_node(
+            "Value",
+            &refdes_prefix(&comp.refdes),
+            x,
+            y - layout.y2 + 1.27,
+            false,
+        ),
+        property_node("Footprint", &fp_value, x, y, true),
     ];
-    if let Some(fp) = &comp.footprint {
-        properties.push(property_node("Footprint", fp, x, y, true));
-    }
 
     Sexpr::list(
         std::iter::once(Sexpr::atom("symbol"))
             .chain(std::iter::once(Sexpr::list([
                 Sexpr::atom("lib_id"),
-                Sexpr::str(lib_id),
+                Sexpr::str(&lib_id),
             ])))
             .chain(std::iter::once(Sexpr::list([
                 Sexpr::atom("at"),
@@ -404,11 +297,40 @@ fn symbol_instance_node(idx: usize, comp: &CompiledComponent) -> Sexpr {
     )
 }
 
-fn symbol_position(idx: usize) -> (f64, f64) {
-    const GRID: f64 = 25.4;
-    let x = GRID + (idx as f64 % 10.0) * GRID;
-    let y = GRID + (idx as f64 / 10.0).floor() * GRID;
-    (x, y)
+/// Row-pack symbol instances on the sheet, keeping every origin on the
+/// 2.54 mm connection grid so pin tips always land on-grid.
+fn symbol_positions(layouts: &[SymbolLayout]) -> Vec<(f64, f64)> {
+    const START: f64 = 25.4;
+    const GAP: f64 = 12.7;
+    const MAX_X: f64 = 300.0;
+    const MARGIN: f64 = sym_layout::PIN_LENGTH + 2.54;
+
+    let mut out = Vec::with_capacity(layouts.len());
+    let mut cursor_x = START;
+    let mut cursor_y = START;
+    let mut row_height: f64 = 0.0;
+
+    for l in layouts {
+        let w = (l.x2 - l.x1) + 2.0 * MARGIN;
+        let h = (l.y1 - l.y2) + 2.0 * MARGIN;
+
+        if cursor_x + w > MAX_X && cursor_x > START {
+            cursor_x = START;
+            cursor_y += row_height + GAP;
+            row_height = 0.0;
+        }
+
+        // Origin such that the symbol extent (body plus pin stubs) lands at
+        // the cursor; sheet Y is down, so the top edge is origin_y - y1.
+        let origin_x = cursor_x + MARGIN - l.x1;
+        let origin_y = cursor_y + MARGIN + l.y1;
+        out.push((origin_x, origin_y));
+
+        cursor_x += w + GAP;
+        row_height = row_height.max(h);
+    }
+
+    out
 }
 
 fn title_block_node() -> Sexpr {
@@ -454,17 +376,19 @@ fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{CompiledComponent, Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{Connection, Net, NetClass, NetId, Pin, UnitExt};
 
-    #[test]
-    fn schematic_starts_with_kicad_sch() {
-        let board = CompiledBoard {
+    fn test_board() -> CompiledBoard {
+        CompiledBoard {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
-                pins: vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
+                pins: vec![Pin::build("VDD").number("1").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
                 constraints: vec![],
                 symbol: Some("MCU:RP2354a".into()),
                 footprint: Some("Package_QFP:LQFP-64".into()),
+                mechanical: vec![],
+                datasheet: None,
+                description: None,
             }],
             nets: vec![Net {
                 name: "V3V3".into(),
@@ -481,10 +405,51 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
-        };
-        let out = emit_schematic(&board);
+        }
+    }
+
+    #[test]
+    fn schematic_starts_with_kicad_sch() {
+        let out = emit_schematic(&test_board());
         assert!(out.starts_with("(kicad_sch"));
         assert!(out.contains("MCU:RP2354a"));
         assert!(out.contains("Package_QFP:LQFP-64"));
+    }
+
+    #[test]
+    fn lib_symbols_deduplicated() {
+        let mut board = test_board();
+        let mut comp2 = board.components[0].clone();
+        comp2.refdes = "U2".into();
+        board.components.push(comp2);
+        let out = emit_schematic(&board);
+        // Only one embedded definition of MCU:RP2354a, two instances.
+        assert_eq!(out.matches("(symbol \"MCU:RP2354a\"").count(), 1, "{}", out);
+        assert_eq!(out.matches("(lib_id \"MCU:RP2354a\")").count(), 2, "{}", out);
+    }
+
+    #[test]
+    fn project_local_symbols_get_copperleaf_prefix() {
+        let mut board = test_board();
+        board.components[0].symbol = Some("RP2354A".into());
+        let out = emit_schematic(&board);
+        assert!(out.contains("(lib_id \"copperleaf:RP2354A\")"), "{}", out);
+        assert!(out.contains("(symbol \"copperleaf:RP2354A\""), "{}", out);
+    }
+
+    #[test]
+    fn pin_tips_match_embedded_symbol() {
+        let board = test_board();
+        let layouts: Vec<SymbolLayout> = board.components.iter().map(layout_for_comp).collect();
+        let positions = symbol_positions(&layouts);
+        let conn = &board.connections[0];
+        let ((tip_x, tip_y), _rot) = pin_tip_and_label(&board, &layouts, &positions, conn).unwrap();
+        // VDD is a power pin on the top edge (rotation 270), so the tip is
+        // above the symbol origin on the sheet.
+        let (ox, oy) = positions[0];
+        assert!(tip_y < oy, "top pin tip should be above origin: {tip_y} vs {oy}");
+        let pin = layouts[0].pins.iter().find(|p| p.name == "VDD").unwrap();
+        assert!((tip_x - (ox + pin.x)).abs() < 1e-9);
+        assert!((tip_y - (oy - pin.y)).abs() < 1e-9);
     }
 }

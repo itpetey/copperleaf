@@ -181,6 +181,9 @@ mod tests {
             constraints,
             symbol: None,
             footprint: None,
+            mechanical: vec![],
+            datasheet: None,
+            description: None,
         }
     }
 

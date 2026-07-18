@@ -382,6 +382,9 @@ fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
                 constraints: entry.component.constraints(),
                 symbol: entry.component.symbol().map(|s| s.to_owned()),
                 footprint: entry.component.footprint().map(|s| s.to_owned()),
+                mechanical: entry.component.mechanical().to_vec(),
+                datasheet: entry.component.datasheet().map(|s| s.to_owned()),
+                description: entry.component.description().map(|s| s.to_owned()),
             }
         })
         .collect()
@@ -489,6 +492,9 @@ fn make_capacitor_component(refdes: &str) -> CompiledComponent {
         constraints: vec![],
         symbol: None,
         footprint: None,
+        mechanical: vec![],
+        datasheet: None,
+        description: None,
     }
 }
 
@@ -789,6 +795,9 @@ mod tests {
             constraints,
             symbol: None,
             footprint: None,
+            mechanical: vec![],
+            datasheet: None,
+            description: None,
         }
     }
 

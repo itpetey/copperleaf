@@ -5,12 +5,13 @@ use std::collections::HashMap;
 use copperleaf::{CompiledBoard, NetClass};
 
 use crate::{
-    common::{build_net_codes, fmt_mm, format_float},
+    common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
+    fp_geom,
     sexpr::{Sexpr, deterministic_uuid, kv},
 };
 
 /// Emit a KiCad S-expression PCB file for the given compiled board.
-pub fn emit_pcb(board: &CompiledBoard) -> String {
+pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
     let net_codes = build_net_codes(board);
     let net_to_code: HashMap<&str, usize> = net_codes
         .iter()
@@ -24,7 +25,7 @@ pub fn emit_pcb(board: &CompiledBoard) -> String {
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
-        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20241229")]),
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260206")]),
         kv("generator", "copperleaf"),
         kv("generator_version", "10.0"),
         general_node(),
@@ -44,12 +45,63 @@ pub fn emit_pcb(board: &CompiledBoard) -> String {
     children.extend(net_class_nodes(board, &net_codes));
     children.extend(board_outline());
 
+    // Auto-place components in rows, packing by their courtyard extents so
+    // footprints do not overlap.
+    let placements = auto_place(board);
+
     for (idx, comp) in board.components.iter().enumerate() {
-        children.push(footprint_node(idx, comp, &pin_to_net, &net_to_code));
+        children.push(footprint_node(
+            idx,
+            comp,
+            placements[idx],
+            &pin_to_net,
+            &net_to_code,
+            project_name,
+        ));
     }
 
     let pcb = Sexpr::list(std::iter::once(Sexpr::atom("kicad_pcb")).chain(children));
     format!("{}\n", pcb)
+}
+
+/// Simple row packing: place footprints left-to-right with a gap, wrapping
+/// before they cross the board outline.  Positions are footprint origins.
+fn auto_place(board: &CompiledBoard) -> Vec<(f64, f64)> {
+    const START_X: f64 = 10.0;
+    const START_Y: f64 = 10.0;
+    const MAX_X: f64 = 95.0;
+    const GAP: f64 = 5.0;
+
+    let mut placements = Vec::with_capacity(board.components.len());
+    let mut cursor_x = START_X;
+    let mut cursor_y = START_Y;
+    let mut row_height: f64 = 0.0;
+
+    for comp in &board.components {
+        let pads = fp_geom::pads_from_component(comp);
+        let (w, h, off_x, off_y) = match fp_geom::pads_extent(&pads) {
+            Some((x1, y1, x2, y2)) => (
+                x2 - x1 + 1.0,
+                y2 - y1 + 1.0,
+                // Offset so the extent's top-left lands at the cursor.
+                -x1 + 0.5,
+                -y1 + 0.5,
+            ),
+            None => (5.0, 5.0, 2.5, 2.5),
+        };
+
+        if cursor_x + w > MAX_X && cursor_x > START_X {
+            cursor_x = START_X;
+            cursor_y += row_height + GAP;
+            row_height = 0.0;
+        }
+
+        placements.push((cursor_x + off_x, cursor_y + off_y));
+        cursor_x += w + GAP;
+        row_height = row_height.max(h);
+    }
+
+    placements
 }
 
 fn board_outline() -> Vec<Sexpr> {
@@ -91,191 +143,125 @@ fn board_outline() -> Vec<Sexpr> {
 fn footprint_node(
     idx: usize,
     comp: &copperleaf::CompiledComponent,
+    at: (f64, f64),
     pin_to_net: &HashMap<(usize, &str), &str>,
     net_to_code: &HashMap<&str, usize>,
+    project_name: &str,
 ) -> Sexpr {
-    const PITCH: f64 = 10.0;
-    let x = 10.0 + (idx as f64 % 10.0) * PITCH;
-    let y = 10.0 + (idx as f64 / 10.0).floor() * PITCH;
-
-    let n_pins = comp.pins.len();
-    let pad_span = if n_pins == 0 {
-        0.0
-    } else {
-        (n_pins as f64 - 1.0) * 2.54
-    };
-    let body_w = pad_span + 2.0 * (0.762 + 0.5);
-    let body_h = 2.0 * (0.762 + 0.5);
-    let half_w = body_w / 2.0;
-    let body_cx = pad_span / 2.0;
+    let pads = fp_geom::pads_from_component(comp);
+    let extent = fp_geom::pads_extent(&pads);
 
     let fp_uuid = deterministic_uuid(&format!("pcb:{}", comp.refdes));
-    let fp_name = comp.footprint.as_deref().unwrap_or("copperleaf:Generic");
+    let fp_name = footprint_ref(comp);
+    let seed = format!("pcb:{}", comp.refdes);
+
+    // Text positions relative to the footprint origin.
+    let (ref_y, val_y) = match extent {
+        Some((x1, y1, _, y2)) => {
+            let _ = x1;
+            (y1 - 1.52, y2 + 1.52)
+        }
+        None => (-2.54, 2.54),
+    };
 
     let mut children = vec![
         Sexpr::atom("footprint"),
-        Sexpr::str(fp_name),
-        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
+        Sexpr::str(&fp_name),
         Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.Cu")]),
+        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
         Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom(format_grid_float(at.0)),
+            Sexpr::atom(format_grid_float(at.1)),
             Sexpr::atom("0"),
         ]),
-        fp_text_node(
-            "reference",
-            &comp.refdes,
-            body_cx,
-            -body_h / 2.0 - 1.0,
-            "F.SilkS",
-            &format!("{}:ref", fp_uuid),
-        ),
-        fp_text_node(
-            "value",
+        // Hidden metadata properties (KiCad 9+ stores Reference/Value as properties).
+        footprint_property("Reference", &comp.refdes, 0.0, ref_y, true),
+        footprint_property(
+            "Value",
             &crate::common::refdes_prefix(&comp.refdes),
-            body_cx,
-            body_h / 2.0 + 1.0,
-            "F.Fab",
-            &format!("{}:val", fp_uuid),
+            0.0,
+            val_y,
+            true,
         ),
+        // Visible text using KiCad variables.
+        fp_geom::fp_text("user", "${REFERENCE}", (0.0, ref_y), "F.SilkS"),
+        fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
+        // Path linkage to schematic symbol.
+        Sexpr::list([
+            Sexpr::atom("path"),
+            Sexpr::str(&format!("/{}", fp_uuid)),
+        ]),
+        Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
+        Sexpr::list([
+            Sexpr::atom("sheetfile"),
+            Sexpr::str(&format!("{}.kicad_sch", project_name)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("attr"),
+            Sexpr::atom(fp_geom::footprint_attr(&pads)),
+        ]),
     ];
 
-    let x1 = body_cx - half_w;
-    let y1 = -body_h / 2.0;
-    let x2 = body_cx + half_w;
-    let y2 = body_h / 2.0;
-    let seed = format!("pcb:{}:outline", comp.refdes);
-    children.push(fp_line(
-        (x1, y1),
-        (x2, y1),
-        "F.SilkS",
-        &format!("{}_top", seed),
-    ));
-    children.push(fp_line(
-        (x2, y1),
-        (x2, y2),
-        "F.SilkS",
-        &format!("{}_right", seed),
-    ));
-    children.push(fp_line(
-        (x2, y2),
-        (x1, y2),
-        "F.SilkS",
-        &format!("{}_bot", seed),
-    ));
-    children.push(fp_line(
-        (x1, y2),
-        (x1, y1),
-        "F.SilkS",
-        &format!("{}_left", seed),
-    ));
-
-    for (i, pin) in comp.pins.iter().enumerate() {
-        let pad_x = i as f64 * 2.54;
-        let pad_y = 0.0;
-        let pad_num = (i + 1).to_string();
-        let pad_uuid = deterministic_uuid(&format!("pcb:{}:pad{}", comp.refdes, pad_num));
-        let mut pad_children = vec![
-            Sexpr::atom("pad"),
-            Sexpr::str(&pad_num),
-            Sexpr::atom("thru_hole"),
-            Sexpr::atom("circle"),
-            Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom(format_float(pad_x, 2)),
-                Sexpr::atom(format_float(pad_y, 2)),
-                Sexpr::atom("0"),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.524"),
-                Sexpr::atom("1.524"),
-            ]),
-            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom("0.762")]),
-            Sexpr::list([
-                Sexpr::atom("layers"),
-                Sexpr::str("*.Cu"),
-                Sexpr::str("*.Mask"),
-            ]),
-            Sexpr::list([Sexpr::atom("remove_unused_layers"), Sexpr::atom("no")]),
-            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&pad_uuid)]),
-        ];
-        if let Some(&net_name) = pin_to_net.get(&(idx, pin.name()))
-            && let Some(&code) = net_to_code.get(net_name)
-        {
-            pad_children.push(Sexpr::list([
-                Sexpr::atom("net"),
-                Sexpr::atom(code.to_string()),
-                Sexpr::str(net_name),
-            ]));
+    // Outlines (fab, silk, courtyard, pin-1 marker).
+    if let Some(ext) = extent {
+        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed)) {
+            children.push(node);
         }
-        children.push(Sexpr::list(pad_children));
+    }
+
+    // Pads with net associations.
+    for pad in &pads {
+        let pad_uuid = deterministic_uuid(&format!("{}:pad:{}", seed, pad.number));
+        let net = pad.pin_index.and_then(|i| {
+            let pin = &comp.pins[i];
+            pin_to_net
+                .get(&(idx, pin.name()))
+                .and_then(|&net_name| net_to_code.get(net_name).map(|&code| (code, net_name)))
+        });
+        children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
     }
 
     Sexpr::list(children)
 }
 
-fn fp_line(from: (f64, f64), to: (f64, f64), layer: &str, uuid_seed: &str) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("fp_line"),
-        Sexpr::list([
-            Sexpr::atom("start"),
-            Sexpr::atom(format_float(from.0, 2)),
-            Sexpr::atom(format_float(from.1, 2)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("end"),
-            Sexpr::atom(format_float(to.0, 2)),
-            Sexpr::atom(format_float(to.1, 2)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("stroke"),
-            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.12")]),
-            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
-        ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
-        Sexpr::list([
-            Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(uuid_seed)),
-        ]),
-    ])
-}
-
-fn fp_text_node(
-    text_type: &str,
-    text: &str,
-    x: f64,
-    y: f64,
-    layer: &str,
-    uuid_seed: &str,
-) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("fp_text"),
-        Sexpr::atom(text_type),
-        Sexpr::str(text),
+/// Hidden footprint property node for KiCad 9+ metadata (Reference, Value, etc.).
+fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
+    let prop_uuid = deterministic_uuid(&format!("pcb:prop:{}:{}", name, value));
+    let mut prop = vec![
+        Sexpr::atom("property"),
+        Sexpr::str(name),
+        Sexpr::str(value),
         Sexpr::list([
             Sexpr::atom("at"),
             Sexpr::atom(format_float(x, 2)),
             Sexpr::atom(format_float(y, 2)),
             Sexpr::atom("0"),
         ]),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str("F.SilkS")]),
+    ];
+    if hide {
+        prop.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    prop.push(Sexpr::list([
+        Sexpr::atom("uuid"),
+        Sexpr::str(&prop_uuid),
+    ]));
+    prop.push(Sexpr::list([
+        Sexpr::atom("effects"),
         Sexpr::list([
-            Sexpr::atom("effects"),
+            Sexpr::atom("font"),
             Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
-                Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
+                Sexpr::atom("size"),
+                Sexpr::atom("1.0"),
+                Sexpr::atom("1.0"),
             ]),
-            Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+            Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
         ]),
-        Sexpr::list([
-            Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(uuid_seed)),
-        ]),
-    ])
+        Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
+    ]));
+    Sexpr::list(prop)
 }
 
 fn general_node() -> Sexpr {
@@ -286,55 +272,26 @@ fn general_node() -> Sexpr {
     ])
 }
 
+/// Layer table using KiCad's canonical (fixed) layer IDs.
 fn layers_node() -> Sexpr {
     Sexpr::list([
         Sexpr::atom("layers"),
         Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("2"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("1"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("3"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("13"),
-            Sexpr::str("F.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("15"),
-            Sexpr::str("B.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("5"),
-            Sexpr::str("F.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("7"),
-            Sexpr::str("B.SilkS"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Silkscreen"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("25"),
-            Sexpr::str("Edge.Cuts"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("27"), Sexpr::str("Margin"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("31"),
-            Sexpr::str("F.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("F.Courtyard"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("29"),
-            Sexpr::str("B.CrtYd"),
-            Sexpr::atom("user"),
-            Sexpr::str("B.Courtyard"),
-        ]),
-        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("33"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("31"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
+        Sexpr::list([Sexpr::atom("32"), Sexpr::str("B.Adhes"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("33"), Sexpr::str("F.Adhes"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("34"), Sexpr::str("B.Paste"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Paste"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("36"), Sexpr::str("B.SilkS"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("37"), Sexpr::str("F.SilkS"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("38"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("39"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("44"), Sexpr::str("Edge.Cuts"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("45"), Sexpr::str("Margin"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("46"), Sexpr::str("B.CrtYd"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("47"), Sexpr::str("F.CrtYd"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("48"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
+        Sexpr::list([Sexpr::atom("49"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
     ])
 }
 
@@ -408,15 +365,27 @@ mod tests {
     use super::*;
     use copperleaf::{CompiledComponent, Connection, Net, NetClass, NetId, NetKind, Pin, UnitExt};
 
-    #[test]
-    fn pcb_starts_with_kicad_pcb() {
-        let board = CompiledBoard {
+    fn test_board() -> CompiledBoard {
+        CompiledBoard {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
-                pins: vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
+                pins: vec![
+                    Pin::build("VDD")
+                        .number("1")
+                        .pos(-1.0, 0.0)
+                        .width(0.6)
+                        .height(1.2)
+                        .pad_type("smd")
+                        .pwr_fixed(3.3.volt(), 0.1.amp())
+                        .pin(),
+                    Pin::build("GND").number("2").pos(1.0, 0.0).width(0.6).height(1.2).pad_type("smd").gnd(),
+                ],
                 constraints: vec![],
                 symbol: None,
                 footprint: None,
+                mechanical: vec![],
+                datasheet: None,
+                description: None,
             }],
             nets: vec![Net {
                 name: "V3V3".into(),
@@ -433,10 +402,36 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
-        };
-        let out = emit_pcb(&board);
+        }
+    }
+
+    #[test]
+    fn pcb_starts_with_kicad_pcb() {
+        let out = emit_pcb(&test_board(), "test");
         assert!(out.starts_with("(kicad_pcb"));
         assert!(out.contains("(net_class \"Default\""));
         assert!(out.contains("(footprint"));
+    }
+
+    #[test]
+    fn pcb_embeds_real_pads() {
+        let out = emit_pcb(&test_board(), "test");
+        // SMD pad with the declared geometry, not a generic through-hole.
+        assert!(out.contains("(pad \"1\" smd rect"), "{}", out);
+        assert!(out.contains("(at -1 0)"), "{}", out);
+        assert!(out.contains("(size 0.6 1.2)"), "{}", out);
+        assert!(out.contains("(attr smd)"), "{}", out);
+        // Net attached to pad 1.
+        assert!(out.contains("(net 1 \"V3V3\")"), "{}", out);
+        // Project-local footprint reference.
+        assert!(out.contains("(footprint \"copperleaf:U1\""), "{}", out);
+    }
+
+    #[test]
+    fn pcb_uses_canonical_layer_ids() {
+        let out = emit_pcb(&test_board(), "test");
+        assert!(out.contains("(31 \"B.Cu\" signal)"), "{}", out);
+        assert!(out.contains("(44 \"Edge.Cuts\" user)"), "{}", out);
+        assert!(out.contains("(47 \"F.CrtYd\" user)"), "{}", out);
     }
 }

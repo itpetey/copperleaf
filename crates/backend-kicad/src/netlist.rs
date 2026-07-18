@@ -83,11 +83,17 @@ fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
 }
 
 fn node_sexpr(board: &CompiledBoard, conn: &copperleaf::Connection) -> Sexpr {
-    let mut children = vec![Sexpr::atom("node"), kv("ref", conn.component.to_string())];
     let comp = board.components.get(conn.component);
-    let pin = comp.and_then(|c| c.pins.iter().find(|p| p.name() == conn.pin));
-    if let Some(pin) = pin {
-        children.push(kv("pin", pin.name()));
+    let refdes = comp.map(|c| c.refdes.as_str()).unwrap_or("");
+    let mut children = vec![Sexpr::atom("node"), kv("ref", refdes)];
+    let pin = comp.and_then(|c| {
+        c.pins
+            .iter()
+            .enumerate()
+            .find(|(_, p)| p.name() == conn.pin)
+    });
+    if let Some((i, pin)) = pin {
+        children.push(kv("pin", crate::fp_geom::pin_number(pin, i)));
         children.push(kv("pinfunction", pin.name()));
         children.push(kv("pintype", role_to_pintype(pin.role())));
     } else {
@@ -113,6 +119,9 @@ mod tests {
                     constraints: vec![],
                     symbol: None,
                     footprint: None,
+                    mechanical: vec![],
+                    datasheet: None,
+                    description: None,
                 },
                 copperleaf::CompiledComponent {
                     refdes: "U2".into(),
@@ -123,6 +132,9 @@ mod tests {
                     constraints: vec![],
                     symbol: None,
                     footprint: None,
+                    mechanical: vec![],
+                    datasheet: None,
+                    description: None,
                 },
             ],
             nets: vec![
