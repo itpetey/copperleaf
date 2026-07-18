@@ -637,6 +637,31 @@ fn load_template(path: &str) -> Result<MustacheRenderer, CodegenError> {
     Ok(MustacheRenderer(manager))
 }
 
+/// Build the Rust expression constructing a [`copperleaf::MechanicalPad`].
+fn mechanical_expr(mech: &MechanicalDef) -> String {
+    let rratio = match mech.roundrect_rratio {
+        Some(rr) => format!("Some({})", fmt_f64(rr)),
+        None => "None".to_string(),
+    };
+    let layers = match &mech.layers {
+        Some(l) => format!("Some({:?}.into())", l),
+        None => "None".to_string(),
+    };
+    format!(
+        "copperleaf::MechanicalPad {{ number: {:?}.into(), pos: ({}, {}), width: {}, height: {}, pad_type: {:?}.into(), pad_shape: {:?}.into(), roundrect_rratio: {}, layers: {}, drill: {} }}",
+        mech.number,
+        fmt_f64(mech.pos.0),
+        fmt_f64(mech.pos.1),
+        fmt_f64(mech.width),
+        fmt_f64(mech.height),
+        mech.pad_type,
+        mech.pad_shape,
+        rratio,
+        layers,
+        fmt_f64(mech.drill),
+    )
+}
+
 fn module_name(path: &Path) -> Result<String, CodegenError> {
     let stem = path
         .file_stem()
@@ -704,31 +729,6 @@ fn physical_suffix(pin: &PinDef) -> String {
         ));
     }
     suffix
-}
-
-/// Build the Rust expression constructing a [`copperleaf::MechanicalPad`].
-fn mechanical_expr(mech: &MechanicalDef) -> String {
-    let rratio = match mech.roundrect_rratio {
-        Some(rr) => format!("Some({})", fmt_f64(rr)),
-        None => "None".to_string(),
-    };
-    let layers = match &mech.layers {
-        Some(l) => format!("Some({:?}.into())", l),
-        None => "None".to_string(),
-    };
-    format!(
-        "copperleaf::MechanicalPad {{ number: {:?}.into(), pos: ({}, {}), width: {}, height: {}, pad_type: {:?}.into(), pad_shape: {:?}.into(), roundrect_rratio: {}, layers: {}, drill: {} }}",
-        mech.number,
-        fmt_f64(mech.pos.0),
-        fmt_f64(mech.pos.1),
-        fmt_f64(mech.width),
-        fmt_f64(mech.height),
-        mech.pad_type,
-        mech.pad_shape,
-        rratio,
-        layers,
-        fmt_f64(mech.drill),
-    )
 }
 
 fn render_component(

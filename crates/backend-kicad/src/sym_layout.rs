@@ -49,9 +49,33 @@ pub struct SymbolLayout {
     pub pins: Vec<PlacedPin>,
 }
 
-/// True for pin names that conventionally indicate an exposed thermal pad.
-fn is_thermal_name(name: &str) -> bool {
-    name.eq_ignore_ascii_case("EXP") || name.eq_ignore_ascii_case("EP") || name.eq_ignore_ascii_case("PAD")
+/// Build the body `(rectangle ...)` S-expression for a layout.
+pub fn body_rect_sexpr(layout: &SymbolLayout) -> crate::sexpr::Sexpr {
+    use crate::common::format_float;
+    use crate::sexpr::Sexpr;
+
+    Sexpr::list([
+        Sexpr::atom("rectangle"),
+        Sexpr::list([
+            Sexpr::atom("start"),
+            Sexpr::atom(format_float(layout.x1, 2)),
+            Sexpr::atom(format_float(layout.y1, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("end"),
+            Sexpr::atom(format_float(layout.x2, 2)),
+            Sexpr::atom(format_float(layout.y2, 2)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("stroke"),
+            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.254")]),
+            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("fill"),
+            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("background")]),
+        ]),
+    ])
 }
 
 /// Lay out `pins` as a boxed symbol.
@@ -218,33 +242,11 @@ pub fn placed_pin_sexpr(pin: &PlacedPin) -> crate::sexpr::Sexpr {
     ])
 }
 
-/// Build the body `(rectangle ...)` S-expression for a layout.
-pub fn body_rect_sexpr(layout: &SymbolLayout) -> crate::sexpr::Sexpr {
-    use crate::common::format_float;
-    use crate::sexpr::Sexpr;
-
-    Sexpr::list([
-        Sexpr::atom("rectangle"),
-        Sexpr::list([
-            Sexpr::atom("start"),
-            Sexpr::atom(format_float(layout.x1, 2)),
-            Sexpr::atom(format_float(layout.y1, 2)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("end"),
-            Sexpr::atom(format_float(layout.x2, 2)),
-            Sexpr::atom(format_float(layout.y2, 2)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("stroke"),
-            Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.254")]),
-            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("default")]),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("fill"),
-            Sexpr::list([Sexpr::atom("type"), Sexpr::atom("background")]),
-        ]),
-    ])
+/// True for pin names that conventionally indicate an exposed thermal pad.
+fn is_thermal_name(name: &str) -> bool {
+    name.eq_ignore_ascii_case("EXP")
+        || name.eq_ignore_ascii_case("EP")
+        || name.eq_ignore_ascii_case("PAD")
 }
 
 #[cfg(test)]
@@ -320,12 +322,7 @@ mod tests {
         let mut positions: Vec<(i64, i64)> = layout
             .pins
             .iter()
-            .map(|p| {
-                (
-                    (p.x * 100.0).round() as i64,
-                    (p.y * 100.0).round() as i64,
-                )
-            })
+            .map(|p| ((p.x * 100.0).round() as i64, (p.y * 100.0).round() as i64))
             .collect();
         positions.sort();
         positions.dedup();

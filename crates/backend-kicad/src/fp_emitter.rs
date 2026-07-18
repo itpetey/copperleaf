@@ -5,8 +5,10 @@
 
 use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
 
-use crate::fp_geom::{self, PadGeom};
-use crate::sexpr::Sexpr;
+use crate::{
+    fp_geom::{self, PadGeom},
+    sexpr::Sexpr,
+};
 
 /// Generate a `.kicad_mod` S-expression string from a component manifest.
 ///
@@ -26,12 +28,21 @@ pub fn emit_footprint(manifest: &Manifest) -> String {
 
     // Footprint header.
     children.push(Sexpr::str(name));
-    children.push(Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20231218")]));
-    children.push(Sexpr::list([Sexpr::atom("generator"), Sexpr::str("copperleaf")]));
+    children.push(Sexpr::list([
+        Sexpr::atom("version"),
+        Sexpr::atom("20231218"),
+    ]));
+    children.push(Sexpr::list([
+        Sexpr::atom("generator"),
+        Sexpr::str("copperleaf"),
+    ]));
     children.push(Sexpr::list([Sexpr::atom("layer"), Sexpr::atom("F.Cu")]));
     children.push(Sexpr::list([Sexpr::atom("tedit"), Sexpr::atom("00000000")]));
     // KLC F9.1: the description should carry the datasheet URL when known.
-    let descr = match (&manifest.component.description, &manifest.component.datasheet) {
+    let descr = match (
+        &manifest.component.description,
+        &manifest.component.datasheet,
+    ) {
         (Some(d), Some(url)) => format!("{}, {}", d, url),
         (Some(d), None) => d.clone(),
         (None, Some(url)) => url.clone(),
@@ -49,7 +60,12 @@ pub fn emit_footprint(manifest: &Manifest) -> String {
         Some((x1, y1, x2, y2)) => ((x1 + x2) / 2.0, y1 - 1.52, y2 + 1.52),
         None => (0.0, -2.54, 2.54),
     };
-    children.push(fp_geom::fp_text("reference", "REF**", (cx, ref_y), "F.SilkS"));
+    children.push(fp_geom::fp_text(
+        "reference",
+        "REF**",
+        (cx, ref_y),
+        "F.SilkS",
+    ));
     children.push(fp_geom::fp_text("value", name, (cx, val_y), "F.Fab"));
     children.push(fp_geom::fp_text("user", "${REFERENCE}", (cx, 0.0), "F.Fab"));
 
@@ -97,43 +113,6 @@ pub fn pads_from_manifest(manifest: &Manifest) -> Vec<PadGeom> {
     pads
 }
 
-fn pad_from_pin_def(pin: &PinDef, index: usize) -> PadGeom {
-    let pos = pin.pos.unwrap_or_else(|| fp_geom::auto_pad_pos(index));
-    let number = if pin.number.is_empty() {
-        pin.num.to_string()
-    } else {
-        pin.number.clone()
-    };
-    let pad_type = pin.pad_type.clone().unwrap_or_else(|| "smd".to_string());
-    let default_shape = if pin.pos.is_some() || pad_type != "thru_hole" {
-        "rect"
-    } else if index == 0 {
-        "rect"
-    } else {
-        "circle"
-    };
-    PadGeom {
-        number,
-        pos,
-        rotation: pin.rotation.unwrap_or(0.0),
-        width: pin.width.or(pin.length).unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
-        height: pin.height.or(pin.length).unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
-        pad_type: pad_type.clone(),
-        shape: pin.pad_shape.clone().unwrap_or_else(|| default_shape.to_string()),
-        roundrect_rratio: pin.roundrect_rratio,
-        layers: pin.layers.clone().unwrap_or_else(|| {
-            if pad_type == "thru_hole" || pad_type == "np_thru_hole" {
-                fp_geom::PTH_LAYERS.to_string()
-            } else {
-                fp_geom::SMD_LAYERS.to_string()
-            }
-        }),
-        drill: pin.drill,
-        solder_mask_margin: pin.solder_mask_margin,
-        pin_index: Some(index),
-    }
-}
-
 fn pad_from_mechanical_def(mech: &MechanicalDef) -> PadGeom {
     // KiCad writes un-numbered pads as `(pad "" ...)`; normalise the legacy
     // `"None"` marker to an empty number.
@@ -162,6 +141,52 @@ fn pad_from_mechanical_def(mech: &MechanicalDef) -> PadGeom {
         },
         solder_mask_margin: None,
         pin_index: None,
+    }
+}
+
+fn pad_from_pin_def(pin: &PinDef, index: usize) -> PadGeom {
+    let pos = pin.pos.unwrap_or_else(|| fp_geom::auto_pad_pos(index));
+    let number = if pin.number.is_empty() {
+        pin.num.to_string()
+    } else {
+        pin.number.clone()
+    };
+    let pad_type = pin.pad_type.clone().unwrap_or_else(|| "smd".to_string());
+    let default_shape = if pin.pos.is_some() || pad_type != "thru_hole" {
+        "rect"
+    } else if index == 0 {
+        "rect"
+    } else {
+        "circle"
+    };
+    PadGeom {
+        number,
+        pos,
+        rotation: pin.rotation.unwrap_or(0.0),
+        width: pin
+            .width
+            .or(pin.length)
+            .unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
+        height: pin
+            .height
+            .or(pin.length)
+            .unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
+        pad_type: pad_type.clone(),
+        shape: pin
+            .pad_shape
+            .clone()
+            .unwrap_or_else(|| default_shape.to_string()),
+        roundrect_rratio: pin.roundrect_rratio,
+        layers: pin.layers.clone().unwrap_or_else(|| {
+            if pad_type == "thru_hole" || pad_type == "np_thru_hole" {
+                fp_geom::PTH_LAYERS.to_string()
+            } else {
+                fp_geom::SMD_LAYERS.to_string()
+            }
+        }),
+        drill: pin.drill,
+        solder_mask_margin: pin.solder_mask_margin,
+        pin_index: Some(index),
     }
 }
 

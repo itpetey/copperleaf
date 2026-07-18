@@ -4,7 +4,11 @@
 //! [`CompiledBoard`], as well as standalone symbol and footprint library
 //! files in `symbols/` and `footprints/` subdirectories.
 
-use std::{collections::{HashMap, HashSet}, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
 
 use copperleaf::{Backend, BackendError, CompiledBoard};
 
@@ -62,8 +66,7 @@ impl Backend for KiCad {
 
         // ── group components by symbol library nickname ───────────
         let mut symbol_lib_nicks: Vec<String> = Vec::new();
-        let mut lib_groups: HashMap<String, Vec<&copperleaf::CompiledComponent>> =
-            HashMap::new();
+        let mut lib_groups: HashMap<String, Vec<&copperleaf::CompiledComponent>> = HashMap::new();
         for comp in &board.components {
             let lib_name = common::symbol_lib_nick(comp);
             lib_groups.entry(lib_name).or_default().push(comp);
@@ -200,7 +203,10 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
             .collect();
-        assert!(!sym_files.is_empty(), "symbols/ directory should not be empty");
+        assert!(
+            !sym_files.is_empty(),
+            "symbols/ directory should not be empty"
+        );
         assert!(
             sym_files.iter().any(|f| f.ends_with(".kicad_sym")),
             "should contain a .kicad_sym file, got: {:?}",
@@ -213,7 +219,10 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
             .collect();
-        assert!(!fp_files.is_empty(), "footprints/ directory should not be empty");
+        assert!(
+            !fp_files.is_empty(),
+            "footprints/ directory should not be empty"
+        );
         assert!(
             fp_files.iter().any(|f| f.ends_with(".kicad_mod")),
             "should contain a .kicad_mod file, got: {:?}",

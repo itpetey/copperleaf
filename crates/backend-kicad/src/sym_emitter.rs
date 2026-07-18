@@ -8,13 +8,14 @@
 //! across the bottom, and the remaining signals split left/right on the
 //! 100 mil grid.
 
+use copperleaf::Role;
 use copperleaf_part_codegen::Manifest;
 
-use copperleaf::Role;
-
-use crate::common::format_float;
-use crate::sexpr::Sexpr;
-use crate::sym_layout::{self, LayoutPin};
+use crate::{
+    common::format_float,
+    sexpr::Sexpr,
+    sym_layout::{self, LayoutPin},
+};
 
 /// Generate a `.kicad_sym` library S-expression string from a component manifest.
 pub fn emit_symbol(manifest: &Manifest) -> String {
@@ -48,54 +49,6 @@ fn kind_to_role(kind: &str) -> Role {
         "analog_in" | "analog_rf" => Role::AnalogIn,
         _ => Role::DigitalIO,
     }
-}
-
-fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
-    let layout_pins: Vec<LayoutPin> = manifest
-        .pins
-        .iter()
-        .map(|p| LayoutPin {
-            name: p.name.clone(),
-            number: if p.number.is_empty() {
-                p.num.to_string()
-            } else {
-                p.number.clone()
-            },
-            role: kind_to_role(&p.kind),
-        })
-        .collect();
-    let layout = sym_layout::layout_symbol(&layout_pins);
-
-    // ── properties ──
-    let mut children = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(lib_id),
-        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        property_at("Reference", "U", (layout.x1, layout.y1 + 1.27), false),
-        property_at("Value", lib_id, (layout.x1, layout.y2 - 1.27), false),
-        property_hidden("Footprint", ""),
-        property_hidden("Datasheet", manifest.component.datasheet.as_deref().unwrap_or("~")),
-        property_hidden(
-            "Description",
-            manifest.component.description.as_deref().unwrap_or(""),
-        ),
-        property_hidden("ki_keywords", "copperleaf"),
-    ];
-
-    // ── unit sub-symbol ──
-    // KiCad sub-symbol names use the bare symbol name (no library prefix).
-    let bare = lib_id.split(':').next_back().unwrap_or(lib_id);
-    let unit_name = format!("{}_0_1", bare);
-    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
-    unit.push(sym_layout::body_rect_sexpr(&layout));
-    for pin in &layout.pins {
-        unit.push(sym_layout::placed_pin_sexpr(pin));
-    }
-    children.push(Sexpr::list(unit));
-
-    Sexpr::list(children)
 }
 
 fn property_at(key: &str, value: &str, pos: (f64, f64), hide: bool) -> Sexpr {
@@ -152,6 +105,57 @@ fn property_hidden(key: &str, value: &str) -> Sexpr {
             ]),
         ]),
     ])
+}
+
+fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
+    let layout_pins: Vec<LayoutPin> = manifest
+        .pins
+        .iter()
+        .map(|p| LayoutPin {
+            name: p.name.clone(),
+            number: if p.number.is_empty() {
+                p.num.to_string()
+            } else {
+                p.number.clone()
+            },
+            role: kind_to_role(&p.kind),
+        })
+        .collect();
+    let layout = sym_layout::layout_symbol(&layout_pins);
+
+    // ── properties ──
+    let mut children = vec![
+        Sexpr::atom("symbol"),
+        Sexpr::str(lib_id),
+        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        property_at("Reference", "U", (layout.x1, layout.y1 + 1.27), false),
+        property_at("Value", lib_id, (layout.x1, layout.y2 - 1.27), false),
+        property_hidden("Footprint", ""),
+        property_hidden(
+            "Datasheet",
+            manifest.component.datasheet.as_deref().unwrap_or("~"),
+        ),
+        property_hidden(
+            "Description",
+            manifest.component.description.as_deref().unwrap_or(""),
+        ),
+        property_hidden("ki_keywords", "copperleaf"),
+    ];
+
+    // ── unit sub-symbol ──
+    // KiCad sub-symbol names use the bare symbol name (no library prefix).
+    let bare = lib_id.split(':').next_back().unwrap_or(lib_id);
+    let unit_name = format!("{}_0_1", bare);
+    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
+    unit.push(sym_layout::body_rect_sexpr(&layout));
+    for pin in &layout.pins {
+        unit.push(sym_layout::placed_pin_sexpr(pin));
+    }
+    children.push(Sexpr::list(unit));
+
+    Sexpr::list(children)
 }
 
 #[cfg(test)]

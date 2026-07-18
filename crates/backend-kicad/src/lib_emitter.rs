@@ -18,6 +18,14 @@ use crate::{
     sym_layout::{self, LayoutPin},
 };
 
+/// Emit a standalone `.kicad_mod` footprint file for a single component.
+///
+/// `fp_name` is the footprint name used in the file content and (by the
+/// caller) as the filename stem (e.g. `"RP2354A"` → `RP2354A.kicad_mod`).
+pub fn emit_footprint_lib(comp: &CompiledComponent, fp_name: &str) -> String {
+    footprint_def(comp, fp_name)
+}
+
 /// Emit a standalone `.kicad_sym` library file containing all given
 /// components' symbols.
 ///
@@ -43,16 +51,6 @@ pub fn emit_symbol_lib(components: &[&CompiledComponent], _library_name: &str) -
     let lib = Sexpr::list(std::iter::once(Sexpr::atom("kicad_symbol_lib")).chain(children));
     format!("{}\n", lib)
 }
-
-/// Emit a standalone `.kicad_mod` footprint file for a single component.
-///
-/// `fp_name` is the footprint name used in the file content and (by the
-/// caller) as the filename stem (e.g. `"RP2354A"` → `RP2354A.kicad_mod`).
-pub fn emit_footprint_lib(comp: &CompiledComponent, fp_name: &str) -> String {
-    footprint_def(comp, fp_name)
-}
-
-// ── symbol helpers ─────────────────────────────────────────────────────
 
 /// Build the `(symbol ...)` definition for one component.
 ///
@@ -120,58 +118,6 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
     Sexpr::list(children)
 }
 
-/// `ki_fp_filters` property value for a component: the footprint name with
-/// `-`/`_` escaped as `?` single-char wildcards (KLC S5.2), plus a trailing
-/// `*`.
-fn footprint_filter(comp: &CompiledComponent) -> String {
-    let name = comp
-        .footprint
-        .as_deref()
-        .map(|s| s.split_once(':').map(|(_, n)| n).unwrap_or(s).to_string())
-        .unwrap_or_else(|| comp.refdes.clone());
-    let escaped: String = name
-        .chars()
-        .map(|c| if c == '-' || c == '_' { '?' } else { c })
-        .collect();
-    format!("{}*", escaped)
-}
-
-/// Build a `(property ...)` node at a given position.
-fn lib_property_at(key: &str, value: &str, pos: (f64, f64), hide: bool) -> Sexpr {
-    let mut effects = vec![Sexpr::list([
-        Sexpr::atom("font"),
-        Sexpr::list([
-            Sexpr::atom("size"),
-            Sexpr::atom("1.27"),
-            Sexpr::atom("1.27"),
-        ]),
-    ])];
-    if pos != (0.0, 0.0) {
-        effects.push(Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]));
-    }
-
-    let mut children = vec![
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(pos.0, 2)),
-            Sexpr::atom(format_float(pos.1, 2)),
-            Sexpr::atom("0"),
-        ]),
-    ];
-    if hide {
-        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    children.push(Sexpr::list(
-        std::iter::once(Sexpr::atom("effects")).chain(effects),
-    ));
-    Sexpr::list(children)
-}
-
-// ── footprint helpers ──────────────────────────────────────────────────
-
 fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
     let pads = fp_geom::pads_from_component(comp);
     let extent = fp_geom::pads_extent(&pads);
@@ -231,6 +177,56 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
 
     let fp = Sexpr::list(std::iter::once(Sexpr::atom("footprint")).chain(children));
     format!("{}\n", fp)
+}
+
+/// `ki_fp_filters` property value for a component: the footprint name with
+/// `-`/`_` escaped as `?` single-char wildcards (KLC S5.2), plus a trailing
+/// `*`.
+fn footprint_filter(comp: &CompiledComponent) -> String {
+    let name = comp
+        .footprint
+        .as_deref()
+        .map(|s| s.split_once(':').map(|(_, n)| n).unwrap_or(s).to_string())
+        .unwrap_or_else(|| comp.refdes.clone());
+    let escaped: String = name
+        .chars()
+        .map(|c| if c == '-' || c == '_' { '?' } else { c })
+        .collect();
+    format!("{}*", escaped)
+}
+
+/// Build a `(property ...)` node at a given position.
+fn lib_property_at(key: &str, value: &str, pos: (f64, f64), hide: bool) -> Sexpr {
+    let mut effects = vec![Sexpr::list([
+        Sexpr::atom("font"),
+        Sexpr::list([
+            Sexpr::atom("size"),
+            Sexpr::atom("1.27"),
+            Sexpr::atom("1.27"),
+        ]),
+    ])];
+    if pos != (0.0, 0.0) {
+        effects.push(Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]));
+    }
+
+    let mut children = vec![
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(pos.0, 2)),
+            Sexpr::atom(format_float(pos.1, 2)),
+            Sexpr::atom("0"),
+        ]),
+    ];
+    if hide {
+        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    children.push(Sexpr::list(
+        std::iter::once(Sexpr::atom("effects")).chain(effects),
+    ));
+    Sexpr::list(children)
 }
 
 #[cfg(test)]

@@ -15,30 +15,20 @@
 
 use std::{collections::HashMap, fmt};
 
-use thiserror::Error;
-
 use copperleaf::{
-    Component, CompiledComponent,
+    CompiledComponent, Component, Farad,
     board::{Board, CompiledBoard, ComponentEntry, Connection, RawNetOverride},
     erc,
     net::{Constraint, Net, NetClass, NetId, NetKind},
     pin::{Pin, PinId, RawConnection, Role, SigSpec},
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
     util::{UnionFind, deterministic_id},
-    Farad,
 };
 use copperleaf_parts_passives::footprint;
+use thiserror::Error;
 
 /// Default footprint code for synthesised decoupling capacitors.
 const DEFAULT_CAP_FOOTPRINT: footprint::Code = footprint::Code::M1608;
-
-/// Resolve a package string (e.g. `"0603"`, `"0805"`) into a [`footprint::Code`],
-/// falling back to [`DEFAULT_CAP_FOOTPRINT`] when `None` or unrecognised.
-fn resolve_footprint_code(package: Option<&str>) -> footprint::Code {
-    package
-        .and_then(footprint::Code::from_str)
-        .unwrap_or(DEFAULT_CAP_FOOTPRINT)
-}
 
 #[derive(Clone, Debug)]
 pub struct NetInfo {
@@ -478,7 +468,11 @@ fn is_ground_net(board: &CompiledBoard, net_name: &str) -> bool {
 
 /// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
 /// footprint from the passives library.
-fn make_capacitor_component(refdes: &str, value: Qty<Farad>, code: footprint::Code) -> CompiledComponent {
+fn make_capacitor_component(
+    refdes: &str,
+    value: Qty<Farad>,
+    code: footprint::Code,
+) -> CompiledComponent {
     let cap = copperleaf_parts_passives::Capacitor::decoupling(value, code);
     let pins: Vec<Pin> = cap
         .pins()
@@ -596,6 +590,14 @@ fn place_decoupling_set(
     }
 }
 
+/// Resolve a package string (e.g. `"0603"`, `"0805"`) into a [`footprint::Code`],
+/// falling back to [`DEFAULT_CAP_FOOTPRINT`] when `None` or unrecognised.
+fn resolve_footprint_code(package: Option<&str>) -> footprint::Code {
+    package
+        .and_then(footprint::Code::from_str)
+        .unwrap_or(DEFAULT_CAP_FOOTPRINT)
+}
+
 /// Determine the name and voltage for every net by merging explicit overrides
 /// with values inferred from connected pins.
 ///
@@ -671,7 +673,12 @@ fn synthesise_decoupling(
 
     for (comp_idx, comp) in board.components.iter().enumerate() {
         for constraint in &comp.constraints {
-            let Constraint::Decoupling { values, per_pin, package } = constraint else {
+            let Constraint::Decoupling {
+                values,
+                per_pin,
+                package,
+            } = constraint
+            else {
                 continue;
             };
 
@@ -857,8 +864,14 @@ mod tests {
         };
         let (comps, _, _, _) = synthesise_decoupling(&board);
         assert_eq!(comps.len(), 1);
-        let fp = comps[0].footprint.as_ref().expect("cap should have a footprint");
-        assert!(fp.contains("Capacitor_SMD"), "footprint should be a KiCad capacitor: {fp}");
+        let fp = comps[0]
+            .footprint
+            .as_ref()
+            .expect("cap should have a footprint");
+        assert!(
+            fp.contains("Capacitor_SMD"),
+            "footprint should be a KiCad capacitor: {fp}"
+        );
     }
 
     #[test]

@@ -189,10 +189,7 @@ fn footprint_node(
         fp_geom::fp_text("user", "${REFERENCE}", (0.0, ref_y), "F.SilkS"),
         fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
         // Path linkage to schematic symbol.
-        Sexpr::list([
-            Sexpr::atom("path"),
-            Sexpr::str(&format!("/{}", fp_uuid)),
-        ]),
+        Sexpr::list([Sexpr::atom("path"), Sexpr::str(&format!("/{}", fp_uuid))]),
         Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
         Sexpr::list([
             Sexpr::atom("sheetfile"),
@@ -244,19 +241,12 @@ fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Se
     if hide {
         prop.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
     }
-    prop.push(Sexpr::list([
-        Sexpr::atom("uuid"),
-        Sexpr::str(&prop_uuid),
-    ]));
+    prop.push(Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&prop_uuid)]));
     prop.push(Sexpr::list([
         Sexpr::atom("effects"),
         Sexpr::list([
             Sexpr::atom("font"),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.0"),
-                Sexpr::atom("1.0"),
-            ]),
+            Sexpr::list([Sexpr::atom("size"), Sexpr::atom("1.0"), Sexpr::atom("1.0")]),
             Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("0.15")]),
         ]),
         Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
@@ -278,18 +268,54 @@ fn layers_node() -> Sexpr {
         Sexpr::atom("layers"),
         Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
         Sexpr::list([Sexpr::atom("31"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("32"), Sexpr::str("B.Adhes"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("33"), Sexpr::str("F.Adhes"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("34"), Sexpr::str("B.Paste"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("35"), Sexpr::str("F.Paste"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("36"), Sexpr::str("B.SilkS"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("37"), Sexpr::str("F.SilkS"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("32"),
+            Sexpr::str("B.Adhes"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("33"),
+            Sexpr::str("F.Adhes"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("34"),
+            Sexpr::str("B.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("35"),
+            Sexpr::str("F.Paste"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("36"),
+            Sexpr::str("B.SilkS"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("37"),
+            Sexpr::str("F.SilkS"),
+            Sexpr::atom("user"),
+        ]),
         Sexpr::list([Sexpr::atom("38"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
         Sexpr::list([Sexpr::atom("39"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("44"), Sexpr::str("Edge.Cuts"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("44"),
+            Sexpr::str("Edge.Cuts"),
+            Sexpr::atom("user"),
+        ]),
         Sexpr::list([Sexpr::atom("45"), Sexpr::str("Margin"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("46"), Sexpr::str("B.CrtYd"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("47"), Sexpr::str("F.CrtYd"), Sexpr::atom("user")]),
+        Sexpr::list([
+            Sexpr::atom("46"),
+            Sexpr::str("B.CrtYd"),
+            Sexpr::atom("user"),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("47"),
+            Sexpr::str("F.CrtYd"),
+            Sexpr::atom("user"),
+        ]),
         Sexpr::list([Sexpr::atom("48"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
         Sexpr::list([Sexpr::atom("49"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
     ])
@@ -378,7 +404,13 @@ mod tests {
                         .pad_type("smd")
                         .pwr_fixed(3.3.volt(), 0.1.amp())
                         .pin(),
-                    Pin::build("GND").number("2").pos(1.0, 0.0).width(0.6).height(1.2).pad_type("smd").gnd(),
+                    Pin::build("GND")
+                        .number("2")
+                        .pos(1.0, 0.0)
+                        .width(0.6)
+                        .height(1.2)
+                        .pad_type("smd")
+                        .gnd(),
                 ],
                 constraints: vec![],
                 symbol: None,

@@ -4,17 +4,29 @@ use serde_json::{Value, json};
 
 use crate::sexpr::Sexpr;
 
+/// Build a `fp-lib-table` S-expression file registering the project-specific
+/// footprint library.  A KiCad footprint library is a **directory** of
+/// `.kicad_mod` files, so the URI points at `footprints/`.
+pub fn emit_fp_lib_table(lib_nick: &str) -> String {
+    let entry = Sexpr::list([
+        Sexpr::atom("lib"),
+        Sexpr::list([Sexpr::atom("name"), Sexpr::str(lib_nick)]),
+        Sexpr::list([Sexpr::atom("type"), Sexpr::str("KiCad")]),
+        Sexpr::list([Sexpr::atom("uri"), Sexpr::str("${KIPRJMOD}/footprints")]),
+        Sexpr::list([Sexpr::atom("options"), Sexpr::str("")]),
+        Sexpr::list([Sexpr::atom("descr"), Sexpr::str("")]),
+    ]);
+    let table = Sexpr::list([Sexpr::atom("fp_lib_table"), entry].into_iter());
+    format!("{}\n", table)
+}
+
 /// Build a minimal `.kicad_pro` JSON document for a project named `name`.
 ///
 /// `symbol_libs` is a list of symbol library nicknames registered as
 /// project-specific pinned libraries pointing into `symbols/`.
 /// `footprint_lib` is the nickname of the single directory-based footprint
 /// library rooted at `footprints/`, when the project has local footprints.
-pub fn emit_project(
-    name: &str,
-    symbol_libs: &[String],
-    footprint_lib: Option<&str>,
-) -> String {
+pub fn emit_project(name: &str, symbol_libs: &[String], footprint_lib: Option<&str>) -> String {
     let root: Value = json!({
         "board": {
             "3dviewports": [],
@@ -188,28 +200,6 @@ pub fn emit_sym_lib_table(lib_nicks: &[String]) -> String {
     format!("{}\n", table)
 }
 
-/// Build a `fp-lib-table` S-expression file registering the project-specific
-/// footprint library.  A KiCad footprint library is a **directory** of
-/// `.kicad_mod` files, so the URI points at `footprints/`.
-pub fn emit_fp_lib_table(lib_nick: &str) -> String {
-    let entry = Sexpr::list([
-        Sexpr::atom("lib"),
-        Sexpr::list([Sexpr::atom("name"), Sexpr::str(lib_nick)]),
-        Sexpr::list([Sexpr::atom("type"), Sexpr::str("KiCad")]),
-        Sexpr::list([
-            Sexpr::atom("uri"),
-            Sexpr::str("${KIPRJMOD}/footprints"),
-        ]),
-        Sexpr::list([Sexpr::atom("options"), Sexpr::str("")]),
-        Sexpr::list([Sexpr::atom("descr"), Sexpr::str("")]),
-    ]);
-    let table = Sexpr::list(
-        [Sexpr::atom("fp_lib_table"), entry]
-            .into_iter(),
-    );
-    format!("{}\n", table)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,15 +227,15 @@ mod tests {
         let sym_libs = v["libraries"]["pinned_symbol_libs"].as_array().unwrap();
         assert_eq!(sym_libs.len(), 1);
         assert_eq!(sym_libs[0]["name"], "copperleaf");
-        assert!(sym_libs[0]["uri"]
-            .as_str()
-            .unwrap()
-            .contains("symbols/copperleaf.kicad_sym"));
+        assert!(
+            sym_libs[0]["uri"]
+                .as_str()
+                .unwrap()
+                .contains("symbols/copperleaf.kicad_sym")
+        );
 
         // A single directory-based footprint library.
-        let fp_libs = v["libraries"]["pinned_footprint_libs"]
-            .as_array()
-            .unwrap();
+        let fp_libs = v["libraries"]["pinned_footprint_libs"].as_array().unwrap();
         assert_eq!(fp_libs.len(), 1);
         assert_eq!(fp_libs[0]["name"], "copperleaf");
         assert_eq!(fp_libs[0]["uri"], "${KIPRJMOD}/footprints");

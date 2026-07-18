@@ -78,21 +78,6 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
     format!("{}\n", sch)
 }
 
-/// Compute the symbol layout for a component from its pin roles.
-fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
-    let pins: Vec<LayoutPin> = comp
-        .pins
-        .iter()
-        .enumerate()
-        .map(|(i, p)| LayoutPin {
-            name: p.name().to_string(),
-            number: fp_geom::pin_number(p, i),
-            role: p.role(),
-        })
-        .collect();
-    sym_layout::layout_symbol(&pins)
-}
-
 fn is_power_net(board: &CompiledBoard, net_name: &str) -> bool {
     board
         .nets
@@ -129,6 +114,21 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
             ))),
         ]),
     ])
+}
+
+/// Compute the symbol layout for a component from its pin roles.
+fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
+    let pins: Vec<LayoutPin> = comp
+        .pins
+        .iter()
+        .enumerate()
+        .map(|(i, p)| LayoutPin {
+            name: p.name().to_string(),
+            number: fp_geom::pin_number(p, i),
+            role: p.role(),
+        })
+        .collect();
+    sym_layout::layout_symbol(&pins)
 }
 
 /// Embedded `lib_symbols` section: one entry per unique symbol identifier.
@@ -227,11 +227,7 @@ fn stub_end((tip_x, tip_y): (f64, f64), rotation: f64) -> (f64, f64) {
     }
 }
 
-fn symbol_instance_node(
-    comp: &CompiledComponent,
-    layout: &SymbolLayout,
-    pos: (f64, f64),
-) -> Sexpr {
+fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f64, f64)) -> Sexpr {
     let (x, y) = pos;
     let lib_id = symbol_lib_id(comp);
     let fp_value = footprint_ref(comp);
@@ -382,7 +378,12 @@ mod tests {
         CompiledBoard {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
-                pins: vec![Pin::build("VDD").number("1").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
+                pins: vec![
+                    Pin::build("VDD")
+                        .number("1")
+                        .pwr_fixed(3.3.volt(), 0.1.amp())
+                        .pin(),
+                ],
                 constraints: vec![],
                 symbol: Some("MCU:RP2354a".into()),
                 footprint: Some("Package_QFP:LQFP-64".into()),
@@ -425,7 +426,12 @@ mod tests {
         let out = emit_schematic(&board);
         // Only one embedded definition of MCU:RP2354a, two instances.
         assert_eq!(out.matches("(symbol \"MCU:RP2354a\"").count(), 1, "{}", out);
-        assert_eq!(out.matches("(lib_id \"MCU:RP2354a\")").count(), 2, "{}", out);
+        assert_eq!(
+            out.matches("(lib_id \"MCU:RP2354a\")").count(),
+            2,
+            "{}",
+            out
+        );
     }
 
     #[test]
@@ -447,7 +453,10 @@ mod tests {
         // VDD is a power pin on the top edge (rotation 270), so the tip is
         // above the symbol origin on the sheet.
         let (ox, oy) = positions[0];
-        assert!(tip_y < oy, "top pin tip should be above origin: {tip_y} vs {oy}");
+        assert!(
+            tip_y < oy,
+            "top pin tip should be above origin: {tip_y} vs {oy}"
+        );
         let pin = layouts[0].pins.iter().find(|p| p.name == "VDD").unwrap();
         assert!((tip_x - (ox + pin.x)).abs() < 1e-9);
         assert!((tip_y - (oy - pin.y)).abs() < 1e-9);

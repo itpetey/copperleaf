@@ -16,5 +16,7 @@ mod connector;
 mod jst_ph;
 
 build_component!("arjm11d7_502_ab_ew2.toml");
+
 build_component!("usb_c_2340901_1.toml");
+
 build_component!("conmhf4_smd_g_t.toml");

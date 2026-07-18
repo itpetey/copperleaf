@@ -5,7 +5,7 @@
 //! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    Component, Constraint, CompileError, Net, NetId, Pin,
+    CompileError, Component, Constraint, Net, NetId, Pin,
     net::NetHandle,
     pin::{PinHandle, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
@@ -71,15 +71,6 @@ pub struct CompiledBoard {
 #[derive(Clone, Copy, Debug)]
 pub struct ComponentHandle(pub usize);
 
-/// Top level structure representing the PCB being designed.
-pub struct Board {
-    name: String,
-    pub components: Vec<ComponentEntry>,
-    pub connections: Vec<RawConnection>,
-    pub net_overrides: Vec<RawNetOverride>,
-    pub(crate) next_edge: usize,
-}
-
 pub struct ComponentEntry {
     pub name: String,
     pub component: Box<dyn Component>,
@@ -89,6 +80,15 @@ pub struct ComponentEntry {
 pub struct RawNetOverride {
     pub voltage: Option<Qty<Volt>>,
     pub name: Option<String>,
+}
+
+/// Top level structure representing the PCB being designed.
+pub struct Board {
+    name: String,
+    pub components: Vec<ComponentEntry>,
+    pub connections: Vec<RawConnection>,
+    pub net_overrides: Vec<RawNetOverride>,
+    pub(crate) next_edge: usize,
 }
 
 impl ComponentHandle {

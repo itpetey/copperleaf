@@ -100,7 +100,11 @@ fn decoupling_caps_have_footprints() {
         .board
         .components
         .iter()
-        .filter(|c| c.footprint.as_deref().is_some_and(|fp| fp.contains("Capacitor_SMD")))
+        .filter(|c| {
+            c.footprint
+                .as_deref()
+                .is_some_and(|fp| fp.contains("Capacitor_SMD"))
+        })
         .collect();
     assert_eq!(caps.len(), 1);
     assert_eq!(caps[0].refdes, "C1");
@@ -146,8 +150,7 @@ fn emitted_schematic_contains_lib_id_and_pin_positions() {
 #[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
-    let err = copperleaf_compile::run(board)
-        .expect_err("overvoltage should fail compilation");
+    let err = copperleaf_compile::run(board).expect_err("overvoltage should fail compilation");
     assert!(err.errors.iter().any(|d| d.code == "ERC:OVERVOLT"));
 }
 

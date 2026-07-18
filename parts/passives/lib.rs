@@ -263,6 +263,10 @@ impl Component for Crystal {
     }
 }
 
+build_component!("b82472p6152m000.toml");
+
+build_component!("b82472p6222m000.toml");
+
 /// Add a pull-down resistor from `pin` to the given ground pin.
 pub fn pulldown(
     board: &mut Board,
@@ -443,5 +447,3 @@ mod tests {
         assert!(matches!(c.pins()[1].role(), Role::DigitalIO));
     }
 }
-build_component!("b82472p6152m000.toml");
-build_component!("b82472p6222m000.toml");
