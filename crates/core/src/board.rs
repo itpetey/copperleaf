@@ -1,13 +1,11 @@
 //! The mutable board builder.
 //!
 //! [`Board`] accumulates components and connections at design time.  Once the
-//! design is complete, [`Board::compile`] consumes the builder and runs the
-//! full compilation pipeline (see [`compile`](crate::compile)) to produce an
-//! immutable [`CompileReport`](crate::CompileReport).
+//! design is complete, the board can be compiled using
+//! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    Component, Constraint, Net, NetId, Pin,
-    compile::{CompileError, CompileReport},
+    Component, Constraint, CompileError, Net, NetId, Pin,
     net::NetHandle,
     pin::{PinHandle, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
@@ -76,21 +74,21 @@ pub struct ComponentHandle(pub usize);
 /// Top level structure representing the PCB being designed.
 pub struct Board {
     name: String,
-    pub(crate) components: Vec<ComponentEntry>,
-    pub(crate) connections: Vec<RawConnection>,
-    pub(crate) net_overrides: Vec<RawNetOverride>,
+    pub components: Vec<ComponentEntry>,
+    pub connections: Vec<RawConnection>,
+    pub net_overrides: Vec<RawNetOverride>,
     pub(crate) next_edge: usize,
 }
 
-pub(crate) struct ComponentEntry {
-    pub(crate) name: String,
-    pub(crate) component: Box<dyn Component>,
+pub struct ComponentEntry {
+    pub name: String,
+    pub component: Box<dyn Component>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct RawNetOverride {
-    pub(crate) voltage: Option<Qty<Volt>>,
-    pub(crate) name: Option<String>,
+pub struct RawNetOverride {
+    pub voltage: Option<Qty<Volt>>,
+    pub name: Option<String>,
 }
 
 impl ComponentHandle {
@@ -142,16 +140,6 @@ impl Board {
         Ok(NetHandle { edge })
     }
 
-    /// Compiles this board into a [`CompileReport`] in a single pass.
-    ///
-    /// The board is consumed and run through lowering, ERC validation, and
-    /// generation.  The resulting [`CompiledBoard`](crate::CompiledBoard) is
-    /// constructed exactly once and never mutated afterwards.
-    pub fn compile(self) -> Result<CompileReport, CompileError> {
-        self.validate_connections()?;
-        crate::compile::run(self)
-    }
-
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -197,7 +185,7 @@ impl Board {
 
     /// Validate that every [`PinHandle`] in a connection refers to an existing
     /// component and pin.
-    fn validate_connections(&self) -> Result<(), CompileError> {
+    pub fn validate_connections(&self) -> Result<(), CompileError> {
         for conn in &self.connections {
             if let Some(diag) = self.validate_pin(&conn.from) {
                 return Err(CompileError::new(vec![diag]));

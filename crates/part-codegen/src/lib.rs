@@ -586,7 +586,7 @@ fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
             let values_expr = values.join(", ");
             let per_pin = c.per_pin.unwrap_or(false);
             Ok(format!(
-                "Constraint::Decoupling {{ values: vec![{}], per_pin: {} }}",
+                "Constraint::Decoupling {{ values: vec![{}], per_pin: {}, package: None }}",
                 values_expr, per_pin
             ))
         }

@@ -2,6 +2,7 @@ use std::fs;
 
 use copperleaf::{Backend, Board, Component, ComponentHandle, Constraint, Pin, PinRef, UnitExt};
 use copperleaf_backend_kicad::KiCad;
+use copperleaf_compile;
 
 struct PwrSource {
     pins: Vec<Pin>,
@@ -66,6 +67,7 @@ impl Component for DecoupledPart {
         vec![Constraint::Decoupling {
             values: vec![100.0.nf()],
             per_pin: true,
+            package: None,
         }]
     }
 }
@@ -84,7 +86,7 @@ fn build_two_component_board(
 }
 
 #[test]
-fn decoupling_caps_appear_in_summary() {
+fn decoupling_caps_have_footprints() {
     let mut board = Board::new("test");
     let src = board.add("SRC", PwrSource::new(3.3));
     let part = board.add("U1", DecoupledPart::new());
@@ -92,18 +94,23 @@ fn decoupling_caps_appear_in_summary() {
         .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
         .unwrap();
 
-    let report = board.compile().expect("board should compile");
-    assert_eq!(report.summary.caps_synthesised.len(), 1);
-    assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
-    assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-18);
-    assert_eq!(report.summary.caps_synthesised[0].source_component, "U1");
-    assert_eq!(report.summary.caps_synthesised[0].source_pin, "VDD");
+    let report = copperleaf_compile::run(board).expect("board should compile");
+    // The synthesised capacitor should appear in the compiled board with a footprint.
+    let caps: Vec<_> = report
+        .board
+        .components
+        .iter()
+        .filter(|c| c.footprint.as_deref().is_some_and(|fp| fp.contains("Capacitor_SMD")))
+        .collect();
+    assert_eq!(caps.len(), 1);
+    assert_eq!(caps[0].refdes, "C1");
+    assert_eq!(report.summary.component_count, 3); // SRC + U1 + C1
 }
 
 #[test]
 fn emitted_netlist_contains_components_and_nets() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = board.compile().unwrap();
+    let report = copperleaf_compile::run(board).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -122,7 +129,7 @@ fn emitted_netlist_contains_components_and_nets() {
 #[test]
 fn emitted_schematic_contains_lib_id_and_pin_positions() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = board.compile().unwrap();
+    let report = copperleaf_compile::run(board).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -139,8 +146,7 @@ fn emitted_schematic_contains_lib_id_and_pin_positions() {
 #[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
-    let err = board
-        .compile()
+    let err = copperleaf_compile::run(board)
         .expect_err("overvoltage should fail compilation");
     assert!(err.errors.iter().any(|d| d.code == "ERC:OVERVOLT"));
 }
@@ -148,7 +154,7 @@ fn overvoltage_produces_compile_error() {
 #[test]
 fn valid_board_compiles_and_emits() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = board.compile().expect("valid board should compile");
+    let report = copperleaf_compile::run(board).expect("valid board should compile");
 
     let dir = tempfile::tempdir().unwrap();
     let backend = KiCad::new().with_project_name("test");

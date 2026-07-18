@@ -2,7 +2,7 @@
 //!
 //! Parses `.kicad_mod` footprint files into structured [`PadDef`] records.
 //! This module is intended for the parts-creation CLI; it is not used during
-//! `Board::compile()` or `Backend::emit()`.
+//! compilation or `Backend::emit()`.
 
 use std::path::Path;
 

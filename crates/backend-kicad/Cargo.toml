@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 copperleaf.workspace = true
+copperleaf-compile.workspace = true
 copperleaf-part-codegen.workspace = true
 serde_json = { workspace = true, features = ["std"] }
 thiserror.workspace = true

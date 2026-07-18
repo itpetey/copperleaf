@@ -1,0 +1,11 @@
+[package]
+name = "copperleaf-compile"
+version.workspace = true
+edition.workspace = true
+description = "Compilation pipeline for copperleaf boards"
+license.workspace = true
+
+[dependencies]
+copperleaf.workspace = true
+copperleaf-parts-passives = { path = "../../parts/passives" }
+thiserror.workspace = true

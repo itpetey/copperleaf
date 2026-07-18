@@ -115,9 +115,9 @@ pub struct PinHandle {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RawConnection {
-    pub(crate) from: PinHandle,
-    pub(crate) to: PinHandle,
+pub struct RawConnection {
+    pub from: PinHandle,
+    pub to: PinHandle,
 }
 
 impl SigSpec {

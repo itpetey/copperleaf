@@ -4,9 +4,9 @@
 //! returns [`Diagnostic`]s.  None of them mutate the board or produce new
 //! components — that is the job of the [`synth`](crate::synth) module.
 //!
-//! [`run_erc`] is the single entry point used by
-//! [`Board::compile`](crate::Board::compile); the individual rule functions are
-//! kept `pub` so they can be unit-tested in isolation.
+//! [`run_erc`] is the single entry point used by the compilation pipeline;
+//! the individual rule functions are kept `pub` so they can be unit-tested
+//! in isolation.
 
 use crate::{
     board::CompiledBoard,

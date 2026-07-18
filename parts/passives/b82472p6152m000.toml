@@ -1,0 +1,37 @@
+[component]
+name = "B82472p6152m000"
+title = "TDK B82472P6152M000 1.5uH SMT Power Inductor (7.3x7.3x4.5mm)"
+datasheet = "https://www.tdk-electronics.com/en/products/inductors/power-inductors/smt-power-inductors/b82472p6152m000"
+lib_id = "B82472P6152M000"
+
+[[pin]]
+num = 1
+number = "1"
+name = "1"
+purpose = "I/O"
+kind = "dio"
+pos = [-3.2, 0.0]
+rotation = 0.0
+length = 2.2
+width = 1.5
+height = 2.2
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "2"
+name = "2"
+purpose = "I/O"
+kind = "dio"
+pos = [3.2, 0.0]
+rotation = 0.0
+length = 2.2
+width = 1.5
+height = 2.2
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"

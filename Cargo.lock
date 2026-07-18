@@ -170,6 +170,7 @@ name = "copperleaf-backend-kicad"
 version = "0.1.0"
 dependencies = [
  "copperleaf",
+ "copperleaf-compile",
  "copperleaf-part-codegen",
  "serde_json",
  "tempfile",
@@ -191,6 +192,15 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "copperleaf-compile"
+version = "0.1.0"
+dependencies = [
+ "copperleaf",
+ "copperleaf-parts-passives",
+ "thiserror",
 ]
 
 [[package]]
@@ -244,6 +254,7 @@ name = "copperleaf-parts-passives"
 version = "0.1.0"
 dependencies = [
  "copperleaf",
+ "copperleaf-part-macro",
 ]
 
 [[package]]

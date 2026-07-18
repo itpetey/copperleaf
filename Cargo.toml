@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/backend-kicad",
   "crates/cli",
+  "crates/compile",
   "crates/core",
   "crates/part-codegen",
   "crates/part-macro",
@@ -28,6 +29,7 @@ copperleaf-backend-kicad = {
   path = "crates/backend-kicad",
   default-features = false
 }
+copperleaf-compile = { path = "crates/compile", default-features = false }
 copperleaf-part-codegen = {
   path = "crates/part-codegen",
   default-features = false

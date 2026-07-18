@@ -1,22 +1,22 @@
-pub(crate) struct UnionFind {
+pub struct UnionFind {
     parent: Vec<usize>,
 }
 
 impl UnionFind {
-    pub(crate) fn new(size: usize) -> Self {
+    pub fn new(size: usize) -> Self {
         Self {
             parent: (0..size).collect(),
         }
     }
 
-    pub(crate) fn find(&mut self, x: usize) -> usize {
+    pub fn find(&mut self, x: usize) -> usize {
         if self.parent[x] != x {
             self.parent[x] = self.find(self.parent[x]);
         }
         self.parent[x]
     }
 
-    pub(crate) fn union(&mut self, a: usize, b: usize) {
+    pub fn union(&mut self, a: usize, b: usize) {
         let ra = self.find(a);
         let rb = self.find(b);
         if ra != rb {

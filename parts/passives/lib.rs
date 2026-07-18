@@ -1,9 +1,12 @@
 //! Library of common parts used in examples and tests.
 
 use copperleaf::{
-    Board, CompileError, Component, Farad, Henry, Hertz, Ohm, Pin, PinHandle, PinRef, PowerSpec,
-    Qty, Role, UnitExt,
+    Board, CompileError, Component, Farad, Hertz, Ohm, Pin, PinHandle, PinRef, PowerSpec, Qty,
+    Role, UnitExt,
 };
+use copperleaf_part_macro::build_component;
+
+use crate::footprint::Code;
 
 pub mod footprint;
 
@@ -36,13 +39,6 @@ pub struct Resistor {
 #[derive(Clone, Debug)]
 pub struct Crystal {
     frequency: Qty<Hertz>,
-    pins: Vec<Pin>,
-}
-
-/// Standard two-pin inductor.
-#[derive(Clone, Debug)]
-pub struct Inductor {
-    value: Qty<Henry>,
     pins: Vec<Pin>,
 }
 
@@ -267,56 +263,15 @@ impl Component for Crystal {
     }
 }
 
-impl Inductor {
-    pub const PIN1: PinRef = PinRef("1");
-    pub const PIN2: PinRef = PinRef("2");
-
-    pub fn value(&self) -> Qty<Henry> {
-        self.value
-    }
-
-    /// Create a generic two-pin inductor.
-    pub fn new(value: Qty<Henry>) -> Self {
-        Self {
-            value,
-            pins: vec![
-                Pin::build("1")
-                    .role(Role::DigitalIO)
-                    .power_spec(PowerSpec {
-                        v_min: 0.0.volt(),
-                        v_max: 3.6.volt(),
-                        v_nom: None,
-                        i_max: 0.1.amp(),
-                    })
-                    .pin(),
-                Pin::build("2")
-                    .role(Role::DigitalIO)
-                    .power_spec(PowerSpec {
-                        v_min: 0.0.volt(),
-                        v_max: 3.6.volt(),
-                        v_nom: None,
-                        i_max: 0.1.amp(),
-                    })
-                    .pin(),
-            ],
-        }
-    }
-}
-
-impl Component for Inductor {
-    fn pins(&self) -> &[Pin] {
-        &self.pins
-    }
-}
-
 /// Add a pull-down resistor from `pin` to the given ground pin.
 pub fn pulldown(
     board: &mut Board,
     refdes: &str,
     pin: PinHandle,
     gnd: PinHandle,
+    code: Code,
 ) -> Result<(), CompileError> {
-    let r = board.add(refdes, Resistor::new(10.0.kohm(), footprint::Code::M1608));
+    let r = board.add(refdes, Resistor::new(10.0.kohm(), code));
     board.connect(pin, r.pin(Resistor::PIN1))?;
     board.connect(gnd, r.pin(Resistor::PIN2))?;
     Ok(())
@@ -328,8 +283,9 @@ pub fn pullup(
     refdes: &str,
     pin: PinHandle,
     vdd_pin: PinHandle,
+    code: Code,
 ) -> Result<(), CompileError> {
-    let r = board.add(refdes, Resistor::new(10.0.kohm(), footprint::Code::M1608));
+    let r = board.add(refdes, Resistor::new(10.0.kohm(), code));
     board.connect(pin, r.pin(Resistor::PIN1))?;
     board.connect(vdd_pin, r.pin(Resistor::PIN2))?;
     Ok(())
@@ -338,10 +294,6 @@ pub fn pullup(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn approx_eq(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-12
-    }
 
     #[test]
     fn capacitor_new_has_two_digital_io_pins() {
@@ -403,18 +355,10 @@ mod tests {
     }
 
     #[test]
-    fn inductor_new_has_two_pins_and_stores_value() {
-        let l = Inductor::new(10.0e-6.henry());
-        assert_eq!(l.pins().len(), 2);
-        assert!(approx_eq(l.value.as_base(), 10e-6));
-    }
-
-    #[test]
     fn constants_are_accessible() {
         assert_eq!(Capacitor::PIN1.0, "1");
         assert_eq!(Resistor::PIN2.0, "2");
         assert_eq!(Crystal::PIN1.0, "1");
-        assert_eq!(Inductor::PIN2.0, "2");
     }
 
     #[test]
@@ -499,3 +443,5 @@ mod tests {
         assert!(matches!(c.pins()[1].role(), Role::DigitalIO));
     }
 }
+build_component!("b82472p6152m000.toml");
+build_component!("b82472p6222m000.toml");

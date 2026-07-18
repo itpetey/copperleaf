@@ -1,0 +1,43 @@
+[component]
+name = "B82472p6222m000"
+title = "TDK B82472P6222M000 SMT Power Inductor 2.2µH 3.0A (7.3×7.3×4.5mm)"
+datasheet = "https://www.tdk-electronics.tdk.com/en/inductors"
+lib_id = "B82472P6222M000"
+
+[[pin]]
+num = 1
+number = "1"
+name = "1"
+purpose = "I/O"
+notes = "Terminal 1"
+kind = "dio"
+v = 0.0
+i = 3.0
+pos = [-3.2, 0.0]
+rotation = 0.0
+length = 2.2
+width = 1.5
+height = 2.2
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 2
+number = "2"
+name = "2"
+purpose = "I/O"
+notes = "Terminal 2"
+kind = "dio"
+v = 0.0
+i = 3.0
+pos = [3.2, 0.0]
+rotation = 0.0
+length = 2.2
+width = 1.5
+height = 2.2
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"

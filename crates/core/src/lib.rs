@@ -1,11 +1,14 @@
 use std::path::Path;
 
 // Re-export all public types at crate root for backward compatibility.
-pub use board::{Board, CompiledBoard, CompiledComponent, ComponentHandle, Connection, MechanicalPad};
-pub use compile::CompileError;
+pub use board::{
+    Board, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle, Connection,
+    MechanicalPad, RawNetOverride,
+};
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
 pub use pin::{
-    Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, Role, SigKind, SigSpec, ThermalVia,
+    Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SigKind, SigSpec,
+    ThermalVia,
 };
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
@@ -13,13 +16,12 @@ pub use units::{
 pub use util::deterministic_id;
 
 pub mod board;
-pub(crate) mod compile;
 pub mod erc;
 pub mod helpers;
 pub mod net;
 pub mod pin;
 pub mod units;
-pub(crate) mod util;
+pub mod util;
 
 /// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
 pub trait Backend {
@@ -85,6 +87,30 @@ pub enum BackendError {
     IoError(#[from] std::io::Error),
     #[error("backend emit error: {0}")]
     EmitError(String),
+}
+
+/// Error returned when board compilation fails.
+#[derive(Clone, Debug, thiserror::Error)]
+pub struct CompileError {
+    pub errors: Vec<Diagnostic>,
+}
+
+impl CompileError {
+    pub fn new(errors: Vec<Diagnostic>) -> Self {
+        Self { errors }
+    }
+}
+
+impl std::fmt::Display for CompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for e in &self.errors {
+            writeln!(f, "[{:?}] {} — {}", e.severity, e.code, e.message)?;
+            if let Some(hint) = &e.hint {
+                writeln!(f, "         hint: {}", hint)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -190,16 +216,14 @@ mod tests {
         let mut board = Board::new("test");
         let u1 = board.add("U1", TwoPins);
         let _ = board.connect(u1.pin(TwoPins::A), u1.pin(TwoPins::B));
-        let compiled = board.compile().unwrap();
-        assert_eq!(compiled.board.nets.len(), 1);
+        assert_eq!(board.connections.len(), 1);
     }
 
     #[test]
-    fn empty_board_compiles() {
+    fn empty_board_has_no_components_or_nets() {
         let board = Board::new("test");
-        let compiled = board.compile().unwrap();
-        assert_eq!(compiled.board.components.len(), 0);
-        assert_eq!(compiled.board.nets.len(), 0);
+        assert_eq!(board.components.len(), 0);
+        assert!(board.connections.is_empty());
     }
 
     #[test]

@@ -148,6 +148,7 @@ impl Backend for KiCad {
 mod tests {
     use super::*;
     use copperleaf::{Board, Component, Pin, PinRef};
+    use copperleaf_compile;
 
     struct TwoPinPart {
         pins: Vec<Pin>,
@@ -174,7 +175,7 @@ mod tests {
         let mut board = Board::new("test");
         let u1 = board.add("U1", TwoPinPart::new());
         let _ = board.connect(u1.pin(TwoPinPart::A), u1.pin(TwoPinPart::B));
-        let report = board.compile().unwrap();
+        let report = copperleaf_compile::run(board).unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         let backend = KiCad::new().with_project_name("test");

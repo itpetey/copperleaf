@@ -1,4 +1,4 @@
-use crate::{Board, NetHandle, PinHandle, compile::CompileError};
+use crate::{Board, CompileError, NetHandle, PinHandle};
 
 /// Connect a list of pins into a single net and return a handle to it.
 ///
