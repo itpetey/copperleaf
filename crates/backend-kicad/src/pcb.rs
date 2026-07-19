@@ -178,8 +178,11 @@ fn footprint_node(
             Sexpr::atom(format_grid_float(at.1)),
             Sexpr::atom("0"),
         ]),
-        // Hidden metadata properties (KiCad 9+ stores Reference/Value as properties).
-        footprint_property("Reference", &comp.refdes, 0.0, ref_y, true),
+        // Properties (KiCad 9+ stores Reference/Value as properties).
+        // The Reference property is visible on F.SilkS; the Value property
+        // is hidden here and re-emitted as fp_text user on F.Fab so it
+        // doesn't conflict with the Reference on the same layer.
+        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
         footprint_property(
             "Value",
             &crate::common::refdes_prefix(&comp.refdes),
@@ -187,8 +190,7 @@ fn footprint_node(
             val_y,
             true,
         ),
-        // Visible text using KiCad variables.
-        fp_geom::fp_text("user", "${REFERENCE}", (0.0, ref_y), "F.SilkS"),
+        // Visible value text on F.Fab using a KiCad variable.
         fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
         // Path linkage to schematic symbol.
         Sexpr::list([Sexpr::atom("path"), Sexpr::str(&format!("/{}", fp_uuid))]),
