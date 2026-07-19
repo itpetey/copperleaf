@@ -24,11 +24,11 @@ use copperleaf::{
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
     util::{UnionFind, deterministic_id},
 };
-use copperleaf_parts_passives::footprint;
+use copperleaf_parts_passives::footprint::Package;
 use thiserror::Error;
 
-/// Default footprint code for synthesised decoupling capacitors.
-const DEFAULT_CAP_FOOTPRINT: footprint::Code = footprint::Code::M1608;
+/// Default footprint package for synthesised decoupling capacitors.
+const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
 
 #[derive(Clone, Debug)]
 pub struct NetInfo {
@@ -145,11 +145,26 @@ impl NetGrouping {
     }
 }
 
+/// Options controlling the compilation pipeline.
+pub struct CompileOptions {
+    /// Footprint code used for synthesised decoupling capacitors.
+    /// Defaults to [`DEFAULT_CAP_FOOTPRINT`] (0603 / 1608 metric).
+    pub decoupling_footprint: Package,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        Self {
+            decoupling_footprint: DEFAULT_CAP_FOOTPRINT,
+        }
+    }
+}
+
 /// Compile a [`Board`] into a [`CompileReport`].
 ///
 /// This is the entry point for the entire pipeline.  It validates
 /// connections first and then runs lowering, ERC, and synthesis.
-pub fn run(board: Board) -> Result<CompileReport, CompileError> {
+pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, CompileError> {
     // --- Phase 1: Lowering ---
     let compiled = compile_components(&board.components);
     let grouping = NetGrouping::build(&board.connections);
@@ -188,6 +203,8 @@ pub fn run(board: Board) -> Result<CompileReport, CompileError> {
         nets,
         connections,
         constraints,
+        width: board.width(),
+        height: board.height(),
     };
 
     // --- Phase 2: Validation (ERC) ---
@@ -198,7 +215,7 @@ pub fn run(board: Board) -> Result<CompileReport, CompileError> {
 
     // --- Phase 3: Generation (synthesis) ---
     let (synth_components, synth_diags, synth_connections, synth_net) =
-        synthesise_decoupling(&board_struct);
+        synthesise_decoupling(&board_struct, options.decoupling_footprint);
     warnings.extend(synth_diags);
 
     let mut final_components = board_struct.components;
@@ -222,6 +239,8 @@ pub fn run(board: Board) -> Result<CompileReport, CompileError> {
         nets: final_nets,
         connections: final_connections,
         constraints: board_struct.constraints,
+        width: board_struct.width,
+        height: board_struct.height,
     };
 
     let summary = build_summary(&final_board);
@@ -471,9 +490,9 @@ fn is_ground_net(board: &CompiledBoard, net_name: &str) -> bool {
 fn make_capacitor_component(
     refdes: &str,
     value: Qty<Farad>,
-    code: footprint::Code,
+    package: Package,
 ) -> CompiledComponent {
-    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, code);
+    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
     let pins: Vec<Pin> = cap
         .pins()
         .iter()
@@ -538,7 +557,7 @@ fn place_decoupling_set(
     comp: &CompiledComponent,
     pin: &Pin,
     values: &[Qty<Farad>],
-    footprint_code: footprint::Code,
+    package: Package,
     gnd_net_name: &str,
     components: &mut Vec<CompiledComponent>,
     connections: &mut Vec<Connection>,
@@ -576,7 +595,7 @@ fn place_decoupling_set(
         *next_c += 1;
 
         let comp_idx_in_final = board.components.len() + components.len();
-        components.push(make_capacitor_component(&refdes, *value, footprint_code));
+        components.push(make_capacitor_component(&refdes, *value, package));
         connections.push(Connection {
             component: comp_idx_in_final,
             pin: "1".into(),
@@ -588,14 +607,6 @@ fn place_decoupling_set(
             net: NetId(gnd_net_name.into()),
         });
     }
-}
-
-/// Resolve a package string (e.g. `"0603"`, `"0805"`) into a [`footprint::Code`],
-/// falling back to [`DEFAULT_CAP_FOOTPRINT`] when `None` or unrecognised.
-fn resolve_footprint_code(package: Option<&str>) -> footprint::Code {
-    package
-        .and_then(footprint::Code::from_str)
-        .unwrap_or(DEFAULT_CAP_FOOTPRINT)
 }
 
 /// Determine the name and voltage for every net by merging explicit overrides
@@ -658,6 +669,7 @@ fn resolve_net_overrides(
 #[allow(clippy::type_complexity)]
 fn synthesise_decoupling(
     board: &CompiledBoard,
+    package: Package,
 ) -> (
     Vec<CompiledComponent>,
     Vec<Diagnostic>,
@@ -673,12 +685,7 @@ fn synthesise_decoupling(
 
     for (comp_idx, comp) in board.components.iter().enumerate() {
         for constraint in &comp.constraints {
-            let Constraint::Decoupling {
-                values,
-                per_pin,
-                package,
-            } = constraint
-            else {
+            let Constraint::Decoupling { values, per_pin } = constraint else {
                 continue;
             };
 
@@ -703,7 +710,6 @@ fn synthesise_decoupling(
             }
 
             if *per_pin {
-                let footprint_code = resolve_footprint_code(package.as_deref());
                 for pin in power_pins {
                     place_decoupling_set(
                         board,
@@ -711,7 +717,7 @@ fn synthesise_decoupling(
                         comp,
                         pin,
                         values,
-                        footprint_code,
+                        package,
                         &gnd_net_name,
                         &mut components,
                         &mut connections,
@@ -721,7 +727,6 @@ fn synthesise_decoupling(
                 }
             } else {
                 // One set of decoupling capacitors per unique power net.
-                let footprint_code = resolve_footprint_code(package.as_deref());
                 let mut pins_by_net: HashMap<String, Vec<&Pin>> = HashMap::new();
                 for pin in power_pins {
                     let net_name = board
@@ -754,7 +759,7 @@ fn synthesise_decoupling(
                             comp,
                             pin,
                             values,
-                            footprint_code,
+                            package,
                             &gnd_net_name,
                             &mut components,
                             &mut connections,
@@ -807,7 +812,6 @@ mod tests {
                 vec![Constraint::Decoupling {
                     values: vec![100.0.nf(), 1.0.uf()],
                     per_pin: true,
-                    package: None,
                 }],
             )],
             nets: vec![Net {
@@ -825,8 +829,10 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
-        let (comps, diags, conns, fallback) = synthesise_decoupling(&board);
+        let (comps, diags, conns, fallback) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);
         assert_eq!(comps[0].refdes, "C1");
         assert_eq!(conns.len(), 4);
@@ -843,7 +849,6 @@ mod tests {
                 vec![Constraint::Decoupling {
                     values: vec![100.0.nf()],
                     per_pin: true,
-                    package: None,
                 }],
             )],
             nets: vec![Net {
@@ -861,8 +866,10 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
-        let (comps, _, _, _) = synthesise_decoupling(&board);
+        let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
         let fp = comps[0]
             .footprint
@@ -888,7 +895,6 @@ mod tests {
                 vec![Constraint::Decoupling {
                     values: vec![100.0.nf()],
                     per_pin: false,
-                    package: None,
                 }],
             )],
             nets: vec![
@@ -924,8 +930,10 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
-        let (comps, _, _, _) = synthesise_decoupling(&board);
+        let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
     }
 
@@ -941,7 +949,6 @@ mod tests {
                 vec![Constraint::Decoupling {
                     values: vec![100.0.nf()],
                     per_pin: false,
-                    package: None,
                 }],
             )],
             nets: vec![
@@ -986,8 +993,10 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
-        let (comps, _, _, _) = synthesise_decoupling(&board);
+        let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);
     }
 }

@@ -406,6 +406,8 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         }
     }
 

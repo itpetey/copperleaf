@@ -65,6 +65,10 @@ pub struct CompiledBoard {
     pub nets: Vec<Net>,
     pub connections: Vec<Connection>,
     pub constraints: Vec<Constraint>,
+    /// Board width in millimetres.
+    pub width: f64,
+    /// Board height in millimetres.
+    pub height: f64,
 }
 
 /// Handle to a component instance on a [`Board`].
@@ -89,6 +93,10 @@ pub struct Board {
     pub connections: Vec<RawConnection>,
     pub net_overrides: Vec<RawNetOverride>,
     pub(crate) next_edge: usize,
+    /// Board width in millimetres (default 100.0).
+    width: f64,
+    /// Board height in millimetres (default 80.0).
+    height: f64,
 }
 
 impl ComponentHandle {
@@ -110,7 +118,25 @@ impl Board {
             connections: Vec::new(),
             net_overrides: Vec::new(),
             next_edge: 0,
+            width: 100.0,
+            height: 80.0,
         }
+    }
+
+    /// Set the board outline dimensions in millimetres.
+    pub fn set_dimensions(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
+    }
+
+    /// Board width in millimetres.
+    pub fn width(&self) -> f64 {
+        self.width
+    }
+
+    /// Board height in millimetres.
+    pub fn height(&self) -> f64 {
+        self.height
     }
 
     /// Add a [`Component`] to this board.

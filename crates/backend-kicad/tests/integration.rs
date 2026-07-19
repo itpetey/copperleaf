@@ -67,7 +67,6 @@ impl Component for DecoupledPart {
         vec![Constraint::Decoupling {
             values: vec![100.0.nf()],
             per_pin: true,
-            package: None,
         }]
     }
 }
@@ -94,7 +93,7 @@ fn decoupling_caps_have_footprints() {
         .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
         .unwrap();
 
-    let report = copperleaf_compile::run(board).expect("board should compile");
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect("board should compile");
     // The synthesised capacitor should appear in the compiled board with a footprint.
     let caps: Vec<_> = report
         .board
@@ -114,7 +113,7 @@ fn decoupling_caps_have_footprints() {
 #[test]
 fn emitted_netlist_contains_components_and_nets() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board).unwrap();
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -133,7 +132,7 @@ fn emitted_netlist_contains_components_and_nets() {
 #[test]
 fn emitted_schematic_contains_lib_id_and_pin_positions() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board).unwrap();
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -150,14 +149,14 @@ fn emitted_schematic_contains_lib_id_and_pin_positions() {
 #[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
-    let err = copperleaf_compile::run(board).expect_err("overvoltage should fail compilation");
+    let err = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect_err("overvoltage should fail compilation");
     assert!(err.errors.iter().any(|d| d.code == "ERC:OVERVOLT"));
 }
 
 #[test]
 fn valid_board_compiles_and_emits() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board).expect("valid board should compile");
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect("valid board should compile");
 
     let dir = tempfile::tempdir().unwrap();
     let backend = KiCad::new().with_project_name("test");
@@ -171,32 +170,7 @@ fn valid_board_compiles_and_emits() {
         .collect();
     assert!(names.contains(&"test.kicad_sch".to_string()));
     assert!(names.contains(&"test.net".to_string()));
-    assert!(names.contains(&"symbols".to_string()));
-    assert!(names.contains(&"footprints".to_string()));
-
-    // Verify symbols/ directory contains at least one .kicad_sym file.
-    let sym_dir = dir.path().join("symbols");
-    let sym_files: Vec<_> = fs::read_dir(&sym_dir)
-        .unwrap()
-        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
-        .collect();
-    assert!(!sym_files.is_empty(), "symbols/ should not be empty");
-    assert!(
-        sym_files.iter().any(|f| f.ends_with(".kicad_sym")),
-        "should contain .kicad_sym files, got: {:?}",
-        sym_files
-    );
-
-    // Verify footprints/ directory contains at least one .kicad_mod file.
-    let fp_dir = dir.path().join("footprints");
-    let fp_files: Vec<_> = fs::read_dir(&fp_dir)
-        .unwrap()
-        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
-        .collect();
-    assert!(!fp_files.is_empty(), "footprints/ should not be empty");
-    assert!(
-        fp_files.iter().any(|f| f.ends_with(".kicad_mod")),
-        "should contain .kicad_mod files, got: {:?}",
-        fp_files
-    );
+    // No symbols/ or footprints/ — geometry is embedded inline.
+    assert!(!names.contains(&"symbols".to_string()));
+    assert!(!names.contains(&"footprints".to_string()));
 }

@@ -43,11 +43,11 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
     }
 
     children.extend(net_class_nodes(board, &net_codes));
-    children.extend(board_outline());
+    children.extend(board_outline(board.width, board.height));
 
     // Auto-place components in rows, packing by their courtyard extents so
     // footprints do not overlap.
-    let placements = auto_place(board);
+    let placements = auto_place(board, board.width);
 
     for (idx, comp) in board.components.iter().enumerate() {
         children.push(footprint_node(
@@ -66,11 +66,13 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
 
 /// Simple row packing: place footprints left-to-right with a gap, wrapping
 /// before they cross the board outline.  Positions are footprint origins.
-fn auto_place(board: &CompiledBoard) -> Vec<(f64, f64)> {
+fn auto_place(board: &CompiledBoard, board_width: f64) -> Vec<(f64, f64)> {
     const START_X: f64 = 10.0;
     const START_Y: f64 = 10.0;
-    const MAX_X: f64 = 95.0;
+    const MARGIN: f64 = 5.0;
     const GAP: f64 = 5.0;
+
+    let max_x = board_width - MARGIN;
 
     let mut placements = Vec::with_capacity(board.components.len());
     let mut cursor_x = START_X;
@@ -90,7 +92,7 @@ fn auto_place(board: &CompiledBoard) -> Vec<(f64, f64)> {
             None => (5.0, 5.0, 2.5, 2.5),
         };
 
-        if cursor_x + w > MAX_X && cursor_x > START_X {
+        if cursor_x + w > max_x && cursor_x > START_X {
             cursor_x = START_X;
             cursor_y += row_height + GAP;
             row_height = 0.0;
@@ -104,12 +106,12 @@ fn auto_place(board: &CompiledBoard) -> Vec<(f64, f64)> {
     placements
 }
 
-fn board_outline() -> Vec<Sexpr> {
+fn board_outline(width: f64, height: f64) -> Vec<Sexpr> {
     let rect = [
-        ((0.0, 0.0), (100.0, 0.0), "top"),
-        ((100.0, 0.0), (100.0, 80.0), "right"),
-        ((100.0, 80.0), (0.0, 80.0), "bottom"),
-        ((0.0, 80.0), (0.0, 0.0), "left"),
+        ((0.0, 0.0), (width, 0.0), "top"),
+        ((width, 0.0), (width, height), "right"),
+        ((width, height), (0.0, height), "bottom"),
+        ((0.0, height), (0.0, 0.0), "left"),
     ];
     rect.iter()
         .map(|((x1, y1), (x2, y2), side)| {
@@ -434,6 +436,8 @@ mod tests {
                 net: NetId("V3V3".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         }
     }
 

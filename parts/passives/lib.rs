@@ -6,25 +6,25 @@ use copperleaf::{
 };
 use copperleaf_part_macro::build_component;
 
-use crate::footprint::Code;
+use crate::footprint::Package;
 
 pub mod footprint;
 
 /// Standard two-pin capacitor.
 ///
-/// The footprint is specified by a [`footprint::Code`] — use
+/// The footprint is specified by a [`Package`] — use
 /// [`Capacitor::new`] to create one with an SMD land pattern and KiCad
 /// footprint reference.
 #[derive(Clone, Debug)]
 pub struct Capacitor {
     value: Qty<Farad>,
     pins: Vec<Pin>,
-    footprint_code: footprint::Code,
+    footprint: Package,
 }
 
 /// Standard two-pin resistor.
 ///
-/// The footprint is specified by a [`footprint::Code`] — use
+/// The footprint is specified by a [`Package`] — use
 /// [`Resistor::new`] to create one with an SMD land pattern and KiCad
 /// footprint reference.
 #[derive(Clone, Debug)]
@@ -32,7 +32,7 @@ pub struct Resistor {
     value: Qty<Ohm>,
     net: String,
     pins: Vec<Pin>,
-    footprint_code: footprint::Code,
+    footprint: Package,
 }
 
 /// Standard two-pin crystal.
@@ -50,8 +50,8 @@ impl Capacitor {
         self.value
     }
 
-    fn smd_pin(name: &str, code: footprint::Code, index: usize) -> Pin {
-        let lp = code.land_pattern();
+    fn smd_pin(name: &str, package: Package, index: usize) -> Pin {
+        let lp = package.land_pattern();
         let x_offset = if index == 0 {
             -lp.pitch / 2.0
         } else {
@@ -74,26 +74,29 @@ impl Capacitor {
             .pin()
     }
 
-    /// Create a two-pin capacitor with the given value and SMD footprint code.
+    /// Create a two-pin capacitor with the given value and SMD footprint package.
     ///
     /// # Example
     ///
     /// ```ignore
     /// use copperleaf_parts_passives::{Capacitor, footprint};
     ///
-    /// let c = Capacitor::new(100.0.nf(), footprint::Code::M1608);
+    /// let c = Capacitor::new(100.0.nf(), Package::M1608);
     /// assert!(c.footprint().unwrap().contains("1608"));
     /// ```
-    pub fn new(value: Qty<Farad>, code: footprint::Code) -> Self {
+    pub fn new(value: Qty<Farad>, package: Package) -> Self {
         Self {
             value,
-            pins: vec![Self::smd_pin("1", code, 0), Self::smd_pin("2", code, 1)],
-            footprint_code: code,
+            pins: vec![
+                Self::smd_pin("1", package, 0),
+                Self::smd_pin("2", package, 1),
+            ],
+            footprint: package,
         }
     }
 
-    fn decoupling_pins(code: footprint::Code) -> Vec<Pin> {
-        let lp = code.land_pattern();
+    fn decoupling_pins(package: Package) -> Vec<Pin> {
+        let lp = package.land_pattern();
         let x = lp.pitch / 2.0;
         vec![
             Pin::build("1")
@@ -130,11 +133,11 @@ impl Capacitor {
     }
 
     /// Create a decoupling capacitor with PowerIn and Gnd pins rated for 50 V.
-    pub fn decoupling(value: Qty<Farad>, code: footprint::Code) -> Self {
+    pub fn decoupling(value: Qty<Farad>, package: Package) -> Self {
         Self {
             value,
-            pins: Self::decoupling_pins(code),
-            footprint_code: code,
+            pins: Self::decoupling_pins(package),
+            footprint: package,
         }
     }
 }
@@ -145,7 +148,7 @@ impl Component for Capacitor {
     }
 
     fn footprint(&self) -> Option<&'static str> {
-        Some(self.footprint_code.capacitor_footprint_name())
+        Some(self.footprint.capacitor_footprint_name())
     }
 }
 
@@ -161,8 +164,8 @@ impl Resistor {
         &self.net
     }
 
-    fn smd_pin(name: &str, code: footprint::Code, index: usize) -> Pin {
-        let lp = code.land_pattern();
+    fn smd_pin(name: &str, package: Package, index: usize) -> Pin {
+        let lp = package.land_pattern();
         let x_offset = if index == 0 {
             -lp.pitch / 2.0
         } else {
@@ -185,29 +188,35 @@ impl Resistor {
             .pin()
     }
 
-    /// Create a two-pin resistor with the given value and SMD footprint code.
-    pub fn new(value: Qty<Ohm>, code: footprint::Code) -> Self {
+    /// Create a two-pin resistor with the given value and SMD footprint package.
+    pub fn new(value: Qty<Ohm>, package: Package) -> Self {
         Self {
             value,
             net: String::new(),
-            pins: vec![Self::smd_pin("1", code, 0), Self::smd_pin("2", code, 1)],
-            footprint_code: code,
+            pins: vec![
+                Self::smd_pin("1", package, 0),
+                Self::smd_pin("2", package, 1),
+            ],
+            footprint: package,
         }
     }
 
     /// Create a pull-up resistor connected to `net`.
-    pub fn pullup(value: Qty<Ohm>, net: &str, code: footprint::Code) -> Self {
+    pub fn pullup(value: Qty<Ohm>, net: &str, package: Package) -> Self {
         Self {
             value,
             net: net.to_owned(),
-            pins: vec![Self::smd_pin("1", code, 0), Self::smd_pin("2", code, 1)],
-            footprint_code: code,
+            pins: vec![
+                Self::smd_pin("1", package, 0),
+                Self::smd_pin("2", package, 1),
+            ],
+            footprint: package,
         }
     }
 
     /// Create a pull-down resistor connected to `net`.
-    pub fn pulldown(value: Qty<Ohm>, net: &str, code: footprint::Code) -> Self {
-        Self::pullup(value, net, code)
+    pub fn pulldown(value: Qty<Ohm>, net: &str, package: Package) -> Self {
+        Self::pullup(value, net, package)
     }
 }
 
@@ -217,7 +226,7 @@ impl Component for Resistor {
     }
 
     fn footprint(&self) -> Option<&'static str> {
-        Some(self.footprint_code.resistor_footprint_name())
+        Some(self.footprint.resistor_footprint_name())
     }
 }
 
@@ -273,9 +282,9 @@ pub fn pulldown(
     refdes: &str,
     pin: PinHandle,
     gnd: PinHandle,
-    code: Code,
+    package: Package,
 ) -> Result<(), CompileError> {
-    let r = board.add(refdes, Resistor::new(10.0.kohm(), code));
+    let r = board.add(refdes, Resistor::new(10.0.kohm(), package));
     board.connect(pin, r.pin(Resistor::PIN1))?;
     board.connect(gnd, r.pin(Resistor::PIN2))?;
     Ok(())
@@ -287,9 +296,9 @@ pub fn pullup(
     refdes: &str,
     pin: PinHandle,
     vdd_pin: PinHandle,
-    code: Code,
+    package: Package,
 ) -> Result<(), CompileError> {
-    let r = board.add(refdes, Resistor::new(10.0.kohm(), code));
+    let r = board.add(refdes, Resistor::new(10.0.kohm(), package));
     board.connect(pin, r.pin(Resistor::PIN1))?;
     board.connect(vdd_pin, r.pin(Resistor::PIN2))?;
     Ok(())
@@ -301,7 +310,7 @@ mod tests {
 
     #[test]
     fn capacitor_new_has_two_digital_io_pins() {
-        let c = Capacitor::new(100.0.nf(), footprint::Code::M1608);
+        let c = Capacitor::new(100.0.nf(), Package::M1608);
         assert_eq!(c.pins().len(), 2);
         assert_eq!(c.pins()[0].name(), "1");
         assert_eq!(c.pins()[1].name(), "2");
@@ -311,7 +320,7 @@ mod tests {
 
     #[test]
     fn capacitor_decoupling_has_power_in_and_gnd() {
-        let c = Capacitor::decoupling(10.0.uf(), footprint::Code::M1608);
+        let c = Capacitor::decoupling(10.0.uf(), Package::M1608);
         assert_eq!(c.pins().len(), 2);
         assert_eq!(c.pins()[0].name(), "1");
         assert_eq!(c.pins()[1].name(), "2");
@@ -322,7 +331,7 @@ mod tests {
 
     #[test]
     fn resistor_new_has_two_pins() {
-        let r = Resistor::new(10.0.kohm(), footprint::Code::M1608);
+        let r = Resistor::new(10.0.kohm(), Package::M1608);
         assert_eq!(r.pins().len(), 2);
         assert!(matches!(r.pins()[0].role(), Role::DigitalIO));
         assert!(matches!(r.pins()[1].role(), Role::DigitalIO));
@@ -330,8 +339,8 @@ mod tests {
 
     #[test]
     fn resistor_pullup_and_pulldown_have_digital_io_pins() {
-        let pullup = Resistor::pullup(10.0.kohm(), "VCC", footprint::Code::M1608);
-        let pulldown = Resistor::pulldown(10.0.kohm(), "GND", footprint::Code::M1608);
+        let pullup = Resistor::pullup(10.0.kohm(), "VCC", Package::M1608);
+        let pulldown = Resistor::pulldown(10.0.kohm(), "GND", Package::M1608);
         assert_eq!(pullup.pins().len(), 2);
         assert_eq!(pulldown.pins().len(), 2);
         assert!(
@@ -367,7 +376,7 @@ mod tests {
 
     #[test]
     fn capacitor_new_sets_footprint_and_pad_geometry() {
-        let c = Capacitor::new(100.0.nf(), footprint::Code::M1608);
+        let c = Capacitor::new(100.0.nf(), Package::M1608);
         let fp = c.footprint().unwrap();
         assert!(fp.contains("0603") || fp.contains("1608"));
         for i in 0..2 {
@@ -385,7 +394,7 @@ mod tests {
 
     #[test]
     fn capacitor_decoupling_sets_footprint() {
-        let c = Capacitor::decoupling(10.0.uf(), footprint::Code::M2012);
+        let c = Capacitor::decoupling(10.0.uf(), Package::M2012);
         assert!(c.footprint().is_some());
         for pin in c.pins() {
             assert_eq!(pin.pad_type(), Some("smd"));
@@ -395,7 +404,7 @@ mod tests {
 
     #[test]
     fn resistor_new_sets_footprint_and_geometry() {
-        let r = Resistor::new(10.0.kohm(), footprint::Code::M1005);
+        let r = Resistor::new(10.0.kohm(), Package::M1005);
         let fp = r.footprint().unwrap();
         assert!(fp.contains("0402") || fp.contains("1005"));
         for pin in r.pins() {
@@ -406,32 +415,32 @@ mod tests {
 
     #[test]
     fn resistor_pullup_sets_footprint() {
-        let r = Resistor::pullup(10.0.kohm(), "VCC", footprint::Code::M3216);
+        let r = Resistor::pullup(10.0.kohm(), "VCC", Package::M3216);
         assert!(r.footprint().is_some());
         assert_eq!(r.net(), "VCC");
     }
 
     #[test]
     fn resistor_pulldown_sets_footprint() {
-        let r = Resistor::pulldown(10.0.kohm(), "GND", footprint::Code::M3216);
+        let r = Resistor::pulldown(10.0.kohm(), "GND", Package::M3216);
         assert!(r.footprint().is_some());
         assert_eq!(r.net(), "GND");
     }
 
     #[test]
-    fn all_footprint_codes_produce_valid_geometry() {
-        for code in [
-            footprint::Code::M0603,
-            footprint::Code::M1005,
-            footprint::Code::M1608,
-            footprint::Code::M2012,
-            footprint::Code::M3216,
-            footprint::Code::M3225,
-            footprint::Code::M4532,
-            footprint::Code::M5025,
-            footprint::Code::M6332,
+    fn all_footprints_produce_valid_geometry() {
+        for package in [
+            Package::M0603,
+            Package::M1005,
+            Package::M1608,
+            Package::M2012,
+            Package::M3216,
+            Package::M3225,
+            Package::M4532,
+            Package::M5025,
+            Package::M6332,
         ] {
-            let r = Resistor::new(10.0.kohm(), code);
+            let r = Resistor::new(10.0.kohm(), package);
             assert!(r.footprint().is_some());
             for pin in r.pins() {
                 assert_eq!(pin.pad_type(), Some("smd"));
@@ -441,8 +450,8 @@ mod tests {
     }
 
     #[test]
-    fn capacitor_with_code_still_has_correct_roles() {
-        let c = Capacitor::new(100.0.nf(), footprint::Code::M1608);
+    fn capacitor_with_package_still_has_correct_roles() {
+        let c = Capacitor::new(100.0.nf(), Package::M1608);
         assert!(matches!(c.pins()[0].role(), Role::DigitalIO));
         assert!(matches!(c.pins()[1].role(), Role::DigitalIO));
     }

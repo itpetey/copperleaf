@@ -49,7 +49,6 @@ pub enum Constraint {
     Decoupling {
         values: Vec<Qty<Farad>>,
         per_pin: bool,
-        package: Option<String>,
     },
     ResonanceIndex {
         max: f64,

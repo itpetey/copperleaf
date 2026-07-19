@@ -210,6 +210,8 @@ mod tests {
                 net: NetId("VBUS".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
         let diags = erc_overvoltage(&board);
         assert_eq!(diags.len(), 1);
@@ -235,6 +237,8 @@ mod tests {
                 net: NetId("NET".into()),
             }],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
         let diags = erc_nc_pin_connected(&board);
         assert_eq!(diags.len(), 1);
@@ -248,6 +252,8 @@ mod tests {
             nets: vec![],
             connections: vec![],
             constraints: vec![],
+            width: 100.0,
+            height: 80.0,
         };
         let diags = erc_floating_inputs(&board);
         assert_eq!(diags.len(), 1);

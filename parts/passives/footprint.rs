@@ -7,9 +7,9 @@
 //! # Example
 //!
 //! ```ignore
-//! use footprint::Code;
+//! use footprint::Package;
 //!
-//! let lp = Code::M0603.land_pattern();
+//! let lp = Package::M0603.land_pattern();
 //! assert_eq!(lp.imperial, "0603");
 //! assert_eq!(lp.metric, "1608");
 //! ```
@@ -17,10 +17,10 @@
 /// Standard SMD footprint code.
 ///
 /// Variants are named by their metric code (e.g. `M1608` for the 0603/1608
-/// package).  Use [`from_str`](Code::from_str) to look up by imperial or
+/// package).  Use [`from_str`](Package::from_str) to look up by imperial or
 /// metric string.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Code {
+pub enum Package {
     /// 0201 (imperial) / 0603 (metric) — 0.6 × 0.3 mm body
     M0603,
     /// 0402 (imperial) / 1005 (metric) — 1.0 × 0.5 mm body
@@ -60,21 +60,21 @@ pub struct LandPattern {
     pub pitch: f64,
 }
 
-impl Code {
+impl Package {
     /// Look up a footprint code by its imperial or metric name.
     ///
     /// Accepts e.g. `"0603"`, `"1608"`, `"0402"`, `"1005"`.
     pub fn from_str(s: &str) -> Option<Self> {
         Some(match s {
-            "0201" | "0603" => Code::M0603,
-            "0402" | "1005" => Code::M1005,
-            /* "0603" | */ "1608" => Code::M1608,
-            "0805" | "2012" => Code::M2012,
-            "1206" | "3216" => Code::M3216,
-            "1210" | "3225" => Code::M3225,
-            "1812" | "4532" => Code::M4532,
-            "2010" | "5025" => Code::M5025,
-            "2512" | "6332" => Code::M6332,
+            "0201" | "0603" => Self::M0603,
+            "0402" | "1005" => Self::M1005,
+            /* "0603" | */ "1608" => Self::M1608,
+            "0805" | "2012" => Self::M2012,
+            "1206" | "3216" => Self::M3216,
+            "1210" | "3225" => Self::M3225,
+            "1812" | "4532" => Self::M4532,
+            "2010" | "5025" => Self::M5025,
+            "2512" | "6332" => Self::M6332,
             _ => return None,
         })
     }
@@ -82,7 +82,7 @@ impl Code {
     /// Resolve the land pattern geometry for this code.
     pub fn land_pattern(self) -> LandPattern {
         match self {
-            Code::M0603 => LandPattern {
+            Self::M0603 => LandPattern {
                 imperial: "0201",
                 metric: "0603",
                 body_x: 0.6,
@@ -91,7 +91,7 @@ impl Code {
                 pad_h: 0.32,
                 pitch: 0.32,
             },
-            Code::M1005 => LandPattern {
+            Self::M1005 => LandPattern {
                 imperial: "0402",
                 metric: "1005",
                 body_x: 1.0,
@@ -100,7 +100,7 @@ impl Code {
                 pad_h: 0.65,
                 pitch: 0.5,
             },
-            Code::M1608 => LandPattern {
+            Self::M1608 => LandPattern {
                 imperial: "0603",
                 metric: "1608",
                 body_x: 1.6,
@@ -109,7 +109,7 @@ impl Code {
                 pad_h: 0.9,
                 pitch: 1.0,
             },
-            Code::M2012 => LandPattern {
+            Self::M2012 => LandPattern {
                 imperial: "0805",
                 metric: "2012",
                 body_x: 2.0,
@@ -118,7 +118,7 @@ impl Code {
                 pad_h: 1.2,
                 pitch: 1.3,
             },
-            Code::M3216 => LandPattern {
+            Self::M3216 => LandPattern {
                 imperial: "1206",
                 metric: "3216",
                 body_x: 3.2,
@@ -127,7 +127,7 @@ impl Code {
                 pad_h: 1.6,
                 pitch: 2.0,
             },
-            Code::M3225 => LandPattern {
+            Self::M3225 => LandPattern {
                 imperial: "1210",
                 metric: "3225",
                 body_x: 3.2,
@@ -136,7 +136,7 @@ impl Code {
                 pad_h: 2.5,
                 pitch: 2.0,
             },
-            Code::M4532 => LandPattern {
+            Self::M4532 => LandPattern {
                 imperial: "1812",
                 metric: "4532",
                 body_x: 4.5,
@@ -145,7 +145,7 @@ impl Code {
                 pad_h: 3.2,
                 pitch: 2.8,
             },
-            Code::M5025 => LandPattern {
+            Self::M5025 => LandPattern {
                 imperial: "2010",
                 metric: "5025",
                 body_x: 5.0,
@@ -154,7 +154,7 @@ impl Code {
                 pad_h: 2.5,
                 pitch: 3.2,
             },
-            Code::M6332 => LandPattern {
+            Self::M6332 => LandPattern {
                 imperial: "2512",
                 metric: "6332",
                 body_x: 6.3,
@@ -169,30 +169,30 @@ impl Code {
     /// KiCad-style footprint library name for a resistor.
     pub fn resistor_footprint_name(self) -> &'static str {
         match self {
-            Code::M0603 => "Resistor_SMD:R_0201_0603Metric",
-            Code::M1005 => "Resistor_SMD:R_0402_1005Metric",
-            Code::M1608 => "Resistor_SMD:R_0603_1608Metric",
-            Code::M2012 => "Resistor_SMD:R_0805_2012Metric",
-            Code::M3216 => "Resistor_SMD:R_1206_3216Metric",
-            Code::M3225 => "Resistor_SMD:R_1210_3225Metric",
-            Code::M4532 => "Resistor_SMD:R_1812_4532Metric",
-            Code::M5025 => "Resistor_SMD:R_2010_5025Metric",
-            Code::M6332 => "Resistor_SMD:R_2512_6332Metric",
+            Self::M0603 => "Resistor_SMD:R_0201_0603Metric",
+            Self::M1005 => "Resistor_SMD:R_0402_1005Metric",
+            Self::M1608 => "Resistor_SMD:R_0603_1608Metric",
+            Self::M2012 => "Resistor_SMD:R_0805_2012Metric",
+            Self::M3216 => "Resistor_SMD:R_1206_3216Metric",
+            Self::M3225 => "Resistor_SMD:R_1210_3225Metric",
+            Self::M4532 => "Resistor_SMD:R_1812_4532Metric",
+            Self::M5025 => "Resistor_SMD:R_2010_5025Metric",
+            Self::M6332 => "Resistor_SMD:R_2512_6332Metric",
         }
     }
 
     /// KiCad-style footprint library name for a capacitor.
     pub fn capacitor_footprint_name(self) -> &'static str {
         match self {
-            Code::M0603 => "Capacitor_SMD:C_0201_0603Metric",
-            Code::M1005 => "Capacitor_SMD:C_0402_1005Metric",
-            Code::M1608 => "Capacitor_SMD:C_0603_1608Metric",
-            Code::M2012 => "Capacitor_SMD:C_0805_2012Metric",
-            Code::M3216 => "Capacitor_SMD:C_1206_3216Metric",
-            Code::M3225 => "Capacitor_SMD:C_1210_3225Metric",
-            Code::M4532 => "Capacitor_SMD:C_1812_4532Metric",
-            Code::M5025 => "Capacitor_SMD:C_2010_5025Metric",
-            Code::M6332 => "Capacitor_SMD:C_2512_6332Metric",
+            Self::M0603 => "Capacitor_SMD:C_0201_0603Metric",
+            Self::M1005 => "Capacitor_SMD:C_0402_1005Metric",
+            Self::M1608 => "Capacitor_SMD:C_0603_1608Metric",
+            Self::M2012 => "Capacitor_SMD:C_0805_2012Metric",
+            Self::M3216 => "Capacitor_SMD:C_1206_3216Metric",
+            Self::M3225 => "Capacitor_SMD:C_1210_3225Metric",
+            Self::M4532 => "Capacitor_SMD:C_1812_4532Metric",
+            Self::M5025 => "Capacitor_SMD:C_2010_5025Metric",
+            Self::M6332 => "Capacitor_SMD:C_2512_6332Metric",
         }
     }
 }
@@ -203,28 +203,28 @@ mod tests {
 
     #[test]
     fn lookup_by_imperial_and_metric() {
-        assert_eq!(Code::from_str("0603"), Some(Code::M1608));
-        assert_eq!(Code::from_str("1608"), Some(Code::M1608));
+        assert_eq!(Package::from_str("0603"), Some(Package::M0603));
+        assert_eq!(Package::from_str("1608"), Some(Package::M1608));
     }
 
     #[test]
     fn unknown_code_returns_none() {
-        assert_eq!(Code::from_str("9999"), None);
-        assert_eq!(Code::from_str(""), None);
+        assert_eq!(Package::from_str("9999"), None);
+        assert_eq!(Package::from_str(""), None);
     }
 
     #[test]
     fn land_pattern_pitch_is_positive() {
         for code in [
-            Code::M0603,
-            Code::M1005,
-            Code::M1608,
-            Code::M2012,
-            Code::M3216,
-            Code::M3225,
-            Code::M4532,
-            Code::M5025,
-            Code::M6332,
+            Package::M0603,
+            Package::M1005,
+            Package::M1608,
+            Package::M2012,
+            Package::M3216,
+            Package::M3225,
+            Package::M4532,
+            Package::M5025,
+            Package::M6332,
         ] {
             let lp = code.land_pattern();
             assert!(lp.pitch > 0.0, "{} has non-positive pitch", lp.imperial);
@@ -238,15 +238,15 @@ mod tests {
     #[test]
     fn footprint_names_are_not_empty() {
         for code in [
-            Code::M0603,
-            Code::M1005,
-            Code::M1608,
-            Code::M2012,
-            Code::M3216,
-            Code::M3225,
-            Code::M4532,
-            Code::M5025,
-            Code::M6332,
+            Package::M0603,
+            Package::M1005,
+            Package::M1608,
+            Package::M2012,
+            Package::M3216,
+            Package::M3225,
+            Package::M4532,
+            Package::M5025,
+            Package::M6332,
         ] {
             assert!(!code.resistor_footprint_name().is_empty());
             assert!(!code.capacitor_footprint_name().is_empty());
