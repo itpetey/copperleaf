@@ -1,9 +1,10 @@
 //! KiCad netlist emitter.
 
-use copperleaf::CompiledBoard;
+use copperleaf::{CompiledBoard, Role};
 
 use crate::{
     common::{build_net_codes, refdes_prefix, role_to_pintype},
+    fp_geom,
     sexpr::{Sexpr, kv},
 };
 
@@ -25,11 +26,46 @@ fn components_node(board: &CompiledBoard) -> Sexpr {
         .components
         .iter()
         .map(|c| {
-            Sexpr::list([
+            let mut children = vec![
                 Sexpr::atom("comp"),
                 kv("ref", &c.refdes),
                 kv("value", refdes_prefix(&c.refdes)),
-            ])
+            ];
+
+            // Emit a (pins ...) section listing every pin on the component,
+            // including unconnected and MECH pins, so that tools comparing
+            // the netlist pin count against the schematic see a 1:1 match.
+            let mut pin_nodes: Vec<Sexpr> = Vec::new();
+            for (i, pin) in c.pins.iter().enumerate() {
+                pin_nodes.push(Sexpr::list([
+                    Sexpr::atom("pin"),
+                    Sexpr::str(fp_geom::pin_number(pin, i)),
+                    kv("type", role_to_pintype(pin.role())),
+                    kv("name", pin.name()),
+                ]));
+            }
+            // Add MECH pins for thermal vias and mechanical pads (same logic
+            // as schematic.rs::layout_for_comp).
+            let pads = fp_geom::pads_from_component(c);
+            let mut extra_idx = 0;
+            for pad in &pads {
+                if pad.pin_index.is_none() {
+                    extra_idx += 1;
+                    pin_nodes.push(Sexpr::list([
+                        Sexpr::atom("pin"),
+                        Sexpr::str(pad.number.clone()),
+                        kv("type", role_to_pintype(Role::Passive)),
+                        kv("name", &format!("MECH{}", extra_idx)),
+                    ]));
+                }
+            }
+            if !pin_nodes.is_empty() {
+                children.push(Sexpr::list(
+                    std::iter::once(Sexpr::atom("pins")).chain(pin_nodes),
+                ));
+            }
+
+            Sexpr::list(children)
         })
         .collect();
     Sexpr::list(std::iter::once(Sexpr::atom("components")).chain(comps))
@@ -187,6 +223,17 @@ mod tests {
         assert!(out.starts_with("(export"));
         assert!(out.contains("(ref \"U1\")"));
         assert!(out.contains("(name \"VBUS\")"));
+    }
+
+    #[test]
+    fn netlist_components_include_pins() {
+        let board = make_board();
+        let out = emit_netlist(&board);
+        // Every electrical pin should appear in the component's (pins ...) list.
+        assert!(out.contains("(name \"VIN\")"), "{}", out);
+        assert!(out.contains("(name \"GND\")"), "{}", out);
+        assert!(out.contains("(name \"VDD\")"), "{}", out);
+        assert!(out.contains("(name \"GPIO\")"), "{}", out);
     }
 
     #[test]

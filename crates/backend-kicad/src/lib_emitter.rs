@@ -9,7 +9,7 @@
 //! [`crate::fp_geom`] (the physical pad geometry carried by the part
 //! definitions).
 
-use copperleaf::CompiledComponent;
+use copperleaf::{CompiledComponent, Role};
 
 use crate::{
     common::{footprint_ref, format_float, refdes_prefix, symbol_name},
@@ -58,7 +58,7 @@ pub fn emit_symbol_lib(components: &[&CompiledComponent], _library_name: &str) -
 /// symbol name in `.kicad_sym` library files, or the full `lib:symbol`
 /// identifier in a schematic's embedded `lib_symbols` section.
 pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> Sexpr {
-    let layout_pins: Vec<LayoutPin> = comp
+    let mut layout_pins: Vec<LayoutPin> = comp
         .pins
         .iter()
         .enumerate()
@@ -68,6 +68,22 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
             role: p.role(),
         })
         .collect();
+
+    // Add pins for thermal vias and mechanical pads that appear in the PCB
+    // footprint but are not electrical pins.
+    let pads = fp_geom::pads_from_component(comp);
+    let mut extra_idx = 0;
+    for pad in &pads {
+        if pad.pin_index.is_none() {
+            extra_idx += 1;
+            layout_pins.push(LayoutPin {
+                name: format!("MECH{}", extra_idx),
+                number: pad.number.clone(),
+                role: Role::Passive,
+            });
+        }
+    }
+
     let layout = sym_layout::layout_symbol(&layout_pins);
 
     let fp_ref = footprint_ref(comp);

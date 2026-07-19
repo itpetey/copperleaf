@@ -242,11 +242,17 @@ pub fn placed_pin_sexpr(pin: &PlacedPin) -> crate::sexpr::Sexpr {
     ])
 }
 
-/// True for pin names that conventionally indicate an exposed thermal pad.
+/// True for pin names that conventionally indicate an exposed thermal pad
+/// or mechanical feature (placed at the bottom of the symbol).
 fn is_thermal_name(name: &str) -> bool {
-    name.eq_ignore_ascii_case("EXP")
-        || name.eq_ignore_ascii_case("EP")
-        || name.eq_ignore_ascii_case("PAD")
+    let upper = name.to_uppercase();
+    upper == "EXP"
+        || upper == "EP"
+        || upper == "PAD"
+        || upper.starts_with("EXP")
+        || upper.starts_with("EP")
+        || upper.starts_with("PAD")
+        || upper.starts_with("MECH")
 }
 
 #[cfg(test)]

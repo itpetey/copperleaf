@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind};
+use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Role};
 
 use crate::{
     common::{footprint_ref, format_float, refdes_prefix, symbol_lib_id},
@@ -117,8 +117,11 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
 }
 
 /// Compute the symbol layout for a component from its pin roles.
+///
+/// Includes electrical pins, thermal vias, and mechanical pads so the
+/// schematic pin count always matches the PCB pad count.
 fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
-    let pins: Vec<LayoutPin> = comp
+    let mut pins: Vec<LayoutPin> = comp
         .pins
         .iter()
         .enumerate()
@@ -128,6 +131,22 @@ fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
             role: p.role(),
         })
         .collect();
+
+    // Add pins for thermal vias and mechanical pads that appear in the PCB
+    // footprint but are not electrical pins.
+    let pads = fp_geom::pads_from_component(comp);
+    let mut extra_idx = 0;
+    for pad in &pads {
+        if pad.pin_index.is_none() {
+            extra_idx += 1;
+            pins.push(LayoutPin {
+                name: format!("MECH{}", extra_idx),
+                number: pad.number.clone(),
+                role: Role::Passive,
+            });
+        }
+    }
+
     sym_layout::layout_symbol(&pins)
 }
 

@@ -15,6 +15,8 @@ pub enum Role {
     DiffPos,
     DiffNeg,
     Gnd,
+    /// Non-electrical pad (thermal via, paste aperture, mounting hole).
+    Passive,
 }
 
 /// Absolute electrical limits and nominal voltage for a pin.

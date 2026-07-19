@@ -92,6 +92,7 @@ pub fn role_to_pin_type(role: Role) -> &'static str {
         Role::AnalogIn => "input",
         Role::AnalogOut => "output",
         Role::DigitalIO | Role::DiffPos | Role::DiffNeg => "bidirectional",
+        Role::Passive => "passive",
     }
 }
 

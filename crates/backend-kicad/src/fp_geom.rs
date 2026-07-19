@@ -394,12 +394,15 @@ pub fn pads_extent(pads: &[PadGeom]) -> Option<(f64, f64, f64, f64)> {
 /// Collect all pads for a component: electrical pins (with thermal vias)
 /// followed by mechanical pads.  The anchor is normalised per KLC (see
 /// [`normalise_anchor`]).
+///
+/// Un-numbered pads (thermal vias and mechanical pads) are assigned
+/// sequential pad numbers continuing after the last electrical pin so
+/// that every pad has a unique number matching its schematic pin.
 pub fn pads_from_component(comp: &CompiledComponent) -> Vec<PadGeom> {
     let mut pads: Vec<PadGeom> = Vec::new();
 
     for (i, pin) in comp.pins.iter().enumerate() {
         pads.push(pad_from_pin(pin, i));
-        // Thermal vias are emitted as un-numbered through-holes on all copper.
         for via in pin.thermal_vias() {
             pads.push(thermal_via_pad(via.pos, via.drill, via.size));
         }
@@ -407,6 +410,24 @@ pub fn pads_from_component(comp: &CompiledComponent) -> Vec<PadGeom> {
 
     for mech in &comp.mechanical {
         pads.push(pad_from_mechanical(mech));
+    }
+
+    // Assign sequential pad numbers to any un-numbered pads (thermal vias
+    // and mechanical pads) so that every pad can be matched to a schematic
+    // pin.  The numbering continues after the highest numeric electrical
+    // pin number.
+    let max_electrical = pads
+        .iter()
+        .filter(|p| p.pin_index.is_some())
+        .filter_map(|p| p.number.parse::<usize>().ok())
+        .max()
+        .unwrap_or(0);
+    let mut next_num = max_electrical + 1;
+    for pad in pads.iter_mut() {
+        if pad.number.is_empty() {
+            pad.number = next_num.to_string();
+            next_num += 1;
+        }
     }
 
     normalise_anchor(&mut pads);
