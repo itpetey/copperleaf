@@ -13,7 +13,7 @@
 use std::{path::Path, process::Command};
 
 use copperleaf::{
-    Backend, Board, Component, ComponentHandle, Constraint, MechanicalPad, Pin, PinRef, UnitExt,
+    Backend, Board, Component, Constraint, Pad, PadShape, PadType, Pin, PinRef, UnitExt,
 };
 use copperleaf_backend_kicad::KiCad;
 
@@ -29,7 +29,7 @@ struct PwrSource {
 
 struct Mcu {
     pins: Vec<Pin>,
-    mechanical: Vec<MechanicalPad>,
+    mechanical: Vec<Pad>,
 }
 
 struct Slave {
@@ -81,16 +81,18 @@ impl Mcu {
                 Pin::build("SCK").clk(25.0),
                 Pin::build("MOSI").spi(25.0),
             ],
-            mechanical: vec![MechanicalPad {
+            mechanical: vec![Pad {
                 number: "None".into(),
                 pos: (0.0, 0.0),
+                rotation: 0.0,
                 width: 1.2,
                 height: 1.2,
-                pad_type: "np_thru_hole".into(),
-                pad_shape: "circle".into(),
+                pad_type: PadType::NpThruHole,
+                pad_shape: PadShape::Circle,
                 roundrect_rratio: None,
                 layers: None,
-                drill: 1.2,
+                drill: Some(1.2),
+                solder_mask_margin: None,
             }],
         }
     }
@@ -101,7 +103,7 @@ impl Component for Mcu {
         &self.pins
     }
 
-    fn mechanical(&self) -> &[MechanicalPad] {
+    fn mechanical(&self) -> &[Pad] {
         &self.mechanical
     }
 

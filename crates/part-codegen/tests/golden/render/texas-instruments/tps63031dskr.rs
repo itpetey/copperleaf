@@ -19,7 +19,7 @@
 /// | 11  | EXP      | I/O         |                       |
 pub struct Tps63031dskr {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Tps63031dskr {
@@ -73,7 +73,7 @@ impl copperleaf::Component for Tps63031dskr {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

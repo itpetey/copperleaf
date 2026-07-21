@@ -150,7 +150,7 @@ fn footprint_node(
     net_to_code: &HashMap<&str, usize>,
     project_name: &str,
 ) -> Sexpr {
-    let pads = fp_geom::pads_from_component(comp);
+    let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
     let extent = fp_geom::pads_extent(&pads);
 
     let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
@@ -213,9 +213,9 @@ fn footprint_node(
     }
 
     // Pads with net associations.
-    for pad in &pads {
+    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
         let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
-        let net = pad.pin_index.and_then(|i| {
+        let net = pin_index.and_then(|i| {
             let pin = &comp.pins[i];
             pin_to_net
                 .get(&(idx, pin.name()))

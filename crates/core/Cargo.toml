@@ -6,5 +6,6 @@ description = "Domain model for electronics components"
 license.workspace = true
 
 [dependencies]
+serde = { workspace = true, features = ["std", "derive"] }
 thiserror.workspace = true
 uom = { workspace = true, features = ["f64", "si"] }

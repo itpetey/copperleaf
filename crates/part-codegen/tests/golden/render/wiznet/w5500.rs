@@ -58,7 +58,7 @@
 /// | 48  | AGND     | Analog ground |                       |
 pub struct W5500 {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl W5500 {
@@ -170,7 +170,7 @@ impl copperleaf::Component for W5500 {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

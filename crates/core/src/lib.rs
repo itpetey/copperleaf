@@ -3,12 +3,13 @@ use std::path::Path;
 // Re-export all public types at crate root for backward compatibility.
 pub use board::{
     Board, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle, Connection,
-    MechanicalPad, RawNetOverride,
+    RawNetOverride,
 };
 pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
 pub use pin::{
-    Pin, PinBuilder, PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SigKind, SigSpec,
-    ThermalVia,
+    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, Pin, PinBuilder,
+    PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SMD_LAYERS, SigKind, SigSpec, SymPin,
+    ThermalVia, auto_pad_pos, normalise_anchor, pad_extent, resolve_mech_pad, resolve_pad,
 };
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
@@ -65,7 +66,7 @@ pub trait Component {
 
     /// Mechanical (non-electrical) pads belonging to this component's
     /// footprint — mounting holes, fiducials, paste apertures, etc.
-    fn mechanical(&self) -> &[MechanicalPad] {
+    fn mechanical(&self) -> &[Pad] {
         &[]
     }
 

@@ -48,7 +48,7 @@
 /// | 38  | GND_1    | Ground      |                       |
 pub struct Mm8108Mf15457 {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Mm8108Mf15457 {
@@ -159,7 +159,7 @@ impl copperleaf::Component for Mm8108Mf15457 {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

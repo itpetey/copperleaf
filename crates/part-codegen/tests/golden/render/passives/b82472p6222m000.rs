@@ -10,7 +10,7 @@
 /// | 2   | 2        | I/O         | Terminal 2            |
 pub struct B82472p6222m000 {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl B82472p6222m000 {
@@ -46,7 +46,7 @@ impl copperleaf::Component for B82472p6222m000 {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

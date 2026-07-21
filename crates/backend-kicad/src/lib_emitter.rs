@@ -222,7 +222,7 @@ fn footprint_filter(comp: &CompiledComponent) -> String {
 mod tests {
     use super::*;
     use copperleaf::UnitExt;
-    use copperleaf::{MechanicalPad, Pin};
+    use copperleaf::{Pad, PadShape, PadType, Pin};
 
     fn make_comp() -> CompiledComponent {
         CompiledComponent {
@@ -243,16 +243,18 @@ mod tests {
             constraints: vec![],
             symbol: Some("TestLib:TestPart".into()),
             footprint: Some("TestFP:QFP-32".into()),
-            mechanical: vec![MechanicalPad {
+            mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),
+                rotation: 0.0,
                 width: 0.91,
                 height: 0.91,
-                pad_type: "smd".into(),
-                pad_shape: "roundrect".into(),
+                pad_type: PadType::Smd,
+                pad_shape: PadShape::RoundRect,
                 roundrect_rratio: Some(0.25),
                 layers: Some("F.Paste".into()),
-                drill: 0.0,
+                drill: None,
+                solder_mask_margin: None,
             }],
             datasheet: Some("https://example.com/ds.pdf".into()),
             description: Some("A test component.".into()),

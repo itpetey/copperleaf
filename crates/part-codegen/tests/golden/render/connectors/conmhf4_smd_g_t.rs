@@ -12,7 +12,7 @@
 /// | 4   | GND3     | Ground      | Outer contact, gold-plated brass. Contact resistance 20.0 mohm max. |
 pub struct Conmhf4SmdGT {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Conmhf4SmdGT {
@@ -52,7 +52,7 @@ impl copperleaf::Component for Conmhf4SmdGT {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

@@ -24,7 +24,7 @@
 /// | 16  | CT_2     | I/O         |                       |
 pub struct Arjm11d7502AbEw2 {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Arjm11d7502AbEw2 {
@@ -64,8 +64,8 @@ impl Arjm11d7502AbEw2 {
                 Pin::build("CT_2").number("P6").pos(-0.635, -8.89).rotation(0.0).length(1.458).width(1.458).height(1.458).pad_type("thru_hole").pad_shape("circle").solder_mask_margin(0.102).layers("*.Cu *.Mask").drill(0.95).dio(),
             ],
             mechanical: vec![
-                copperleaf::MechanicalPad { number: "None".into(), pos: (5.715, 0.0), width: 3.3, height: 3.3, pad_type: "np_thru_hole".into(), pad_shape: "circle".into(), roundrect_rratio: None, layers: Some("*.Cu *.Mask".into()), drill: 3.3 },
-                copperleaf::MechanicalPad { number: "None".into(), pos: (-5.715, 0.0), width: 3.3, height: 3.3, pad_type: "np_thru_hole".into(), pad_shape: "circle".into(), roundrect_rratio: None, layers: Some("*.Cu *.Mask".into()), drill: 3.3 },
+                copperleaf::Pad { number: String::new(), pos: (5.715, 0.0), rotation: 0.0, width: 3.3, height: 3.3, pad_type: copperleaf::PadType::NpThruHole, pad_shape: copperleaf::PadShape::Circle, roundrect_rratio: None, solder_mask_margin: None, layers: Some("*.Cu *.Mask".into()), drill: Some(3.3) },
+                copperleaf::Pad { number: String::new(), pos: (-5.715, 0.0), rotation: 0.0, width: 3.3, height: 3.3, pad_type: copperleaf::PadType::NpThruHole, pad_shape: copperleaf::PadShape::Circle, roundrect_rratio: None, solder_mask_margin: None, layers: Some("*.Cu *.Mask".into()), drill: Some(3.3) },
             ],
         }
     }
@@ -86,7 +86,7 @@ impl copperleaf::Component for Arjm11d7502AbEw2 {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

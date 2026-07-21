@@ -24,7 +24,7 @@
 /// | 16  | DN2      | I/O         |                       |
 pub struct UsbC23409011 {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl UsbC23409011 {
@@ -85,7 +85,7 @@ impl copperleaf::Component for UsbC23409011 {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

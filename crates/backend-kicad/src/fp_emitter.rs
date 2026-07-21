@@ -6,8 +6,10 @@
 use base64::Engine as _;
 use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
 
+use copperleaf::{Pad, PadShape, PadType};
+
 use crate::{
-    fp_geom::{self, PadGeom},
+    fp_geom::{self},
     sexpr::Sexpr,
 };
 
@@ -152,8 +154,8 @@ pub fn emit_footprint_to(
 
 /// Collect all pads for a manifest: electrical pins (with thermal vias)
 /// followed by mechanical pads.
-pub fn pads_from_manifest(manifest: &Manifest) -> Vec<PadGeom> {
-    let mut pads: Vec<PadGeom> = Vec::new();
+pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
+    let mut pads: Vec<Pad> = Vec::new();
 
     for (i, pin) in manifest.pins.iter().enumerate() {
         pads.push(pad_from_pin_def(pin, i));
@@ -171,7 +173,7 @@ pub fn pads_from_manifest(manifest: &Manifest) -> Vec<PadGeom> {
     pads
 }
 
-fn pad_from_mechanical_def(mech: &MechanicalDef) -> PadGeom {
+fn pad_from_mechanical_def(mech: &MechanicalDef) -> Pad {
     // KiCad writes un-numbered pads as `(pad "" ...)`; normalise the legacy
     // `"None"` marker to an empty number.
     let number = if mech.number.eq_ignore_ascii_case("none") {
@@ -179,43 +181,51 @@ fn pad_from_mechanical_def(mech: &MechanicalDef) -> PadGeom {
     } else {
         mech.number.clone()
     };
-    PadGeom {
+    let pad_type = PadType::parse(&mech.pad_type).unwrap_or(PadType::Smd);
+    let pad_shape = PadShape::parse(&mech.pad_shape).unwrap_or(PadShape::Rect);
+    Pad {
         number,
         pos: mech.pos,
         rotation: 0.0,
         width: mech.width,
         height: mech.height,
-        pad_type: mech.pad_type.clone(),
-        shape: mech.pad_shape.clone(),
+        pad_type,
+        pad_shape,
         roundrect_rratio: mech.roundrect_rratio,
-        layers: mech
-            .layers
-            .clone()
-            .unwrap_or_else(|| "*.Cu *.Mask".to_string()),
+        layers: Some(
+            mech.layers
+                .clone()
+                .unwrap_or_else(|| "*.Cu *.Mask".to_string()),
+        ),
         drill: if mech.drill > 0.0 {
             Some(mech.drill)
         } else {
             None
         },
         solder_mask_margin: None,
-        pin_index: None,
     }
 }
 
-fn pad_from_pin_def(pin: &PinDef, index: usize) -> PadGeom {
+fn pad_from_pin_def(pin: &PinDef, index: usize) -> Pad {
     let pos = pin.pos.unwrap_or_else(|| fp_geom::auto_pad_pos(index));
     let number = if pin.number.is_empty() {
         pin.num.to_string()
     } else {
         pin.number.clone()
     };
-    let pad_type = pin.pad_type.clone().unwrap_or_else(|| "smd".to_string());
-    let default_shape = if pin.pos.is_some() || pad_type != "thru_hole" || index == 0 {
-        "rect"
+    let pad_type = PadType::parse(pin.pad_type.as_deref().unwrap_or("smd")).unwrap_or(PadType::Smd);
+    let is_through_hole = matches!(pad_type, PadType::ThruHole | PadType::NpThruHole);
+    let default_shape = if pin.pos.is_some() || !is_through_hole || index == 0 {
+        PadShape::Rect
     } else {
-        "circle"
+        PadShape::Circle
     };
-    PadGeom {
+    let pad_shape = pin
+        .pad_shape
+        .as_deref()
+        .and_then(PadShape::parse)
+        .unwrap_or(default_shape);
+    Pad {
         number,
         pos,
         rotation: pin.rotation.unwrap_or(0.0),
@@ -227,22 +237,18 @@ fn pad_from_pin_def(pin: &PinDef, index: usize) -> PadGeom {
             .height
             .or(pin.length)
             .unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
-        pad_type: pad_type.clone(),
-        shape: pin
-            .pad_shape
-            .clone()
-            .unwrap_or_else(|| default_shape.to_string()),
+        pad_type,
+        pad_shape,
         roundrect_rratio: pin.roundrect_rratio,
-        layers: pin.layers.clone().unwrap_or_else(|| {
-            if pad_type == "thru_hole" || pad_type == "np_thru_hole" {
+        layers: Some(pin.layers.clone().unwrap_or_else(|| {
+            if is_through_hole {
                 fp_geom::PTH_LAYERS.to_string()
             } else {
                 fp_geom::SMD_LAYERS.to_string()
             }
-        }),
+        })),
         drill: pin.drill,
         solder_mask_margin: pin.solder_mask_margin,
-        pin_index: Some(index),
     }
 }
 
@@ -370,5 +376,315 @@ mod tests {
         assert!(out.contains("thru_hole"), "missing via pad");
         assert!(out.contains("*.Cu"), "missing via layers");
         assert!(out.contains("0.35"), "missing via position");
+    }
+
+    // ── Characterisation tests for pad_from_pin_def (Phase 2 baseline) ──
+
+    /// pad_type: always defaults to "smd" — this is the known divergence
+    /// from fp_geom::pad_from_pin which infers SMD only when pos.is_some().
+    #[test]
+    fn pad_from_pin_def_defaults_pad_type_to_smd() {
+        let pd = pin_without_pos();
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        // fp_emitter always defaults pad_type to "smd", regardless of pos.
+        assert_eq!(pads[0].pad_type, PadType::Smd);
+    }
+
+    /// drill: never defaulted — passes through as-is (None stays None).
+    /// This is the second known divergence: fp_geom defaults drill for TH pads.
+    #[test]
+    fn pad_from_pin_def_does_not_default_drill() {
+        let pd = PinDef {
+            pad_type: Some("thru_hole".into()),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        // fp_emitter does NOT default drill — it passes None through.
+        assert_eq!(pads[0].drill, None);
+    }
+
+    /// Explicit drill is preserved.
+    #[test]
+    fn pad_from_pin_def_preserves_explicit_drill() {
+        let pd = PinDef {
+            pad_type: Some("thru_hole".into()),
+            drill: Some(1.0),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        assert_eq!(pads[0].drill, Some(1.0));
+    }
+
+    /// Layers default by pad type: PTH_LAYERS for through-hole, SMD_LAYERS for SMD.
+    #[test]
+    fn pad_from_pin_def_defaults_layers_by_type() {
+        // smd pin
+        let smd = PinDef {
+            pad_type: Some("smd".into()),
+            pos: Some((1.0, 0.0)),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(smd));
+        assert_eq!(pads[0].layers.as_deref(), Some(fp_geom::SMD_LAYERS));
+
+        // thru_hole pin
+        let th = PinDef {
+            pad_type: Some("thru_hole".into()),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(th));
+        assert_eq!(pads[0].layers.as_deref(), Some(fp_geom::PTH_LAYERS));
+
+        // np_thru_hole pin
+        let npth = PinDef {
+            pad_type: Some("np_thru_hole".into()),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(npth));
+        assert_eq!(pads[0].layers.as_deref(), Some(fp_geom::PTH_LAYERS));
+    }
+
+    /// Shape default: because pad_type defaults to "smd", shape is always
+    /// "rect" in the default path.  The circle default for auto TH rows only
+    /// triggers when pad_type is explicitly "thru_hole" and pos is None.
+    #[test]
+    fn pad_from_pin_def_shape_default_all_rect_when_smd() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+            },
+            pins: vec![
+                PinDef {
+                    num: 1,
+                    ..pin_without_pos()
+                },
+                PinDef {
+                    num: 2,
+                    ..pin_without_pos()
+                },
+                PinDef {
+                    num: 3,
+                    ..pin_without_pos()
+                },
+            ],
+            constraints: vec![],
+            mechanical: vec![],
+        };
+        let pads = pads_from_manifest(&manifest);
+        // All default to "rect" because pad_type defaults to "smd".
+        // DIVERGENCE: fp_geom would give [rect, circle, circle] for a pure
+        // auto TH row, since it infers TH when pos is None.
+        assert_eq!(pads[0].pad_shape, PadShape::Rect);
+        assert_eq!(pads[1].pad_shape, PadShape::Rect);
+        assert_eq!(pads[2].pad_shape, PadShape::Rect);
+    }
+
+    /// With explicit thru_hole + no pos, index>0 pads get "circle" default.
+    #[test]
+    fn pad_from_pin_def_shape_circle_for_th_auto_row() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+            },
+            pins: vec![
+                PinDef {
+                    num: 1,
+                    pad_type: Some("thru_hole".into()),
+                    ..pin_without_pos()
+                },
+                PinDef {
+                    num: 2,
+                    pad_type: Some("thru_hole".into()),
+                    ..pin_without_pos()
+                },
+                PinDef {
+                    num: 3,
+                    pad_type: Some("thru_hole".into()),
+                    ..pin_without_pos()
+                },
+            ],
+            constraints: vec![],
+            mechanical: vec![],
+        };
+        let pads = pads_from_manifest(&manifest);
+        assert_eq!(pads[0].pad_shape, PadShape::Rect);
+        assert_eq!(pads[1].pad_shape, PadShape::Circle);
+        assert_eq!(pads[2].pad_shape, PadShape::Circle);
+    }
+
+    /// Explicit shape is preserved.
+    #[test]
+    fn pad_from_pin_def_preserves_explicit_shape() {
+        let pd = PinDef {
+            pad_shape: Some("roundrect".into()),
+            roundrect_rratio: Some(0.25),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        assert_eq!(pads[0].pad_shape, PadShape::RoundRect);
+        assert_eq!(pads[0].roundrect_rratio, Some(0.25));
+    }
+
+    /// Width/height fall back to pin length, then DEFAULT_PAD_SIZE.
+    #[test]
+    fn pad_from_pin_def_falls_back_width_height_to_length() {
+        let with_length = PinDef {
+            length: Some(2.0),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(with_length));
+        assert_eq!(pads[0].width, 2.0);
+        assert_eq!(pads[0].height, 2.0);
+
+        let bare = pin_without_pos();
+        let pads = pads_from_manifest(&make_single_pin_manifest(bare));
+        assert_eq!(pads[0].width, fp_geom::DEFAULT_PAD_SIZE);
+        assert_eq!(pads[0].height, fp_geom::DEFAULT_PAD_SIZE);
+    }
+
+    /// Pin number falls back to pin.num when number is empty.
+    #[test]
+    fn pad_from_pin_def_falls_back_number_to_num() {
+        let pd = PinDef {
+            num: 42,
+            number: String::new(),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        assert_eq!(pads[0].number, "42");
+    }
+
+    /// Explicit number is preserved.
+    #[test]
+    fn pad_from_pin_def_preserves_explicit_number() {
+        let pd = PinDef {
+            num: 1,
+            number: "A1".into(),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(pd));
+        assert_eq!(pads[0].number, "A1");
+    }
+
+    /// Auto-row positions: 2.54 mm pitch starting at origin.
+    #[test]
+    fn pad_from_pin_def_auto_row_positions() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+            },
+            pins: vec![
+                PinDef {
+                    num: 1,
+                    ..pin_without_pos()
+                },
+                PinDef {
+                    num: 2,
+                    ..pin_without_pos()
+                },
+            ],
+            constraints: vec![],
+            mechanical: vec![],
+        };
+        let pads = pads_from_manifest(&manifest);
+        assert_eq!(pads[0].pos, (0.0, 0.0));
+        assert_eq!(pads[1].pos, (2.54, 0.0));
+    }
+
+    /// rotation defaults to 0.0 when not set.
+    #[test]
+    fn pad_from_pin_def_defaults_rotation_to_zero() {
+        let pads = pads_from_manifest(&make_single_pin_manifest(pin_without_pos()));
+        assert_eq!(pads[0].rotation, 0.0);
+    }
+
+    /// solder_mask_margin passes through (None when unset).
+    #[test]
+    fn pad_from_pin_def_solder_mask_margin_passthrough() {
+        let with_smm = PinDef {
+            solder_mask_margin: Some(0.102),
+            ..pin_without_pos()
+        };
+        let pads = pads_from_manifest(&make_single_pin_manifest(with_smm));
+        assert_eq!(pads[0].solder_mask_margin, Some(0.102));
+
+        let bare = pin_without_pos();
+        let pads = pads_from_manifest(&make_single_pin_manifest(bare));
+        assert_eq!(pads[0].solder_mask_margin, None);
+    }
+
+    // ── Helpers ──
+
+    fn pin_without_pos() -> PinDef {
+        PinDef {
+            num: 1,
+            number: String::new(),
+            name: "P1".into(),
+            purpose: "Test".into(),
+            notes: String::new(),
+            kind: "dio".into(),
+            bw_mhz: None,
+            v: None,
+            v_min: None,
+            v_max: None,
+            i: None,
+            i_max: None,
+            pos: None,
+            rotation: None,
+            length: None,
+            nc: None,
+            width: None,
+            height: None,
+            pad_type: None,
+            pad_shape: None,
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: None,
+            drill: None,
+            thermal_vias: vec![],
+        }
+    }
+
+    fn make_single_pin_manifest(pin: PinDef) -> Manifest {
+        Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+            },
+            pins: vec![pin],
+            constraints: vec![],
+            mechanical: vec![],
+        }
     }
 }

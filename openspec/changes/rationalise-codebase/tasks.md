@@ -17,18 +17,18 @@
 
 ## 2. Phase 2 — One pad model (golden: reviewed diffs only)
 
-- [ ] 2.1 Add characterisation tests pinning current `fp_geom::pad_from_pin` vs `fp_emitter::pad_from_pin_def` defaulting behaviour (pad_type inference, shape/drill/layers defaults, anchor normalisation)
-- [ ] 2.2 Define `Pad`, `PadType`, `PadShape`, and `SymPin` in `core` (with serde derives); define `Pin.nc: bool`
-- [ ] 2.3 Restructure `Pin`/`PinBuilder`: remove bare physical fields and setters; add `pad: Option<Pad>`, `symbol: Option<SymPin>` with `.pad()`/`.symbol()` builder methods
-- [ ] 2.4 Implement `resolve_pad()`/`resolve_mech_pad()` and anchor normalisation in core, implementing design D2's reconciled defaults
-- [ ] 2.5 Replace `MechanicalPad` with `Pad` throughout core (`Component::mechanical`, `CompiledComponent.mechanical`)
-- [ ] 2.6 Migrate `fp_geom` to consume core `Pad` via `resolve_pad()`; delete `PadGeom` and `pad_from_pin`/`pad_from_mechanical`
-- [ ] 2.7 Add `PadDef::to_pad`/`from_pad` conversions in `fp_parser` (typed enums at the boundary); delete `fp_emitter`'s `pad_from_pin_def`/`pad_from_mechanical_def`
-- [ ] 2.8 Update `part-codegen` schema and template to emit `.pad()`/`.symbol()` construction; regenerate render goldens
-- [ ] 2.9 Migrate CLI merge code (`manifest_from_footprint`, `merge_footprint`, `merge_symbol`) to build `Pad`/`SymPin` directly; delete field-by-field mapping
-- [ ] 2.10 Migrate hand-written parts (passives `Capacitor`/`Resistor`/`Crystal`) to the new `Pin` API
-- [ ] 2.11 Regenerate all parts crates; review every golden diff against D2's stated rule; bless and document the review
-- [ ] 2.12 Verify `cargo test --workspace`, clippy, fmt; confirm the `Pin.length` overload is gone (symbol length only in `SymPin`)
+- [x] 2.1 Add characterisation tests pinning current `fp_geom::pad_from_pin` vs `fp_emitter::pad_from_pin_def` defaulting behaviour (pad_type inference, shape/drill/layers defaults, anchor normalisation)
+- [x] 2.2 Define `Pad`, `PadType`, `PadShape`, and `SymPin` in `core` (with serde derives); define `Pin.nc: bool`
+- [x] 2.3 Restructure `Pin`/`PinBuilder`: remove bare physical fields and setters; add `pad: Option<Pad>`, `symbol: Option<SymPin>` with `.pad()`/`.symbol()` builder methods
+- [x] 2.4 Implement `resolve_pad()`/`resolve_mech_pad()` and anchor normalisation in core, implementing design D2's reconciled defaults
+- [x] 2.5 Replace `MechanicalPad` with `Pad` throughout core (`Component::mechanical`, `CompiledComponent.mechanical`)
+- [x] 2.6 Migrate `fp_geom` to consume core `Pad` via `resolve_pad()`; delete `PadGeom` and `pad_from_pin`/`pad_from_mechanical`
+- [x] 2.7 Add `PadDef::to_pad`/`from_pad` conversions in `fp_parser` (typed enums at the boundary); delete `fp_emitter`'s `pad_from_pin_def`/`pad_from_mechanical_def`
+- [x] 2.8 Update `part-codegen` schema and template to emit `.pad()`/`.symbol()` construction; regenerate render goldens
+- [x] 2.9 Migrate CLI merge code (`manifest_from_footprint`, `merge_footprint`, `merge_symbol`) to build `Pad`/`SymPin` directly; delete field-by-field mapping
+- [x] 2.10 Migrate hand-written parts (passives `Capacitor`/`Resistor`/`Crystal`) to the new `Pin` API
+- [x] 2.11 Regenerate all parts crates; review every golden diff against D2's stated rule; bless and document the review
+- [x] 2.12 Verify `cargo test --workspace`, clippy, fmt; confirm the `Pin.length` overload is gone (symbol length only in `SymPin`)
 
 ## 3. Phase 3 — One component representation (golden: byte-identical)
 

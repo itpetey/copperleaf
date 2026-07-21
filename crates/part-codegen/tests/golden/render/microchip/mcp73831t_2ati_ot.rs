@@ -13,7 +13,7 @@
 /// | 5   | PROG     | I/O         |                       |
 pub struct Mcp73831t2atiOt {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Mcp73831t2atiOt {
@@ -55,7 +55,7 @@ impl copperleaf::Component for Mcp73831t2atiOt {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

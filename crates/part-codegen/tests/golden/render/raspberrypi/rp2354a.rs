@@ -71,7 +71,7 @@
 /// | 61  | GND      | Ground      |                       |
 pub struct Rp2354a {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl Rp2354a {
@@ -198,15 +198,15 @@ impl Rp2354a {
                 Pin::build("GND").number("61").pos(0.0, 0.0).rotation(0.0).length(3.4).width(3.4).height(3.4).pad_type("smd").pad_shape("rect").layers("F.Cu F.Mask").gnd(),
             ],
             mechanical: vec![
-                copperleaf::MechanicalPad { number: "".into(), pos: (-1.13, -1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (-1.13, 0.0), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (-1.13, 1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (0.0, -1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (0.0, 0.0), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (0.0, 1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (1.13, -1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (1.13, 0.0), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
-                copperleaf::MechanicalPad { number: "".into(), pos: (1.13, 1.13), width: 0.91, height: 0.91, pad_type: "smd".into(), pad_shape: "roundrect".into(), roundrect_rratio: Some(0.25), layers: Some("F.Paste".into()), drill: 0.0 },
+                copperleaf::Pad { number: "".into(), pos: (-1.13, -1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (-1.13, 0.0), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (-1.13, 1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (0.0, -1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (0.0, 0.0), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (0.0, 1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (1.13, -1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (1.13, 0.0), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
+                copperleaf::Pad { number: "".into(), pos: (1.13, 1.13), rotation: 0.0, width: 0.91, height: 0.91, pad_type: copperleaf::PadType::Smd, pad_shape: copperleaf::PadShape::RoundRect, roundrect_rratio: Some(0.25), solder_mask_margin: None, layers: Some("F.Paste".into()), drill: None },
             ],
         }
     }
@@ -230,7 +230,7 @@ impl copperleaf::Component for Rp2354a {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

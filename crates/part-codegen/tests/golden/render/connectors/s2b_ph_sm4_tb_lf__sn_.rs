@@ -10,7 +10,7 @@
 /// | 2   | SHIELD   | I/O         |                       |
 pub struct S2bPhSm4TbLfSn {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl S2bPhSm4TbLfSn {
@@ -49,7 +49,7 @@ impl copperleaf::Component for S2bPhSm4TbLfSn {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
 

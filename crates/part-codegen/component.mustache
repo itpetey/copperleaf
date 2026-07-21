@@ -17,7 +17,7 @@
 {{/pins}}
 pub struct {{{struct_name}}} {
     pins: Vec<copperleaf::Pin>,
-    mechanical: Vec<copperleaf::MechanicalPad>,
+    mechanical: Vec<copperleaf::Pad>,
 }
 
 impl {{{struct_name}}} {
@@ -61,7 +61,7 @@ impl copperleaf::Component for {{{struct_name}}} {
         Self::constraints(self)
     }
 
-    fn mechanical(&self) -> &[copperleaf::MechanicalPad] {
+    fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
     {{#symbol_id}}

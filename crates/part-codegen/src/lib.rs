@@ -663,7 +663,7 @@ fn load_template(path: &str) -> Result<MustacheRenderer, CodegenError> {
     Ok(MustacheRenderer(manager))
 }
 
-/// Build the Rust expression constructing a [`copperleaf::MechanicalPad`].
+/// Build the Rust expression constructing a [`copperleaf::Pad`].
 fn mechanical_expr(mech: &MechanicalDef) -> String {
     let rratio = match mech.roundrect_rratio {
         Some(rr) => format!("Some({})", fmt_f64(rr)),
@@ -673,18 +673,42 @@ fn mechanical_expr(mech: &MechanicalDef) -> String {
         Some(l) => format!("Some({:?}.into())", l),
         None => "None".to_string(),
     };
+    let drill = if mech.drill > 0.0 {
+        format!("Some({})", fmt_f64(mech.drill))
+    } else {
+        "None".to_string()
+    };
+    let pad_type = match mech.pad_type.as_str() {
+        "smd" => "PadType::Smd",
+        "thru_hole" => "PadType::ThruHole",
+        "np_thru_hole" => "PadType::NpThruHole",
+        "connect" => "PadType::Connect",
+        other => panic!("unknown pad type: {other}"),
+    };
+    let pad_shape = match mech.pad_shape.as_str() {
+        "rect" => "PadShape::Rect",
+        "roundrect" => "PadShape::RoundRect",
+        "circle" => "PadShape::Circle",
+        "oval" => "PadShape::Oval",
+        other => panic!("unknown pad shape: {other}"),
+    };
+    let number = if mech.number.eq_ignore_ascii_case("none") {
+        "String::new()".to_string()
+    } else {
+        format!("{:?}.into()", mech.number)
+    };
     format!(
-        "copperleaf::MechanicalPad {{ number: {:?}.into(), pos: ({}, {}), width: {}, height: {}, pad_type: {:?}.into(), pad_shape: {:?}.into(), roundrect_rratio: {}, layers: {}, drill: {} }}",
-        mech.number,
+        "copperleaf::Pad {{ number: {}, pos: ({}, {}), rotation: 0.0, width: {}, height: {}, pad_type: copperleaf::{}, pad_shape: copperleaf::{}, roundrect_rratio: {}, solder_mask_margin: None, layers: {}, drill: {} }}",
+        number,
         fmt_f64(mech.pos.0),
         fmt_f64(mech.pos.1),
         fmt_f64(mech.width),
         fmt_f64(mech.height),
-        mech.pad_type,
-        mech.pad_shape,
+        pad_type,
+        pad_shape,
         rratio,
         layers,
-        fmt_f64(mech.drill),
+        drill,
     )
 }
 

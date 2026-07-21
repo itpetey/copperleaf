@@ -5,7 +5,14 @@
 //! `.kicad_mod` library files and the footprints embedded in the `.kicad_pcb`
 //! are always identical.
 
-use copperleaf::{CompiledComponent, MechanicalPad, Pin};
+use copperleaf::{
+    CompiledComponent, Pad, PadShape, PadType, Pin, pad_extent, resolve_mech_pad, resolve_pad,
+};
+
+// Re-exports for backward compatibility with callers.
+pub use copperleaf::{
+    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, SMD_LAYERS, auto_pad_pos, normalise_anchor,
+};
 
 use crate::{
     common::{format_float, format_grid_float},
@@ -16,50 +23,20 @@ use crate::{
 const BODY_MARGIN: f64 = 0.25;
 /// Courtyard offset from the fab outline, in mm.
 const COURTYARD_OFFSET: f64 = 0.25;
-/// Default drill for through-hole pads, in mm.
-pub const DEFAULT_DRILL: f64 = 0.762;
-/// Default pad size when the part data carries no geometry, in mm.
-pub const DEFAULT_PAD_SIZE: f64 = 1.524;
-/// Default layers for through-hole pads.
-pub const PTH_LAYERS: &str = "*.Cu *.Mask";
 /// Silkscreen offset from the fab outline, in mm.
 const SILK_OFFSET: f64 = 0.11;
-/// Default layers for SMD pads.
-pub const SMD_LAYERS: &str = "F.Cu F.Mask F.Paste";
 
-/// One footprint pad with fully resolved geometry.
-#[derive(Clone, Debug)]
-pub struct PadGeom {
-    pub number: String,
-    pub pos: (f64, f64),
-    pub rotation: f64,
-    pub width: f64,
-    pub height: f64,
-    /// KiCad pad type: `smd`, `thru_hole`, or `np_thru_hole`.
-    pub pad_type: String,
-    /// Pad shape: `rect`, `roundrect`, `circle`, or `oval`.
-    pub shape: String,
-    pub roundrect_rratio: Option<f64>,
-    /// Space-separated layer list, e.g. `"F.Cu F.Mask F.Paste"`.
-    pub layers: String,
-    pub drill: Option<f64>,
-    pub solder_mask_margin: Option<f64>,
-    /// Index into the component's pin list (used for net association in the
-    /// PCB); `None` for thermal vias and mechanical pads.
-    pub pin_index: Option<usize>,
-}
-
-/// Auto-layout position for pins without physical pad data: a single
-/// horizontal row at 2.54 mm pitch with pad 1 at the origin (KLC F7.2).
-pub fn auto_pad_pos(index: usize) -> (f64, f64) {
-    (index as f64 * 2.54, 0.0)
+/// See [`copperleaf::pad_extent`].
+#[inline]
+pub fn pads_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
+    pad_extent(pads)
 }
 
 /// KiCad footprint `attr` value for the pad set: `smd` when any pad is
 /// surface-mount (mixed footprints included), `through_hole` only when all
 /// pads are through-hole (KLC F6.1).
-pub fn footprint_attr(pads: &[PadGeom]) -> &'static str {
-    if pads.iter().any(|p| p.pad_type == "smd") || pads.is_empty() {
+pub fn footprint_attr(pads: &[Pad]) -> &'static str {
+    if pads.iter().any(|p| p.pad_type == PadType::Smd) || pads.is_empty() {
         "smd"
     } else {
         "through_hole"
@@ -213,47 +190,6 @@ pub fn model_sexpr(
     ])
 }
 
-/// Normalise the footprint anchor:
-///
-/// - Footprints with any SMD pad are recentred so the pad bounding box is
-///   centred on the origin (KLC F6.2).
-/// - Pure through-hole footprints are translated so pad 1 sits at the origin
-///   (KLC F7.2).  Auto-generated rows already start at the origin.
-/// - Fully automatic footprints (no explicit positions at all) are left
-///   untouched.
-pub fn normalise_anchor(pads: &mut [PadGeom]) {
-    if pads.is_empty() {
-        return;
-    }
-
-    let any_explicit = pads.iter().any(|p| {
-        p.pin_index.is_some() && p.pos != auto_pad_pos(p.pin_index.unwrap())
-            || p.pin_index.is_none()
-    });
-    if !any_explicit {
-        return; // fully automatic row: pad 1 already at the origin
-    }
-
-    let any_smd = pads.iter().any(|p| p.pad_type == "smd");
-    if any_smd {
-        // Recentre on the pad bounding box.
-        if let Some((x1, y1, x2, y2)) = pads_extent(pads) {
-            let cx = (x1 + x2) / 2.0;
-            let cy = (y1 + y2) / 2.0;
-            for p in pads.iter_mut() {
-                p.pos.0 -= cx;
-                p.pos.1 -= cy;
-            }
-        }
-    } else if let Some(anchor) = pads.iter().find(|p| p.pin_index == Some(0)).map(|p| p.pos) {
-        // Through-hole: pad 1 at the origin.
-        for p in pads.iter_mut() {
-            p.pos.0 -= anchor.0;
-            p.pos.1 -= anchor.1;
-        }
-    }
-}
-
 /// Build the fab/silk/courtyard outlines plus the pin-1 marker for a pad
 /// bounding box `(x1, y1, x2, y2)`.  All coordinates are rounded to the
 /// 0.01 mm grid and use KLC-legal line widths.
@@ -305,12 +241,12 @@ pub fn outline_sexprs(
 ///
 /// `uuid` is included when `Some`; `net` as `(code, name)` is appended when
 /// `Some` (only meaningful inside `.kicad_pcb` files).
-pub fn pad_sexpr(pad: &PadGeom, uuid: Option<&str>, net: Option<(usize, &str)>) -> Sexpr {
+pub fn pad_sexpr(pad: &Pad, uuid: Option<&str>, net: Option<(usize, &str)>) -> Sexpr {
     let mut children = vec![
         Sexpr::atom("pad"),
         Sexpr::str(&pad.number),
-        Sexpr::atom(&pad.pad_type),
-        Sexpr::atom(&pad.shape),
+        Sexpr::atom(pad.pad_type.as_str()),
+        Sexpr::atom(pad.pad_shape.as_str()),
     ];
 
     if let Some(rr) = pad.roundrect_rratio {
@@ -349,9 +285,10 @@ pub fn pad_sexpr(pad: &PadGeom, uuid: Option<&str>, net: Option<(usize, &str)>) 
         ]));
     }
 
+    let layers_str = pad.layers.as_deref().unwrap_or("");
     children.push(Sexpr::list(
         std::iter::once(Sexpr::atom("layers"))
-            .chain(pad.layers.split_whitespace().map(Sexpr::atom)),
+            .chain(layers_str.split_whitespace().map(Sexpr::atom)),
     ));
 
     if let Some(smm) = pad.solder_mask_margin {
@@ -376,31 +313,48 @@ pub fn pad_sexpr(pad: &PadGeom, uuid: Option<&str>, net: Option<(usize, &str)>) 
     Sexpr::list(children)
 }
 
-/// Bounding box over all pads, accounting for 90°/270° pad rotation.
-/// Returns `(x1, y1, x2, y2)`.
-pub fn pads_extent(pads: &[PadGeom]) -> Option<(f64, f64, f64, f64)> {
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
+/// Internal helper: gather all pads with pin-index metadata, without
+/// normalisation.  Returns `(pads, pin_indices)` where `pin_indices[i]` is
+/// `Some(pin_index)` for electrical pins and `None` for thermal vias and
+/// mechanical pads.
+fn gather_pads_internal(comp: &CompiledComponent) -> (Vec<Pad>, Vec<Option<usize>>) {
+    let mut pads = Vec::new();
+    let mut pin_indices = Vec::new();
 
-    for pad in pads {
-        let rot = pad.rotation.rem_euclid(360.0);
-        let (w, h) = if (rot - 90.0).abs() < 1.0 || (rot - 270.0).abs() < 1.0 {
-            (pad.height, pad.width)
-        } else {
-            (pad.width, pad.height)
-        };
-        min_x = min_x.min(pad.pos.0 - w / 2.0);
-        max_x = max_x.max(pad.pos.0 + w / 2.0);
-        min_y = min_y.min(pad.pos.1 - h / 2.0);
-        max_y = max_y.max(pad.pos.1 + h / 2.0);
+    for (i, pin) in comp.pins.iter().enumerate() {
+        pads.push(resolve_pad(pin, i));
+        pin_indices.push(Some(i));
+        for via in pin.thermal_vias() {
+            pads.push(thermal_via_pad(via.pos, via.drill, via.size));
+            pin_indices.push(None);
+        }
     }
 
-    if min_x == f64::MAX {
-        return None;
+    for mech in &comp.mechanical {
+        pads.push(resolve_mech_pad(mech));
+        pin_indices.push(None);
     }
-    Some((min_x, min_y, max_x, max_y))
+
+    // Assign sequential pad numbers to any un-numbered pads (thermal vias
+    // and mechanical pads) so that every pad can be matched to a schematic
+    // pin.  The numbering continues after the highest numeric electrical
+    // pin number.
+    let max_electrical = pads
+        .iter()
+        .zip(pin_indices.iter())
+        .filter(|(_, i)| i.is_some())
+        .filter_map(|(p, _)| p.number.parse::<usize>().ok())
+        .max()
+        .unwrap_or(0);
+    let mut next_num = max_electrical + 1;
+    for (pad, pi) in pads.iter_mut().zip(pin_indices.iter()) {
+        if pi.is_none() && pad.number.is_empty() {
+            pad.number = next_num.to_string();
+            next_num += 1;
+        }
+    }
+
+    (pads, pin_indices)
 }
 
 /// Collect all pads for a component: electrical pins (with thermal vias)
@@ -410,61 +364,39 @@ pub fn pads_extent(pads: &[PadGeom]) -> Option<(f64, f64, f64, f64)> {
 /// Un-numbered pads (thermal vias and mechanical pads) are assigned
 /// sequential pad numbers continuing after the last electrical pin so
 /// that every pad has a unique number matching its schematic pin.
-pub fn pads_from_component(comp: &CompiledComponent) -> Vec<PadGeom> {
-    let mut pads: Vec<PadGeom> = Vec::new();
-
-    for (i, pin) in comp.pins.iter().enumerate() {
-        pads.push(pad_from_pin(pin, i));
-        for via in pin.thermal_vias() {
-            pads.push(thermal_via_pad(via.pos, via.drill, via.size));
-        }
-    }
-
-    for mech in &comp.mechanical {
-        pads.push(pad_from_mechanical(mech));
-    }
-
-    // Assign sequential pad numbers to any un-numbered pads (thermal vias
-    // and mechanical pads) so that every pad can be matched to a schematic
-    // pin.  The numbering continues after the highest numeric electrical
-    // pin number.
-    let max_electrical = pads
-        .iter()
-        .filter(|p| p.pin_index.is_some())
-        .filter_map(|p| p.number.parse::<usize>().ok())
-        .max()
-        .unwrap_or(0);
-    let mut next_num = max_electrical + 1;
-    for pad in pads.iter_mut() {
-        if pad.number.is_empty() {
-            pad.number = next_num.to_string();
-            next_num += 1;
-        }
-    }
-
+pub fn pads_from_component(comp: &CompiledComponent) -> Vec<Pad> {
+    let (mut pads, _pin_indices) = gather_pads_internal(comp);
     normalise_anchor(&mut pads);
     pads
+}
+
+/// Like [`pads_from_component`], but also returns a parallel vector of
+/// pin indices: `Some(i)` for electrical pins (the `i`th pin in
+/// `comp.pins`), `None` for thermal vias and mechanical pads.
+pub fn pads_from_component_with_indices(
+    comp: &CompiledComponent,
+) -> (Vec<Pad>, Vec<Option<usize>>) {
+    let (mut pads, pin_indices) = gather_pads_internal(comp);
+    normalise_anchor(&mut pads);
+    (pads, pin_indices)
 }
 
 /// Return `(number, MECH_name)` pairs for pads that do not correspond to an
 /// electrical pin (thermal vias and mechanical pads).  Schematic and netlist
 /// emitters add these as extra symbol pins so pin counts match.
 pub fn mech_pad_names(comp: &CompiledComponent) -> Vec<(String, String)> {
-    pads_from_component(comp)
-        .iter()
-        .filter(|p| p.pin_index.is_none())
+    let (pads, pin_indices) = gather_pads_internal(comp);
+    pads.iter()
+        .zip(pin_indices.iter())
+        .filter(|(_, i)| i.is_none())
         .enumerate()
-        .map(|(i, p)| (p.number.clone(), format!("MECH{}", i + 1)))
+        .map(|(i, (p, _))| (p.number.clone(), format!("MECH{}", i + 1)))
         .collect()
 }
 
-/// Position of pad `"1"` (the first electrical pad), used for the pin-1
-/// marker.
-pub fn pin1_pos(pads: &[PadGeom]) -> Option<(f64, f64)> {
-    pads.iter()
-        .filter(|p| p.pin_index.is_some())
-        .min_by_key(|p| p.pin_index.unwrap())
-        .map(|p| p.pos)
+/// Position of the first electrical pad, used for the pin-1 marker.
+pub fn pin1_pos(pads: &[Pad]) -> Option<(f64, f64)> {
+    pads.first().map(|p| p.pos)
 }
 
 /// Resolve the physical pad number for a pin: the explicit `number` when
@@ -478,25 +410,20 @@ pub fn pin_number(pin: &Pin, index: usize) -> String {
 /// Build an un-numbered through-hole pad for a thermal via.
 ///
 /// Thermal vias live on all copper layers plus the solder mask (KLC F7.4).
-pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> PadGeom {
-    PadGeom {
+pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> Pad {
+    Pad {
         number: String::new(),
         pos,
         rotation: 0.0,
         width: size,
         height: size,
-        pad_type: "thru_hole".to_string(),
-        shape: "circle".to_string(),
+        pad_type: PadType::ThruHole,
+        pad_shape: PadShape::Circle,
         roundrect_rratio: None,
-        layers: "*.Cu *.Mask".to_string(),
+        layers: Some(PTH_LAYERS.to_string()),
         drill: Some(drill),
         solder_mask_margin: None,
-        pin_index: None,
     }
-}
-
-fn is_through_hole(pad_type: &str) -> bool {
-    pad_type == "thru_hole" || pad_type == "np_thru_hole"
 }
 
 /// Four line segments forming a rectangle.
@@ -507,88 +434,6 @@ fn outline_segments(x1: f64, y1: f64, x2: f64, y2: f64) -> [((f64, f64), (f64, f
         ((x2, y2), (x1, y2)),
         ((x1, y2), (x1, y1)),
     ]
-}
-
-/// Build a pad from a mechanical (non-electrical) pad definition.
-fn pad_from_mechanical(mech: &MechanicalPad) -> PadGeom {
-    // KiCad writes un-numbered pads as `(pad "" ...)`; normalise the legacy
-    // `"None"` marker to an empty number.
-    let number = if mech.number.eq_ignore_ascii_case("none") {
-        String::new()
-    } else {
-        mech.number.clone()
-    };
-    PadGeom {
-        number,
-        pos: mech.pos,
-        rotation: 0.0,
-        width: mech.width,
-        height: mech.height,
-        pad_type: mech.pad_type.clone(),
-        shape: mech.pad_shape.clone(),
-        roundrect_rratio: mech.roundrect_rratio,
-        layers: mech
-            .layers
-            .clone()
-            .unwrap_or_else(|| "*.Cu *.Mask".to_string()),
-        drill: if mech.drill > 0.0 {
-            Some(mech.drill)
-        } else {
-            None
-        },
-        solder_mask_margin: None,
-        pin_index: None,
-    }
-}
-
-/// Build a pad from an electrical pin.
-fn pad_from_pin(pin: &Pin, index: usize) -> PadGeom {
-    let pos = pin.pos().unwrap_or_else(|| auto_pad_pos(index));
-    let pad_type = pin
-        .pad_type()
-        .unwrap_or(if pin.pos().is_some() {
-            "smd"
-        } else {
-            "thru_hole"
-        })
-        .to_string();
-    let width = pin.width().or(pin.length()).unwrap_or(DEFAULT_PAD_SIZE);
-    let height = pin.height().or(pin.length()).unwrap_or(DEFAULT_PAD_SIZE);
-    let layers = pin.layers().map(str::to_owned).unwrap_or_else(|| {
-        if is_through_hole(&pad_type) {
-            PTH_LAYERS.to_string()
-        } else {
-            SMD_LAYERS.to_string()
-        }
-    });
-    let drill = pin.drill().or(if is_through_hole(&pad_type) {
-        Some(DEFAULT_DRILL)
-    } else {
-        None
-    });
-
-    // KLC F7.3: for auto-generated through-hole rows, pad 1 is rectangular
-    // and the rest circular.  Explicit vendor geometry is preserved as-is.
-    let default_shape = if pin.pos().is_some() || !is_through_hole(&pad_type) || index == 0 {
-        "rect"
-    } else {
-        "circle"
-    };
-
-    PadGeom {
-        number: pin_number(pin, index),
-        pos,
-        rotation: pin.rotation().unwrap_or(0.0),
-        width,
-        height,
-        pad_type,
-        shape: pin.pad_shape().unwrap_or(default_shape).to_string(),
-        roundrect_rratio: pin.roundrect_rratio(),
-        layers,
-        drill,
-        solder_mask_margin: pin.solder_mask_margin(),
-        pin_index: Some(index),
-    }
 }
 
 #[cfg(test)]
@@ -623,16 +468,18 @@ mod tests {
             constraints: vec![],
             symbol: Some("TestPart".into()),
             footprint: Some("TestPart".into()),
-            mechanical: vec![MechanicalPad {
+            mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),
+                rotation: 0.0,
                 width: 0.91,
                 height: 0.91,
-                pad_type: "smd".into(),
-                pad_shape: "roundrect".into(),
+                pad_type: PadType::Smd,
+                pad_shape: PadShape::RoundRect,
                 roundrect_rratio: Some(0.25),
                 layers: Some("F.Paste".into()),
-                drill: 0.0,
+                drill: None,
+                solder_mask_margin: None,
             }],
             datasheet: None,
             description: None,
@@ -649,10 +496,10 @@ mod tests {
         assert_eq!(pads.len(), 3); // 2 pins + 1 mechanical
         assert_eq!(pads[0].width, 0.8);
         assert_eq!(pads[0].height, 0.2);
-        assert_eq!(pads[0].pad_type, "smd");
-        assert_eq!(pads[0].shape, "roundrect");
+        assert_eq!(pads[0].pad_type, PadType::Smd);
+        assert_eq!(pads[0].pad_shape, PadShape::RoundRect);
         assert_eq!(pads[0].roundrect_rratio, Some(0.25));
-        assert_eq!(pads[2].layers, "F.Paste");
+        assert_eq!(pads[2].layers.as_deref(), Some("F.Paste"));
         // SMD anchor: pad bounding box is centred on the origin.
         let (x1, y1, x2, y2) = pads_extent(&pads).unwrap();
         assert!((x1 + x2).abs() < 1e-9, "anchor not centred: {x1}..{x2}");
@@ -675,13 +522,13 @@ mod tests {
         assert_eq!(pads[0].pos, (0.0, 0.0));
         assert_eq!(pads[1].pos, (2.54, 0.0));
         assert_eq!(pads[2].pos, (5.08, 0.0));
-        assert_eq!(pads[0].pad_type, "thru_hole");
+        assert_eq!(pads[0].pad_type, PadType::ThruHole);
         assert_eq!(pads[0].drill, Some(DEFAULT_DRILL));
         assert_eq!(footprint_attr(&pads), "through_hole");
         // KLC F7.3: pad 1 rectangular, the rest circular.
-        assert_eq!(pads[0].shape, "rect");
-        assert_eq!(pads[1].shape, "circle");
-        assert_eq!(pads[2].shape, "circle");
+        assert_eq!(pads[0].pad_shape, PadShape::Rect);
+        assert_eq!(pads[1].pad_shape, PadShape::Circle);
+        assert_eq!(pads[2].pad_shape, PadShape::Circle);
     }
 
     #[test]
@@ -694,19 +541,18 @@ mod tests {
 
     #[test]
     fn pad_sexpr_omits_zero_rotation() {
-        let pad = PadGeom {
+        let pad = Pad {
             number: "1".into(),
             pos: (-3.45, -2.8),
             rotation: 0.0,
             width: 0.8,
             height: 0.2,
-            pad_type: "smd".into(),
-            shape: "roundrect".into(),
+            pad_type: PadType::Smd,
+            pad_shape: PadShape::RoundRect,
             roundrect_rratio: Some(0.25),
-            layers: SMD_LAYERS.into(),
+            layers: Some(SMD_LAYERS.to_string()),
             drill: None,
             solder_mask_margin: None,
-            pin_index: Some(0),
         };
         let s = pad_sexpr(&pad, None, None).to_string();
         assert!(s.contains("(at -3.45 -2.8)"), "{s}");
@@ -748,5 +594,272 @@ mod tests {
             !text.contains("0000000000"),
             "float noise in output: {text}"
         );
+    }
+
+    // ── Characterisation tests for resolve_pad (phase 2 baseline) ──
+
+    /// pad_type: SMD when pos is Some, through-hole when pos is None.
+    #[test]
+    fn resolve_pad_infers_pad_type_from_pos() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").pos(1.0, 0.0).dio(),
+                Pin::build("2").dio(), // no pos → through-hole row
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        // Pin with explicit pos → SMD
+        assert_eq!(pads[0].pad_type, PadType::Smd);
+        // Pin without pos → through-hole (auto-row)
+        assert_eq!(pads[1].pad_type, PadType::ThruHole);
+    }
+
+    /// Through-hole pads get a default drill; SMD pads get None.
+    #[test]
+    fn resolve_pad_defaults_drill_for_th() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").pos(0.0, 0.0).pad_type("thru_hole").dio(),
+                Pin::build("2").pos(1.0, 0.0).pad_type("smd").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        // TH pad: drill defaults to DEFAULT_DRILL.
+        assert_eq!(pads[0].drill, Some(DEFAULT_DRILL));
+        // SMD pad: no drill.
+        assert_eq!(pads[1].drill, None);
+    }
+
+    /// Explicit drill is preserved.
+    #[test]
+    fn resolve_pad_preserves_explicit_drill() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1")
+                    .pos(0.0, 0.0)
+                    .pad_type("thru_hole")
+                    .drill(1.0)
+                    .dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].drill, Some(1.0));
+    }
+
+    /// Layers default by pad type: PTH_LAYERS for through-hole, SMD_LAYERS for SMD.
+    #[test]
+    fn resolve_pad_defaults_layers_by_type() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").pos(0.0, 0.0).pad_type("thru_hole").dio(),
+                Pin::build("2").pos(1.0, 0.0).pad_type("smd").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].layers.as_deref(), Some(PTH_LAYERS));
+        assert_eq!(pads[1].layers.as_deref(), Some(SMD_LAYERS));
+    }
+
+    /// Auto-generated through-hole rows: pad 1 is rect, the rest are circle (KLC F7.3).
+    #[test]
+    fn pad_from_pin_shape_default_for_auto_row() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").dio(),
+                Pin::build("2").dio(),
+                Pin::build("3").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].pad_shape, PadShape::Rect);
+        assert_eq!(pads[1].pad_shape, PadShape::Circle);
+        assert_eq!(pads[2].pad_shape, PadShape::Circle);
+    }
+
+    /// Explicit shape is preserved even in auto-row context.
+    #[test]
+    fn pad_from_pin_preserves_explicit_shape() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1")
+                    .pad_shape("roundrect")
+                    .roundrect_rratio(0.25)
+                    .dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].pad_shape, PadShape::RoundRect);
+        assert_eq!(pads[0].roundrect_rratio, Some(0.25));
+    }
+
+    /// Width/height fall back to pin length, then DEFAULT_PAD_SIZE.
+    /// NOTE: [`resolve_pad`] treats zero-width/zero-height pads as
+    /// "not set" and falls through to the symbol length or
+    /// [`DEFAULT_PAD_SIZE`] — this is the single source of truth.
+    #[test]
+    fn pad_from_pin_falls_back_width_height_to_length() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                // No pad fields at all: width/height fall back to DEFAULT_PAD_SIZE.
+                Pin::build("1").dio(),
+                // Only pos set → width=0.0 in pad; resolve_pad treats 0.0 as
+                // unset, so falls through to DEFAULT_PAD_SIZE.
+                Pin::build("2").pos(1.0, 0.0).dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].width, DEFAULT_PAD_SIZE);
+        assert_eq!(pads[0].height, DEFAULT_PAD_SIZE);
+        // Zero-width pad is treated as unset by resolve_pad → falls to default.
+        assert_eq!(pads[1].width, DEFAULT_PAD_SIZE);
+        assert_eq!(pads[1].height, DEFAULT_PAD_SIZE);
+    }
+
+    /// Pin number defaults to 1-based index when not set.
+    #[test]
+    fn pad_from_pin_defaults_number_to_index() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![Pin::build("A").dio(), Pin::build("B").dio()],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].number, "1");
+        assert_eq!(pads[1].number, "2");
+    }
+
+    /// Explicit pin number is preserved.
+    #[test]
+    fn pad_from_pin_preserves_explicit_number() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![Pin::build("A").number("7").dio()],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].number, "7");
+    }
+
+    /// Auto-row positions: 2.54 mm pitch starting at origin.
+    #[test]
+    fn pad_from_pin_auto_row_positions() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").dio(),
+                Pin::build("2").dio(),
+                Pin::build("4").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].pos, (0.0, 0.0));
+        assert_eq!(pads[1].pos, (2.54, 0.0));
+        assert_eq!(pads[2].pos, (5.08, 0.0));
+    }
+
+    /// Anchor normalisation: fully auto row is left untouched.
+    #[test]
+    fn pad_from_pin_anchor_auto_row_untouched() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![Pin::build("1").dio(), Pin::build("2").dio()],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        // Pad 1 stays at origin for pure auto-row.
+        assert_eq!(pads[0].pos, (0.0, 0.0));
+    }
+
+    /// Anchor normalisation: SMD pads are centred on the bounding box.
+    #[test]
+    fn pad_from_pin_anchor_smd_centred() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").pos(1.0, 1.0).dio(),
+                Pin::build("2").pos(3.0, 3.0).dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        let (x1, y1, x2, y2) = pads_extent(&pads).unwrap();
+        assert!((x1 + x2).abs() < 1e-9, "SMD anchor not centred: {x1}..{x2}");
+        assert!((y1 + y2).abs() < 1e-9, "SMD anchor not centred: {y1}..{y2}");
+    }
+
+    /// Anchor normalisation: explicit through-hole pads anchor on pad 1.
+    #[test]
+    fn pad_from_pin_anchor_th_on_pad1() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").pos(5.0, 3.0).pad_type("thru_hole").dio(),
+                Pin::build("2").pos(7.54, 3.0).pad_type("thru_hole").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].pos, (0.0, 0.0));
+        assert_eq!(pads[1].pos, (2.54, 0.0));
+    }
+
+    /// rotation defaults to 0.0 when not set.
+    #[test]
+    fn pad_from_pin_defaults_rotation_to_zero() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![Pin::build("1").dio()],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].rotation, 0.0);
+    }
+
+    /// solder_mask_margin passes through (None when unset).
+    #[test]
+    fn pad_from_pin_solder_mask_margin_passthrough() {
+        let comp = CompiledComponent {
+            refdes: "U1".into(),
+            pins: vec![
+                Pin::build("1").solder_mask_margin(0.102).dio(),
+                Pin::build("2").dio(),
+            ],
+            ..empty_comp()
+        };
+        let pads = pads_from_component(&comp);
+        assert_eq!(pads[0].solder_mask_margin, Some(0.102));
+        assert_eq!(pads[1].solder_mask_margin, None);
+    }
+
+    fn empty_comp() -> CompiledComponent {
+        CompiledComponent {
+            refdes: String::new(),
+            pins: vec![],
+            constraints: vec![],
+            symbol: None,
+            footprint: None,
+            mechanical: vec![],
+            datasheet: None,
+            description: None,
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            model_3d_offset: (0.0, 0.0, 0.0),
+        }
     }
 }

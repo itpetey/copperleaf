@@ -5,37 +5,12 @@
 //! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    CompileError, Component, Constraint, Net, NetId, Pin,
+    CompileError, Component, Constraint, Net, NetId, Pad, Pin,
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
     util::deterministic_id,
 };
-
-/// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
-/// or paste-only stencil aperture on an exposed pad.
-#[derive(Clone, Debug)]
-pub struct MechanicalPad {
-    /// KiCad pad number. `"None"` for mounting holes / fiducials, `""` for
-    /// unnamed pads (e.g. paste stencil apertures).
-    pub number: String,
-    /// Position in millimetres, relative to the footprint origin.
-    pub pos: (f64, f64),
-    /// Pad width in millimetres (X dimension).
-    pub width: f64,
-    /// Pad height in millimetres (Y dimension).
-    pub height: f64,
-    /// KiCad pad type: `np_thru_hole`, `thru_hole`, or `smd`.
-    pub pad_type: String,
-    /// Pad shape: `circle`, `rect`, `oval`, or `roundrect`.
-    pub pad_shape: String,
-    /// Roundrect corner radius ratio (only for `roundrect` shape).
-    pub roundrect_rratio: Option<f64>,
-    /// Copper layers, e.g. `"*.Cu *.Mask"` or `"F.Paste"`.
-    pub layers: Option<String>,
-    /// Drill diameter in millimetres.
-    pub drill: f64,
-}
 
 #[derive(Clone, Debug)]
 pub struct CompiledComponent {
@@ -45,7 +20,7 @@ pub struct CompiledComponent {
     pub symbol: Option<String>,
     pub footprint: Option<String>,
     /// Mechanical (non-electrical) pads belonging to the component's footprint.
-    pub mechanical: Vec<MechanicalPad>,
+    pub mechanical: Vec<Pad>,
     /// Datasheet URL carried through to the symbol library.
     pub datasheet: Option<String>,
     /// Human-readable description carried through to library metadata.
