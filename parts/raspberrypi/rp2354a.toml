@@ -10,7 +10,7 @@ SVNPLTEwMzAzLTIxOw0KSEVBREVSOw0KLyogR2VuZXJhdGVkIGJ5IHNvZnR3YXJlIGNvbnRhaW5pbmcg
 [[pin]]
 num = 1
 number = "1"
-name = "IOVDD"
+name = "IOVDD_1"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"
@@ -94,7 +94,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 6
 number = "6"
-name = "DVDD"
+name = "DVDD_1"
 purpose = "Supply"
 notes = "Core supply"
 kind = "pwr"
@@ -178,7 +178,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 11
 number = "11"
-name = "IOVDD"
+name = "IOVDD_2"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"
@@ -326,7 +326,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 20
 number = "20"
-name = "IOVDD"
+name = "IOVDD_3"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"
@@ -382,7 +382,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 23
 number = "23"
-name = "DVDD"
+name = "DVDD_2"
 purpose = "Supply"
 notes = "Core supply"
 kind = "pwr"
@@ -499,7 +499,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 30
 number = "30"
-name = "IOVDD"
+name = "IOVDD_4"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"
@@ -631,7 +631,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 38
 number = "38"
-name = "IOVDD"
+name = "IOVDD_5"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"
@@ -651,7 +651,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 39
 number = "39"
-name = "DVDD"
+name = "DVDD_3"
 purpose = "Supply"
 notes = "Core supply"
 kind = "pwr"
@@ -754,7 +754,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 45
 number = "45"
-name = "IOVDD"
+name = "IOVDD_6"
 purpose = "Supply"
 notes = "I/O supply"
 kind = "pwr"

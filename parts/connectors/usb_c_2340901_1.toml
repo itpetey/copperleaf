@@ -110,7 +110,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 7
 number = "SH1"
-name = "SHIELD"
+name = "SHIELD_1"
 purpose = "I/O"
 kind = "dio"
 pos = [-5.62, -4.0]
@@ -126,7 +126,7 @@ layers = "*.Cu *.Mask"
 [[pin]]
 num = 8
 number = "SH2"
-name = "SHIELD"
+name = "SHIELD_2"
 purpose = "I/O"
 kind = "dio"
 pos = [5.62, -4.0]
@@ -142,7 +142,7 @@ layers = "*.Cu *.Mask"
 [[pin]]
 num = 9
 number = "SH3"
-name = "SHIELD"
+name = "SHIELD_3"
 purpose = "I/O"
 kind = "dio"
 pos = [-5.62, 0.0]
@@ -158,7 +158,7 @@ layers = "*.Cu *.Mask"
 [[pin]]
 num = 10
 number = "SH4"
-name = "SHIELD"
+name = "SHIELD_4"
 purpose = "I/O"
 kind = "dio"
 pos = [5.62, 0.0]
