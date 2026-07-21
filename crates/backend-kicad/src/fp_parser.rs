@@ -42,6 +42,16 @@ pub fn parse_footprint(path: impl AsRef<Path>) -> Result<Vec<PadDef>, ParseError
     Ok(extract_pads(&sexpr))
 }
 
+/// Extract the 3D model path from a `.kicad_mod` file's `(model ...)` node.
+///
+/// Returns the path string (e.g. `"${KICAD10_3DMODEL_DIR}/footprints.3dshapes/QFN-60.step"`)
+/// if a model node is found, or `None` otherwise.
+pub fn parse_footprint_model(path: impl AsRef<Path>) -> Result<Option<String>, ParseError> {
+    let source = std::fs::read_to_string(path.as_ref())?;
+    let sexpr = parse(&source)?;
+    Ok(extract_model_path(&sexpr))
+}
+
 /// Parse a `.pretty` footprint library directory, returning one entry per
 /// `.kicad_mod` file found inside.
 pub fn parse_footprint_lib(
@@ -67,6 +77,31 @@ pub fn parse_footprint_lib(
     Ok(entries)
 }
 
+/// Extract the 3D model path for a named footprint within a `.pretty` library
+/// directory.
+pub fn parse_footprint_model_lib(
+    dir: impl AsRef<Path>,
+    footprint_name: &str,
+) -> Result<Option<String>, ParseError> {
+    let dir = dir.as_ref();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("kicad_mod") {
+            continue;
+        }
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        if name == footprint_name {
+            return parse_footprint_model(&path);
+        }
+    }
+    Ok(None)
+}
+
 fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     let Sexpr::List(children) = node else {
         return;
@@ -83,6 +118,27 @@ fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
     let mut pads = Vec::new();
     collect_pads(sexpr, &mut pads);
     pads
+}
+
+/// Walk the S-expression tree looking for a `(model <path> ...)` node and
+/// return the model path string if found.
+fn extract_model_path(node: &Sexpr) -> Option<String> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    if let Some(Sexpr::Atom(head)) = children.first() {
+        if head == "model" {
+            if let Some(path_node) = children.get(1) {
+                return Some(string_value(path_node));
+            }
+        }
+    }
+    for child in children {
+        if let Some(path) = extract_model_path(child) {
+            return Some(path);
+        }
+    }
+    None
 }
 
 fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {

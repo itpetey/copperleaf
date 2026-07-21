@@ -189,7 +189,12 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
     }
 
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
-    children.push(fp_geom::model_sexpr(fp_name));
+    children.push(fp_geom::model_sexpr(
+        fp_name,
+        comp.model_3d.as_deref(),
+        comp.model_3d_offset,
+        comp.model_3d_rotation,
+    ));
 
     let fp = Sexpr::list(std::iter::once(Sexpr::atom("footprint")).chain(children));
     format!("{}\n", fp)
@@ -283,6 +288,10 @@ mod tests {
             }],
             datasheet: Some("https://example.com/ds.pdf".into()),
             description: Some("A test component.".into()),
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 

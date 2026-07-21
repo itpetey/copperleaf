@@ -77,13 +77,37 @@ impl copperleaf::Component for {{{struct_name}}} {
     {{#datasheet_lit}}
 
     fn datasheet(&self) -> Option<&'static str> {
-        Some({{{datasheet_lit}}})
+        Some("{{{datasheet_lit}}}")
     }
     {{/datasheet_lit}}
+    {{#model3d_lit}}
+
+    fn model_3d(&self) -> Option<&'static str> {
+        Some("{{{model3d_lit}}}")
+    }
+    {{/model3d_lit}}
+    {{#model3d_data_lit}}
+
+    fn model_3d_data(&self) -> Option<&'static str> {
+        Some("{{{model3d_data_lit}}}")
+    }
+    {{/model3d_data_lit}}
+    {{#model3d_rotation_lit}}
+
+    fn model_3d_rotation(&self) -> (f64, f64, f64) {
+        {{{model3d_rotation_lit}}}
+    }
+    {{/model3d_rotation_lit}}
+    {{#model3d_offset_lit}}
+
+    fn model_3d_offset(&self) -> (f64, f64, f64) {
+        {{{model3d_offset_lit}}}
+    }
+    {{/model3d_offset_lit}}
     {{#description_lit}}
 
     fn description(&self) -> Option<&'static str> {
-        Some({{{description_lit}}})
+        Some("{{{description_lit}}}")
     }
     {{/description_lit}}
 }

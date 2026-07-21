@@ -8,6 +8,22 @@ use copperleaf_backend_kicad::{
 use crate::{CliError, UpdateArgs, kindmap::KindMap, manifest};
 
 pub fn run(args: UpdateArgs) -> Result<(), CliError> {
+    // At least one source must be provided.
+    if args.symbol.is_none()
+        && args.footprint.is_none()
+        && args.datasheet.is_none()
+        && args.model_3d.is_none()
+    {
+        return Err(CliError::Diagnostic(Diagnostic {
+            code: "CLI:NO_SOURCE".into(),
+            severity: Severity::Error,
+            message: "No source provided — pass --symbol, --footprint, --datasheet, or --model-3d"
+                .into(),
+            entities: vec![],
+            hint: None,
+        }));
+    }
+
     let kindmap = KindMap::load(args.kind_map.as_deref())?;
 
     let source = std::fs::read_to_string(&args.part_toml)?;
@@ -144,10 +160,11 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             .lib_id
             .as_deref()
             .or(manifest.component.lib_id.as_deref())
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_owned();
         // Idiot check: verify the source matches this part.
         if let Some(ref existing) = manifest.component.lib_id
-            && existing != resolved_lib_id
+            && *existing != resolved_lib_id
         {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:LIB_ID_MISMATCH".into(),
@@ -162,7 +179,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         }
         let pads = if std::fs::metadata(footprint_path)?.is_dir() {
             let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
-            let Some((_, pads)) = lib.into_iter().find(|(name, _)| name == resolved_lib_id) else {
+            let Some((_, pads)) = lib.into_iter().find(|(name, _)| *name == resolved_lib_id) else {
                 return Err(CliError::Diagnostic(Diagnostic {
                     code: "CLI:FOOTPRINT_NOT_FOUND".into(),
                     severity: Severity::Error,
@@ -230,6 +247,43 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             });
         }
         diags.extend(manifest::merge_footprint(&mut manifest, &pads));
+
+        // Extract 3D model path from the footprint source, unless overridden
+        // by --model-3d.
+        if manifest.component.model_3d.is_none() && args.model_3d.is_none() {
+            let extracted_model = if std::fs::metadata(footprint_path)?.is_dir() {
+                copperleaf_backend_kicad::parse_footprint_model_lib(
+                    footprint_path,
+                    &resolved_lib_id,
+                )?
+            } else {
+                copperleaf_backend_kicad::parse_footprint_model(footprint_path)?
+            };
+            manifest.component.model_3d = extracted_model;
+
+            // If no model found in the footprint S-expression, look for a
+            // .step file alongside the footprint file.
+            if manifest.component.model_3d.is_none() {
+                manifest.component.model_3d =
+                    find_step_file_alongside(footprint_path);
+            }
+        }
+    }
+
+    // Allow --model-3d to override the model path.
+    if let Some(ref model_3d) = args.model_3d {
+        manifest.component.model_3d = Some(model_3d.clone());
+    }
+
+    // If we have a model path but no embedded data, read and embed the file.
+    if let Some(ref model_path) = manifest.component.model_3d.clone() {
+        if manifest.component.model_3d_data.is_none() {
+            if let Ok(bytes) = std::fs::read(model_path) {
+                use base64::Engine;
+                manifest.component.model_3d_data =
+                    Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+            }
+        }
     }
 
     let output = manifest::serialise(&manifest);
@@ -254,6 +308,11 @@ fn is_thermal_via(
     pins: &[copperleaf_part_codegen::PinDef],
 ) -> bool {
     for pin in pins {
+        // Skip pins that correspond to the same pad number — a pad is not a
+        // thermal via of itself.
+        if pin.number == pad.number {
+            continue;
+        }
         let Some((px, py)) = pin.pos else { continue };
         let half_w = pin.width.unwrap_or(0.0) / 2.0;
         let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
@@ -266,4 +325,27 @@ fn is_thermal_via(
         }
     }
     false
+}
+
+/// Look for a `.step` file in the same directory as `footprint_path`.
+///
+/// If the footprint path is a directory (`.pretty` library), searches for any
+/// `.step` file inside it.  Returns the first match as a `Some(String)`, or
+/// `None` if nothing is found.
+pub(crate) fn find_step_file_alongside(footprint_path: &str) -> Option<String> {
+    let path = std::path::Path::new(footprint_path);
+    let dir = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()?.to_path_buf()
+    };
+
+    for entry in std::fs::read_dir(&dir).ok()? {
+        let entry = entry.ok()?;
+        let p = entry.path();
+        if p.extension().and_then(|s| s.to_str()) == Some("step") {
+            return p.to_str().map(|s| s.to_string());
+        }
+    }
+    None
 }

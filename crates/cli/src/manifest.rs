@@ -345,6 +345,23 @@ pub fn serialise(manifest: &Manifest) -> String {
     if let Some(lib_id) = &manifest.component.lib_id {
         out.push_str(&format!("lib_id = \"{}\"\n", escape_toml_string(lib_id)));
     }
+    if let Some(model_3d) = &manifest.component.model_3d {
+        out.push_str(&format!(
+            "model_3d = \"{}\"\n",
+            escape_toml_string(model_3d)
+        ));
+    }
+    if let Some(model_3d_data) = &manifest.component.model_3d_data {
+        out.push_str("model_3d_data = \"\"\"\n");
+        out.push_str(model_3d_data);
+        out.push_str("\"\"\"\n");
+    }
+    if let Some((x, y, z)) = manifest.component.model_3d_rotation {
+        out.push_str(&format!("model_3d_rotation = [{x}, {y}, {z}]\n"));
+    }
+    if let Some((x, y, z)) = manifest.component.model_3d_offset {
+        out.push_str(&format!("model_3d_offset = [{x}, {y}, {z}]\n"));
+    }
     out.push('\n');
 
     for pin in &manifest.pins {
@@ -631,6 +648,10 @@ mod tests {
                 description: None,
                 datasheet: None,
                 lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
             },
             pins: vec![CodegenPinDef {
                 num: 1,
@@ -775,6 +796,10 @@ mod tests {
                 description: None,
                 datasheet: None,
                 lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
             },
             pins: vec![],
             constraints: vec![],

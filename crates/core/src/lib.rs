@@ -52,14 +52,14 @@ pub trait Component {
     /// Symbol library identifier for this part (e.g. `"RP2354A"` or
     /// `"MCU_RaspberryPi:RP2354A"`).  Identifiers without a library prefix are
     /// emitted into the project's own symbol library.
-    fn symbol(&self) -> Option<&'static str> {
+    fn symbol(&self) -> Option<&str> {
         None
     }
 
     /// Footprint name for this part.  Names without a library prefix are
     /// generated into the project's own footprint library; names containing a
     /// `':'` are treated as external library references.
-    fn footprint(&self) -> Option<&'static str> {
+    fn footprint(&self) -> Option<&str> {
         None
     }
 
@@ -70,13 +70,33 @@ pub trait Component {
     }
 
     /// Datasheet URL carried through to the symbol library.
-    fn datasheet(&self) -> Option<&'static str> {
+    fn datasheet(&self) -> Option<&str> {
         None
     }
 
     /// Human-readable description carried through to library metadata.
-    fn description(&self) -> Option<&'static str> {
+    fn description(&self) -> Option<&str> {
         None
+    }
+
+    /// Path to a 3D model file (`.step` / `.stp`) for this part's footprint.
+    fn model_3d(&self) -> Option<&str> {
+        None
+    }
+
+    /// Base64-encoded content of the 3D model file, decoded during emit.
+    fn model_3d_data(&self) -> Option<&str> {
+        None
+    }
+
+    /// 3D model rotation in degrees (x, y, z) to align with the footprint.
+    fn model_3d_rotation(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
+
+    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
+    fn model_3d_offset(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
     }
 }
 

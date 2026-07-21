@@ -28,6 +28,8 @@ pub enum CliError {
     Codegen(#[from] copperleaf_part_codegen::CodegenError),
     #[error("parse error: {0}")]
     Parse(#[from] copperleaf_backend_kicad::ParseError),
+    #[error("emit error: {0}")]
+    Emit(#[from] copperleaf_backend_kicad::fp_emitter::EmitError),
 }
 
 #[derive(Parser)]
@@ -54,6 +56,9 @@ struct NewArgs {
     /// Default kind for unrecognised pin types.
     #[arg(long, default_value = "dio")]
     default_kind: String,
+    /// Path to a 3D model (.step) file for the footprint.
+    #[arg(long)]
+    model_3d: Option<String>,
     /// Component title.
     #[arg(long)]
     title: Option<String>,
@@ -69,7 +74,7 @@ struct NewArgs {
 }
 
 #[derive(Parser)]
-#[command(group = clap::ArgGroup::new("source").required(true).multiple(false))]
+#[command(group = clap::ArgGroup::new("source").multiple(false))]
 struct UpdateArgs {
     /// Existing part TOML file.
     part_toml: String,
@@ -94,6 +99,9 @@ struct UpdateArgs {
     /// Default kind for unrecognised pin types.
     #[arg(long, default_value = "dio")]
     default_kind: String,
+    /// Path to a 3D model (.step) file for the footprint.
+    #[arg(long)]
+    model_3d: Option<String>,
     /// LLM model for datasheet processing (provider/model format).
     #[arg(long, default_value = "opencode/big-pickle")]
     model: String,

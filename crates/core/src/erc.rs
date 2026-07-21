@@ -184,6 +184,10 @@ mod tests {
             mechanical: vec![],
             datasheet: None,
             description: None,
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 

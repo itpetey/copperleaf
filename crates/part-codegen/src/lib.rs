@@ -107,6 +107,22 @@ pub struct ComponentMeta {
     /// Library identifier for the symbol/footprint within the source file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lib_id: Option<String>,
+    /// Path to a 3D model file (`.step`) for this component's footprint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_3d: Option<String>,
+    /// Base64-encoded content of the 3D model file for self-contained
+    /// distribution.  When present, this is written to disk during footprint
+    /// generation and `model_3d` is used as the reference path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_3d_data: Option<String>,
+    /// 3D model rotation (degrees around X, Y, Z axes) to align the model
+    /// with the footprint, e.g. `[0.0, 0.0, 90.0]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_3d_rotation: Option<(f64, f64, f64)>,
+    /// 3D model offset in millimetres (X, Y, Z) to position the model
+    /// relative to the footprint origin, e.g. `[0.0, 0.0, -2.0]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_3d_offset: Option<(f64, f64, f64)>,
 }
 
 /// A thermal via that lives inside a pad (e.g. exposed thermal pad).
@@ -309,6 +325,14 @@ struct TemplateData {
     symbol_id: Option<String>,
     /// Datasheet URL as a Rust string literal (e.g. `"https://..."`).
     datasheet_lit: Option<String>,
+    /// 3D model path as a Rust string literal
+    model3d_lit: Option<String>,
+    /// Base64-encoded 3D model data as a Rust string literal
+    model3d_data_lit: Option<String>,
+    /// 3D model rotation as a Rust tuple expression, e.g. `(0.0, 0.0, 90.0)`.
+    model3d_rotation_lit: Option<String>,
+    /// 3D model offset as a Rust tuple expression, e.g. `(0.0, 0.0, -2.0)`.
+    model3d_offset_lit: Option<String>,
     /// Description as a Rust string literal.
     description_lit: Option<String>,
 }
@@ -796,16 +820,18 @@ fn render_component(
         constraints: constraints?,
         mechanicals,
         symbol_id: manifest.component.lib_id.clone(),
-        datasheet_lit: manifest
+        datasheet_lit: manifest.component.datasheet.clone(),
+        model3d_lit: manifest.component.model_3d.clone(),
+        model3d_data_lit: manifest.component.model_3d_data.clone(),
+        model3d_rotation_lit: manifest
             .component
-            .datasheet
-            .as_ref()
-            .map(|s| format!("{s:?}")),
-        description_lit: manifest
+            .model_3d_rotation
+            .map(|(x, y, z)| format!("({x:?}, {y:?}, {z:?})")),
+        model3d_offset_lit: manifest
             .component
-            .description
-            .as_ref()
-            .map(|s| format!("{s:?}")),
+            .model_3d_offset
+            .map(|(x, y, z)| format!("({x:?}, {y:?}, {z:?})")),
+        description_lit: manifest.component.description.clone(),
     };
 
     let mut out = String::new();
@@ -888,6 +914,10 @@ mod tests {
                 description: None,
                 datasheet: None,
                 lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
             },
             pins: vec![PinDef {
                 num: 1,
@@ -932,6 +962,10 @@ mod tests {
                 description: None,
                 datasheet: None,
                 lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
             },
             pins: vec![PinDef {
                 num: 1,

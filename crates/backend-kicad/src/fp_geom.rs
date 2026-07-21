@@ -161,23 +161,35 @@ pub fn fp_text(kind: &str, value: &str, pos: (f64, f64), layer: &str) -> Sexpr {
 
 /// Build the `(model ...)` 3D-model reference for a footprint.
 ///
-/// The path follows the KLC F9.3 convention of referencing the model by name
-/// even when the `.step` file does not (yet) exist; KiCad silently ignores
-/// missing models.
-pub fn model_sexpr(fp_name: &str) -> Sexpr {
+/// If `model_path` is `Some`, uses that exact path. Otherwise follows the KLC
+/// F9.3 convention of referencing the model by name even when the `.step` file
+/// does not (yet) exist; KiCad silently ignores missing models.
+///
+/// `offset` is the model offset in millimetres (x, y, z) relative to the
+/// footprint origin.  `rotation` is the model rotation in degrees around the
+/// X, Y, and Z axes (e.g. `(0.0, 0.0, 90.0)` to rotate 90° around Z).
+pub fn model_sexpr(
+    fp_name: &str,
+    model_path: Option<&str>,
+    offset: (f64, f64, f64),
+    rotation: (f64, f64, f64),
+) -> Sexpr {
+    let path = match model_path {
+        Some(p) => p.to_string(),
+        None => format!("${{KICAD10_3DMODEL_DIR}}/{}.step", fp_name),
+    };
+    let (ox, oy, oz) = offset;
+    let (rx, ry, rz) = rotation;
     Sexpr::list([
         Sexpr::atom("model"),
-        Sexpr::str(&format!(
-            "${{KICAD10_3DMODEL_DIR}}/footprints.3dshapes/{}.step",
-            fp_name
-        )),
+        Sexpr::str(&path),
         Sexpr::list([
             Sexpr::atom("offset"),
             Sexpr::list([
                 Sexpr::atom("xyz"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
+                Sexpr::atom(&format!("{ox}")),
+                Sexpr::atom(&format!("{oy}")),
+                Sexpr::atom(&format!("{oz}")),
             ]),
         ]),
         Sexpr::list([
@@ -193,9 +205,9 @@ pub fn model_sexpr(fp_name: &str) -> Sexpr {
             Sexpr::atom("rotate"),
             Sexpr::list([
                 Sexpr::atom("xyz"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
-                Sexpr::atom("0"),
+                Sexpr::atom(&format!("{rx}")),
+                Sexpr::atom(&format!("{ry}")),
+                Sexpr::atom(&format!("{rz}")),
             ]),
         ]),
     ])
@@ -614,6 +626,10 @@ mod tests {
             }],
             datasheet: None,
             description: None,
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 

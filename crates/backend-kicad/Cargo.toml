@@ -6,6 +6,7 @@ description = "KiCad backend emitters"
 license.workspace = true
 
 [dependencies]
+base64.workspace = true
 copperleaf.workspace = true
 copperleaf-compile.workspace = true
 copperleaf-part-codegen.workspace = true

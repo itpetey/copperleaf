@@ -36,8 +36,7 @@ pub fn fmt_mm(meters: f64) -> String {
 /// Full `lib:footprint` reference used in symbol properties and the PCB.
 pub fn footprint_ref(comp: &CompiledComponent) -> String {
     match comp.footprint.as_deref() {
-        Some(s) if s.contains(':') => s.to_string(),
-        Some(s) => format!("{}:{s}", PROJECT_LIB),
+        Some(s) => s.to_owned(),
         None => format!("{}:{}", PROJECT_LIB, comp.refdes),
     }
 }

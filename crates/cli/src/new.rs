@@ -4,7 +4,7 @@ use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{find_symbol, flatten_extends, parse_symbol_lib};
 use copperleaf_part_codegen::{ComponentMeta, Manifest};
 
-use crate::{CliError, NewArgs, kindmap::KindMap, manifest, vendor};
+use crate::{CliError, NewArgs, kindmap::KindMap, manifest, update, vendor};
 
 pub fn run(args: NewArgs) -> Result<(), CliError> {
     let kindmap = KindMap::load(args.kind_map.as_deref())?;
@@ -73,7 +73,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
         }
     }
     let lib_id = args.lib_id.clone().unwrap_or_default();
-    let pads = if std::fs::metadata(footprint_path)?.is_dir() {
+    let (pads, extracted_model) = if std::fs::metadata(footprint_path)?.is_dir() {
         let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
         let Some((_, pads)) = lib.into_iter().find(|(name, _)| name == &lib_id) else {
             return Err(CliError::Diagnostic(Diagnostic {
@@ -84,14 +84,24 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
                 hint: None,
             }));
         };
-        pads
+        let model = copperleaf_backend_kicad::parse_footprint_model_lib(
+            footprint_path,
+            &lib_id,
+        )?;
+        (pads, model)
     } else {
-        copperleaf_backend_kicad::parse_footprint(footprint_path)?
+        let model = copperleaf_backend_kicad::parse_footprint_model(footprint_path)?;
+        (copperleaf_backend_kicad::parse_footprint(footprint_path)?, model)
     };
 
+    let model_3d = args
+        .model_3d
+        .clone()
+        .or(extracted_model)
+        .or_else(|| update::find_step_file_alongside(footprint_path));
     let title = args.title.clone().unwrap_or_else(|| lib_id.clone());
     let description = args.description.clone();
-    let manifest = manifest::manifest_from_footprint(
+    let mut manifest = manifest::manifest_from_footprint(
         &pads,
         ComponentMeta {
             name: struct_name(&lib_id),
@@ -99,9 +109,22 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
             description,
             datasheet: None,
             lib_id: Some(lib_id.clone()),
+            model_3d,
+            model_3d_data: None,
+            model_3d_rotation: None,
+            model_3d_offset: None,
         },
         &args.default_kind,
     );
+
+    // Embed the 3D model file content as base64.
+    if let Some(ref model_path) = manifest.component.model_3d.clone() {
+        if let Ok(bytes) = std::fs::read(model_path) {
+            use base64::Engine;
+            manifest.component.model_3d_data =
+                Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+        }
+    }
 
     let output = manifest::serialise(&manifest);
     let diags = vec![Diagnostic {
@@ -200,6 +223,10 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
             description,
             datasheet: symbol.datasheet.clone(),
             lib_id: Some(lib_id.to_string()),
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: None,
+            model_3d_offset: None,
         },
         pins: vec![],
         constraints: vec![],

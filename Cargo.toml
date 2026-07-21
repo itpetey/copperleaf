@@ -23,6 +23,7 @@ license = "MPL-2.0"
 
 [workspace.dependencies]
 anyhow = { version = "1.0", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 clap = { version = "4.6", default-features = false }
 copperleaf = { path = "crates/core", default-features = false }
 copperleaf-backend-kicad = {

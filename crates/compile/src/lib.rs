@@ -394,6 +394,10 @@ fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
                 mechanical: entry.component.mechanical().to_vec(),
                 datasheet: entry.component.datasheet().map(|s| s.to_owned()),
                 description: entry.component.description().map(|s| s.to_owned()),
+                model_3d: entry.component.model_3d().map(|s| s.to_owned()),
+                model_3d_data: entry.component.model_3d_data().map(|s| s.to_owned()),
+                model_3d_rotation: entry.component.model_3d_rotation(),
+                model_3d_offset: entry.component.model_3d_offset(),
             }
         })
         .collect()
@@ -510,6 +514,10 @@ fn make_capacitor_component(
         mechanical: cap.mechanical().to_vec(),
         datasheet: cap.datasheet().map(|s| s.to_owned()),
         description: cap.description().map(|s| s.to_owned()),
+        model_3d: cap.model_3d().map(|s| s.to_owned()),
+        model_3d_data: cap.model_3d_data().map(|s| s.to_owned()),
+        model_3d_rotation: cap.model_3d_rotation(),
+        model_3d_offset: cap.model_3d_offset(),
     }
 }
 
@@ -800,6 +808,10 @@ mod tests {
             mechanical: vec![],
             datasheet: None,
             description: None,
+            model_3d: None,
+            model_3d_data: None,
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 

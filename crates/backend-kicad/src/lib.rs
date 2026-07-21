@@ -6,10 +6,11 @@
 
 use std::{fs, path::Path};
 
+use base64::Engine as _;
 use copperleaf::{Backend, BackendError, CompiledBoard};
 
-pub use fp_emitter::emit_footprint;
-pub use fp_parser::{PadDef, parse_footprint, parse_footprint_lib};
+pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
+pub use fp_parser::{PadDef, parse_footprint, parse_footprint_lib, parse_footprint_model, parse_footprint_model_lib};
 pub use lib_emitter::{emit_footprint_lib, emit_symbol_lib};
 pub use project::{emit_fp_lib_table, emit_sym_lib_table};
 pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
@@ -71,6 +72,25 @@ impl Backend for KiCad {
 
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+
+        // Write 3D model files from embedded base64 data.
+        for comp in &board.components {
+            if let Some(ref data) = comp.model_3d_data {
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(data)
+                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
+                // Derive the filename from model_3d, or fall back to <refdes>.step.
+                let fallback = format!("{}.step", comp.refdes);
+                let filename = comp
+                    .model_3d
+                    .as_deref()
+                    .and_then(|p| Path::new(p).file_name())
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&fallback);
+                let dst = out.join(filename);
+                fs::write(&dst, &bytes)?;
+            }
+        }
 
         Ok(())
     }

@@ -8,12 +8,13 @@ pub fn footprint(args: GenerateFootprintArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.part_toml)?;
     let manifest = manifest::deserialise(&source)?;
 
-    let kicad_mod = copperleaf_backend_kicad::emit_footprint(&manifest);
-
     let out_path = match args.out {
         Some(ref p) => PathBuf::from(p),
         None => default_out(&args.part_toml, &manifest, "kicad_mod"),
     };
+
+    let output_dir = out_path.parent();
+    let kicad_mod = copperleaf_backend_kicad::emit_footprint_to(&manifest, output_dir)?;
 
     std::fs::write(&out_path, kicad_mod)?;
     eprintln!("Wrote footprint to {}", out_path.display());

@@ -169,30 +169,30 @@ impl Package {
     /// KiCad-style footprint library name for a resistor.
     pub fn resistor_footprint_name(self) -> &'static str {
         match self {
-            Self::M0603 => "Resistor_SMD:R_0201_0603Metric",
-            Self::M1005 => "Resistor_SMD:R_0402_1005Metric",
-            Self::M1608 => "Resistor_SMD:R_0603_1608Metric",
-            Self::M2012 => "Resistor_SMD:R_0805_2012Metric",
-            Self::M3216 => "Resistor_SMD:R_1206_3216Metric",
-            Self::M3225 => "Resistor_SMD:R_1210_3225Metric",
-            Self::M4532 => "Resistor_SMD:R_1812_4532Metric",
-            Self::M5025 => "Resistor_SMD:R_2010_5025Metric",
-            Self::M6332 => "Resistor_SMD:R_2512_6332Metric",
+            Self::M0603 => "Resistor_SMD.3dshapes/R_0201_0603Metric",
+            Self::M1005 => "Resistor_SMD.3dshapes/R_0402_1005Metric",
+            Self::M1608 => "Resistor_SMD.3dshapes/R_0603_1608Metric",
+            Self::M2012 => "Resistor_SMD.3dshapes/R_0805_2012Metric",
+            Self::M3216 => "Resistor_SMD.3dshapes/R_1206_3216Metric",
+            Self::M3225 => "Resistor_SMD.3dshapes/R_1210_3225Metric",
+            Self::M4532 => "Resistor_SMD.3dshapes/R_1812_4532Metric",
+            Self::M5025 => "Resistor_SMD.3dshapes/R_2010_5025Metric",
+            Self::M6332 => "Resistor_SMD.3dshapes/R_2512_6332Metric",
         }
     }
 
     /// KiCad-style footprint library name for a capacitor.
     pub fn capacitor_footprint_name(self) -> &'static str {
         match self {
-            Self::M0603 => "Capacitor_SMD:C_0201_0603Metric",
-            Self::M1005 => "Capacitor_SMD:C_0402_1005Metric",
-            Self::M1608 => "Capacitor_SMD:C_0603_1608Metric",
-            Self::M2012 => "Capacitor_SMD:C_0805_2012Metric",
-            Self::M3216 => "Capacitor_SMD:C_1206_3216Metric",
-            Self::M3225 => "Capacitor_SMD:C_1210_3225Metric",
-            Self::M4532 => "Capacitor_SMD:C_1812_4532Metric",
-            Self::M5025 => "Capacitor_SMD:C_2010_5025Metric",
-            Self::M6332 => "Capacitor_SMD:C_2512_6332Metric",
+            Self::M0603 => "Capacitor_SMD.3dshapes/C_0201_0603Metric",
+            Self::M1005 => "Capacitor_SMD.3dshapes/C_0402_1005Metric",
+            Self::M1608 => "Capacitor_SMD.3dshapes/C_0603_1608Metric",
+            Self::M2012 => "Capacitor_SMD.3dshapes/C_0805_2012Metric",
+            Self::M3216 => "Capacitor_SMD.3dshapes/C_1206_3216Metric",
+            Self::M3225 => "Capacitor_SMD.3dshapes/C_1210_3225Metric",
+            Self::M4532 => "Capacitor_SMD.3dshapes/C_1812_4532Metric",
+            Self::M5025 => "Capacitor_SMD.3dshapes/C_2010_5025Metric",
+            Self::M6332 => "Capacitor_SMD.3dshapes/C_2512_6332Metric",
         }
     }
 }

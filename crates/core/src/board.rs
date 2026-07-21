@@ -49,6 +49,14 @@ pub struct CompiledComponent {
     pub datasheet: Option<String>,
     /// Human-readable description carried through to library metadata.
     pub description: Option<String>,
+    /// Path to a 3D model file for the footprint.
+    pub model_3d: Option<String>,
+    /// Base64-encoded 3D model data, decoded and written at emit time.
+    pub model_3d_data: Option<String>,
+    /// 3D model rotation in degrees (x, y, z) to align with the footprint.
+    pub model_3d_rotation: (f64, f64, f64),
+    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
+    pub model_3d_offset: (f64, f64, f64),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

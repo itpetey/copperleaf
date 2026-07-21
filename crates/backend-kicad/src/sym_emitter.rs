@@ -201,6 +201,10 @@ mod tests {
                 description: Some("A test component.".into()),
                 datasheet: Some("https://example.com/ds.pdf".into()),
                 lib_id: Some("TestPart".into()),
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
             },
             pins: vec![
                 pin_def(1, "VDD", "pwr"),
