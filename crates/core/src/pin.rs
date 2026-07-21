@@ -76,15 +76,15 @@ pub struct Pad {
 /// Schematic symbol pin graphics.
 ///
 /// Separated from [`Pad`] so that symbol geometry does not leak into
-/// footprint pad-dimension calculations.
+/// footprint pad-dimension calculations.  All values are in millimetres.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SymPin {
-    /// Position in the symbol coordinate system (mils).
+    /// Position in the symbol coordinate system (millimetres).
     pub pos: (f64, f64),
     /// Rotation in degrees.
     #[serde(default)]
     pub rotation: f64,
-    /// Pin stub length in mils (schematic only, not a pad dimension).
+    /// Pin stub length in millimetres (schematic only, not a pad dimension).
     pub length: f64,
 }
 
@@ -218,6 +218,7 @@ pub struct PinHandle {
 pub struct RawConnection {
     pub from: PinHandle,
     pub to: PinHandle,
+    pub id: usize,
 }
 
 impl SigSpec {
@@ -790,9 +791,10 @@ pub fn auto_pad_pos(index: usize) -> (f64, f64) {
 
 /// Resolve a pin's pad to fully-populated geometry for emission.
 ///
-/// This is the **only** place pad-defaulting rules live.  Both the CLI
-/// `generate` pipeline and board emission MUST use this function (or
-/// [`resolve_mech_pad`] for mechanical pads).
+/// This function owns D2's pad-defaulting rules.  The board-emission path
+/// calls it directly; the CLI `generate` path has an equivalent
+/// `resolve_pin_def_pad` in `backend-kicad` that implements the same rules
+/// against the TOML data model (see design D2).
 ///
 /// # Defaults applied (in order of precedence)
 ///
@@ -814,8 +816,13 @@ pub fn auto_pad_pos(index: usize) -> (f64, f64) {
 /// 7. **number** — explicit `pad.number` (non-empty) wins; otherwise
 ///    falls back to `pin.number()` or the 1-based pad index.
 pub fn resolve_pad(pin: &Pin, index: usize) -> Pad {
-    let has_explicit_pos = pin.pad().map(|p| p.pos != (0.0, 0.0)).unwrap_or(false)
-        || pin.pad().is_some() && pin.pos().is_some();
+    // A pin has an explicit position when its pad carries non-default geometry
+    // (pos ≠ (0,0), width > 0, height > 0, or rotation ≠ 0).  A pad that was
+    // auto-created by `build_pad` with only pad_type set, for example, should
+    // NOT be treated as explicitly positioned — the auto-row rules must apply.
+    let has_explicit_pos = pin.pad().is_some_and(|p| {
+        p.pos != (0.0, 0.0) || p.width > 0.0 || p.height > 0.0 || p.rotation != 0.0
+    });
     let has_explicit_pad = pin.pad().is_some();
 
     // 1. pad_type

@@ -75,7 +75,7 @@ pub struct CompileOptions {
 
 impl NetGrouping {
     /// Build the grouping from the given connections and single-pin nets.
-    fn build(connections: &[RawConnection], single_pin_nets: &[PinHandle]) -> Self {
+    fn build(connections: &[RawConnection], single_pin_nets: &[(usize, PinHandle)]) -> Self {
         let mut pin_to_node: HashMap<(usize, &'static str), usize> = HashMap::new();
         let mut nodes: Vec<(usize, &'static str)> = Vec::new();
 
@@ -91,7 +91,7 @@ impl NetGrouping {
         }
 
         // Add single-pin nets as single-node entries.
-        for pin in single_pin_nets {
+        for &(_, pin) in single_pin_nets {
             if let std::collections::hash_map::Entry::Vacant(e) =
                 pin_to_node.entry((pin.component, pin.pin))
             {
@@ -124,21 +124,21 @@ impl NetGrouping {
         }
     }
 
-    /// Return the set of connection-edge indices whose pins belong to the net
+    /// Return the set of connection-edge ids whose pins belong to the net
     /// identified by `rep`.
     fn edges_for_net(&self, rep: usize, connections: &[RawConnection]) -> Vec<usize> {
         let mut edge_ids = Vec::new();
-        for (edge_id, conn) in connections.iter().enumerate() {
+        for conn in connections {
             let a = (conn.from.component, conn.from.pin);
             let b = (conn.to.component, conn.to.pin);
             let a_node = self.pin_to_node[&a];
             if self.roots[a_node] == rep {
-                edge_ids.push(edge_id);
+                edge_ids.push(conn.id);
                 continue;
             }
             let b_node = self.pin_to_node[&b];
             if self.roots[b_node] == rep {
-                edge_ids.push(edge_id);
+                edge_ids.push(conn.id);
             }
         }
         edge_ids
@@ -168,10 +168,8 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
     let single_net_overrides: BTreeMap<(usize, &str), RawNetOverride> = board
         .single_pin_nets
         .iter()
-        .enumerate()
-        .map(|(i, pin)| {
-            let key = board.next_edge + i;
-            let ov = board.net_overrides.get(&key).cloned().unwrap_or_default();
+        .map(|&(id, pin)| {
+            let ov = board.net_overrides.get(&id).cloned().unwrap_or_default();
             ((pin.component, pin.pin), ov)
         })
         .collect();
@@ -904,5 +902,53 @@ mod tests {
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);
+    }
+
+    #[test]
+    fn single_pin_net_interleaved_with_connect_preserves_overrides() {
+        use copperleaf::PinRef;
+
+        struct TwoPins;
+        impl copperleaf::Component for TwoPins {
+            fn pins(&self) -> &[Pin] {
+                static PINS: std::sync::OnceLock<Vec<Pin>> = std::sync::OnceLock::new();
+                PINS.get_or_init(|| {
+                    vec![
+                        Pin::build("A").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                        Pin::build("B").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),
+                        Pin::build("C").pwr_fixed(5.0.volt(), 0.1.amp()).pin(),
+                    ]
+                })
+            }
+        }
+        impl TwoPins {
+            const A: PinRef = PinRef("A");
+            const B: PinRef = PinRef("B");
+            const C: PinRef = PinRef("C");
+        }
+
+        let mut board = Board::new("t");
+        let u1 = board.add("U1", TwoPins);
+
+        // Interleave: net() before connect() — Phase 4 key scheme must not alias.
+        let single = board.net(u1.pin(TwoPins::C)).unwrap();
+        board.set_net_name(single, "FIVE_VOLT");
+
+        let pair = board
+            .connect(u1.pin(TwoPins::A), u1.pin(TwoPins::B))
+            .unwrap();
+        board.set_net_name(pair, "PAIR_NET");
+
+        let report = crate::run(board, &CompileOptions::default()).expect("compiles");
+
+        let names: Vec<&str> = report.board.nets.iter().map(|n| n.name.as_str()).collect();
+        assert!(
+            names.contains(&"FIVE_VOLT"),
+            "single-pin net lost its name override: {names:?}"
+        );
+        assert!(
+            names.contains(&"PAIR_NET"),
+            "connect net lost its name override: {names:?}"
+        );
     }
 }

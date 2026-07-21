@@ -4,10 +4,6 @@ use crate::{
     units::{Farad, Meter, Ohm, Qty, UnitExt, Volt},
 };
 
-/// Identifier for a net name (legacy; prefer [`NetIdx`] for compiled boards).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct NetId(pub String);
-
 /// Index into [`CompiledBoard::nets`](crate::board::CompiledBoard::nets).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NetIdx(pub usize);

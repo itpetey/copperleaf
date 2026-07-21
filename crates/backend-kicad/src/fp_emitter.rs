@@ -6,7 +6,10 @@
 use base64::Engine as _;
 use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
 
-use copperleaf::{Pad, PadShape, PadType};
+use copperleaf::{
+    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, SMD_LAYERS,
+    resolve_mech_pad,
+};
 
 use crate::{
     fp_geom::{self},
@@ -153,12 +156,15 @@ pub fn emit_footprint_to(
 }
 
 /// Collect all pads for a manifest: electrical pins (with thermal vias)
-/// followed by mechanical pads.
+/// followed by mechanical pads.  Pin pads are resolved via
+/// [`resolve_pin_def_pad`], which implements the same defaulting rules as
+/// [`copperleaf::resolve_pad`] (design D2) so the generate and board pipelines
+/// are always consistent.
 pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
     let mut pads: Vec<Pad> = Vec::new();
 
     for (i, pin) in manifest.pins.iter().enumerate() {
-        pads.push(pad_from_pin_def(pin, i));
+        pads.push(resolve_pin_def_pad(pin, i));
         // Thermal vias are emitted as un-numbered through-holes on all copper.
         for via in &pin.thermal_vias {
             pads.push(fp_geom::thermal_via_pad(via.pos, via.drill, via.size));
@@ -166,89 +172,110 @@ pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
     }
 
     for mech in &manifest.mechanical {
-        pads.push(pad_from_mechanical_def(mech));
+        let raw = mech_to_pad(mech);
+        pads.push(resolve_mech_pad(&raw));
     }
 
     fp_geom::normalise_anchor(&mut pads);
     pads
 }
 
-fn pad_from_mechanical_def(mech: &MechanicalDef) -> Pad {
-    // KiCad writes un-numbered pads as `(pad "" ...)`; normalise the legacy
-    // `"None"` marker to an empty number.
-    let number = if mech.number.eq_ignore_ascii_case("none") {
-        String::new()
+/// Resolve one pin's pad from TOML data, applying the exact same defaulting
+/// rules as [`copperleaf::resolve_pad`] (design D2).  This is the only place
+/// the generate-path pad defaulting lives.
+fn resolve_pin_def_pad(pin_def: &PinDef, index: usize) -> Pad {
+    // ── Gather explicit values ──
+    let has_explicit_pos = pin_def.pos.is_some();
+    let explicit_pad_type = pin_def.pad_type.as_deref().and_then(PadType::parse);
+    let explicit_pad_shape = pin_def.pad_shape.as_deref().and_then(PadShape::parse);
+    let sym_len = pin_def.length; // symbol pin stub length (width/height fallback)
+
+    // 1. pad_type — explicit wins; SMD iff explicit pos, else through-hole.
+    let pad_type = explicit_pad_type.unwrap_or(if has_explicit_pos {
+        PadType::Smd
     } else {
-        mech.number.clone()
+        PadType::ThruHole
+    });
+    let is_through_hole = matches!(pad_type, PadType::ThruHole | PadType::NpThruHole);
+
+    // 2. pos — explicit wins; else auto row at 2.54 mm pitch.
+    let pos = pin_def.pos.unwrap_or_else(|| fp_geom::auto_pad_pos(index));
+
+    // 3. width / height — explicit (> 0) wins; else sym_len; else default.
+    let width = pin_def
+        .width
+        .filter(|&w| w > 0.0)
+        .or(sym_len)
+        .unwrap_or(DEFAULT_PAD_SIZE);
+    let height = pin_def
+        .height
+        .filter(|&h| h > 0.0)
+        .or(sym_len)
+        .unwrap_or(DEFAULT_PAD_SIZE);
+
+    // 4. layers — explicit wins; else PTH_LAYERS / SMD_LAYERS.
+    let layers = pin_def.layers.clone().unwrap_or(if is_through_hole {
+        PTH_LAYERS.to_string()
+    } else {
+        SMD_LAYERS.to_string()
+    });
+
+    // 5. drill — explicit wins; else DEFAULT_DRILL for TH, None for SMD.
+    let drill = if is_through_hole {
+        pin_def.drill.or(Some(DEFAULT_DRILL))
+    } else {
+        pin_def.drill
     };
-    let pad_type = PadType::parse(&mech.pad_type).unwrap_or(PadType::Smd);
-    let pad_shape = PadShape::parse(&mech.pad_shape).unwrap_or(PadShape::Rect);
+
+    // 6. pad_shape — explicit wins; else auto TH row: pad 1 rect, rest circle.
+    let pad_shape =
+        explicit_pad_shape.unwrap_or(if !has_explicit_pos && is_through_hole && index > 0 {
+            PadShape::Circle
+        } else {
+            PadShape::Rect
+        });
+
+    // 7. number — explicit (non-empty) wins; else TOML num or 1-based index.
+    let number = if !pin_def.number.is_empty() {
+        pin_def.number.clone()
+    } else {
+        pin_def.num.to_string()
+    };
+
     Pad {
         number,
+        pos,
+        rotation: pin_def.rotation.unwrap_or(0.0),
+        width,
+        height,
+        pad_type,
+        pad_shape,
+        roundrect_rratio: pin_def.roundrect_rratio,
+        layers: Some(layers),
+        drill,
+        solder_mask_margin: pin_def.solder_mask_margin,
+    }
+}
+
+/// Convert a [`MechanicalDef`] into a raw [`Pad`] (before
+/// [`resolve_mech_pad`] fills in remaining defaults).
+fn mech_to_pad(mech: &MechanicalDef) -> Pad {
+    Pad {
+        number: mech.number.clone(),
         pos: mech.pos,
         rotation: 0.0,
         width: mech.width,
         height: mech.height,
-        pad_type,
-        pad_shape,
+        pad_type: PadType::parse(&mech.pad_type).unwrap_or(PadType::Smd),
+        pad_shape: PadShape::parse(&mech.pad_shape).unwrap_or(PadShape::Rect),
         roundrect_rratio: mech.roundrect_rratio,
-        layers: Some(
-            mech.layers
-                .clone()
-                .unwrap_or_else(|| "*.Cu *.Mask".to_string()),
-        ),
+        layers: mech.layers.clone(),
         drill: if mech.drill > 0.0 {
             Some(mech.drill)
         } else {
             None
         },
         solder_mask_margin: None,
-    }
-}
-
-fn pad_from_pin_def(pin: &PinDef, index: usize) -> Pad {
-    let pos = pin.pos.unwrap_or_else(|| fp_geom::auto_pad_pos(index));
-    let number = if pin.number.is_empty() {
-        pin.num.to_string()
-    } else {
-        pin.number.clone()
-    };
-    let pad_type = PadType::parse(pin.pad_type.as_deref().unwrap_or("smd")).unwrap_or(PadType::Smd);
-    let is_through_hole = matches!(pad_type, PadType::ThruHole | PadType::NpThruHole);
-    let default_shape = if pin.pos.is_some() || !is_through_hole || index == 0 {
-        PadShape::Rect
-    } else {
-        PadShape::Circle
-    };
-    let pad_shape = pin
-        .pad_shape
-        .as_deref()
-        .and_then(PadShape::parse)
-        .unwrap_or(default_shape);
-    Pad {
-        number,
-        pos,
-        rotation: pin.rotation.unwrap_or(0.0),
-        width: pin
-            .width
-            .or(pin.length)
-            .unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
-        height: pin
-            .height
-            .or(pin.length)
-            .unwrap_or(fp_geom::DEFAULT_PAD_SIZE),
-        pad_type,
-        pad_shape,
-        roundrect_rratio: pin.roundrect_rratio,
-        layers: Some(pin.layers.clone().unwrap_or_else(|| {
-            if is_through_hole {
-                fp_geom::PTH_LAYERS.to_string()
-            } else {
-                fp_geom::SMD_LAYERS.to_string()
-            }
-        })),
-        drill: pin.drill,
-        solder_mask_margin: pin.solder_mask_margin,
     }
 }
 
@@ -376,27 +403,24 @@ mod tests {
 
     // ── Characterisation tests for pad_from_pin_def (Phase 2 baseline) ──
 
-    /// pad_type: always defaults to "smd" — this is the known divergence
-    /// from fp_geom::pad_from_pin which infers SMD only when pos.is_some().
+    /// pad_type: without an explicit position, defaults to through-hole
+    /// (design D2: SMD iff explicit pos, else TH).
     #[test]
-    fn pad_from_pin_def_defaults_pad_type_to_smd() {
+    fn pad_from_pin_def_defaults_pad_type_to_th() {
         let pd = pin_without_pos();
         let pads = pads_from_manifest(&make_single_pin_manifest(pd));
-        // fp_emitter always defaults pad_type to "smd", regardless of pos.
-        assert_eq!(pads[0].pad_type, PadType::Smd);
+        assert_eq!(pads[0].pad_type, PadType::ThruHole);
     }
 
-    /// drill: never defaulted — passes through as-is (None stays None).
-    /// This is the second known divergence: fp_geom defaults drill for TH pads.
+    /// drill: TH pads get the default drill (design D2).
     #[test]
-    fn pad_from_pin_def_does_not_default_drill() {
+    fn pad_from_pin_def_defaults_drill_for_th() {
         let pd = PinDef {
             pad_type: Some("thru_hole".into()),
             ..pin_without_pos()
         };
         let pads = pads_from_manifest(&make_single_pin_manifest(pd));
-        // fp_emitter does NOT default drill — it passes None through.
-        assert_eq!(pads[0].drill, None);
+        assert_eq!(pads[0].drill, Some(copperleaf::DEFAULT_DRILL));
     }
 
     /// Explicit drill is preserved.
@@ -440,11 +464,10 @@ mod tests {
         assert_eq!(pads[0].layers.as_deref(), Some(fp_geom::PTH_LAYERS));
     }
 
-    /// Shape default: because pad_type defaults to "smd", shape is always
-    /// "rect" in the default path.  The circle default for auto TH rows only
-    /// triggers when pad_type is explicitly "thru_hole" and pos is None.
+    /// Without explicit geometry, pad_type defaults to TH and auto-row
+    /// KLC F7.3 applies: pad 1 rect, the rest circle.
     #[test]
-    fn pad_from_pin_def_shape_default_all_rect_when_smd() {
+    fn pad_from_pin_def_shape_default_auto_th_row() {
         let manifest = Manifest {
             component: ComponentMeta {
                 name: "Test".into(),
@@ -475,12 +498,10 @@ mod tests {
             mechanical: vec![],
         };
         let pads = pads_from_manifest(&manifest);
-        // All default to "rect" because pad_type defaults to "smd".
-        // DIVERGENCE: fp_geom would give [rect, circle, circle] for a pure
-        // auto TH row, since it infers TH when pos is None.
+        // D2: no pos → pad_type = TH → auto row: pad 1 rect, rest circle.
         assert_eq!(pads[0].pad_shape, PadShape::Rect);
-        assert_eq!(pads[1].pad_shape, PadShape::Rect);
-        assert_eq!(pads[2].pad_shape, PadShape::Rect);
+        assert_eq!(pads[1].pad_shape, PadShape::Circle);
+        assert_eq!(pads[2].pad_shape, PadShape::Circle);
     }
 
     /// With explicit thru_hole + no pos, index>0 pads get "circle" default.

@@ -60,21 +60,25 @@
   (pad "SH1" thru_hole oval
     (at -5.62 -1.6375)
     (size 1.05 1.85)
+    (drill 0.762)
     (layers *.Cu *.Mask)
     (solder_mask_margin 0.102))
   (pad "SH2" thru_hole oval
     (at 5.62 -1.6375)
     (size 1.05 1.85)
+    (drill 0.762)
     (layers *.Cu *.Mask)
     (solder_mask_margin 0.102))
   (pad "SH3" thru_hole oval
     (at -5.62 2.3625)
     (size 1.05 2.25)
+    (drill 0.762)
     (layers *.Cu *.Mask)
     (solder_mask_margin 0.102))
   (pad "SH4" thru_hole oval
     (at 5.62 2.3625)
     (size 1.05 2.25)
+    (drill 0.762)
     (layers *.Cu *.Mask)
     (solder_mask_margin 0.102))
   (pad "B1/A12" smd rect

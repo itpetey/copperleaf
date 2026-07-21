@@ -116,25 +116,8 @@ pub fn manifest_from_footprint(
     let mut mechanical = Vec::new();
     let mut next_num = 1;
     for pad in pads {
-        if pad.number.eq_ignore_ascii_case("none")
-            || pad.number.is_empty()
-            || pad.pad_type == "np_thru_hole"
-        {
-            mechanical.push(MechanicalDef {
-                number: pad.number.clone(),
-                pos: pad.pos,
-                width: pad.width,
-                height: pad.height,
-                pad_type: pad.pad_type.clone(),
-                pad_shape: pad.shape.clone(),
-                roundrect_rratio: pad.roundrect_rratio,
-                layers: if pad.layers.is_empty() {
-                    None
-                } else {
-                    Some(pad.layers.clone())
-                },
-                drill: pad.drill.unwrap_or(0.0),
-            });
+        if is_mechanical_pad(pad) {
+            mechanical.push(mech_def_from_pad(pad));
             continue;
         }
         let num = pin_number(&pad.number, &mut next_num);
@@ -203,25 +186,8 @@ pub fn merge_footprint(existing: &mut Manifest, pads: &[PadDef]) -> Vec<Diagnost
     for pad in pads {
         // Mechanical-only pads (KiCad number "None"/"none", unnamed paste
         // apertures, or np_thru_hole).
-        if pad.number.eq_ignore_ascii_case("none")
-            || pad.number.is_empty()
-            || pad.pad_type == "np_thru_hole"
-        {
-            existing.mechanical.push(MechanicalDef {
-                number: pad.number.clone(),
-                pos: pad.pos,
-                width: pad.width,
-                height: pad.height,
-                pad_type: pad.pad_type.clone(),
-                pad_shape: pad.shape.clone(),
-                roundrect_rratio: pad.roundrect_rratio,
-                layers: if pad.layers.is_empty() {
-                    None
-                } else {
-                    Some(pad.layers.clone())
-                },
-                drill: pad.drill.unwrap_or(0.0),
-            });
+        if is_mechanical_pad(pad) {
+            existing.mechanical.push(mech_def_from_pad(pad));
             continue;
         }
         // Fall back to matching by `num` when `number` is empty (pins created
@@ -513,6 +479,32 @@ pub(crate) fn struct_name(lib_id: &str) -> String {
         out.push_str("Part");
     }
     out
+}
+
+/// Return `true` if `pad` is a mechanical (non-electrical) pad.
+pub(crate) fn is_mechanical_pad(pad: &PadDef) -> bool {
+    pad.number.eq_ignore_ascii_case("none")
+        || pad.number.is_empty()
+        || pad.pad_type == "np_thru_hole"
+}
+
+/// Convert a [`PadDef`] into a [`MechanicalDef`] for TOML storage.
+pub(crate) fn mech_def_from_pad(pad: &PadDef) -> MechanicalDef {
+    MechanicalDef {
+        number: pad.number.clone(),
+        pos: pad.pos,
+        width: pad.width,
+        height: pad.height,
+        pad_type: pad.pad_type.clone(),
+        pad_shape: pad.shape.clone(),
+        roundrect_rratio: pad.roundrect_rratio,
+        layers: if pad.layers.is_empty() {
+            None
+        } else {
+            Some(pad.layers.clone())
+        },
+        drill: pad.drill.unwrap_or(0.0),
+    }
 }
 
 /// Return `true` if `pad` is a thru-hole that sits inside any existing pin's

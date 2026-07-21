@@ -104,7 +104,6 @@ impl Backend for KiCad {
 mod tests {
     use super::*;
     use copperleaf::{Board, Component, Pin, PinRef};
-    use copperleaf_compile;
 
     struct TwoPinPart {
         pins: Vec<Pin>,

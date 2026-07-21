@@ -164,8 +164,8 @@ fn collect_pins_and_properties(
 
 fn merge_conversions(children: Vec<Sexpr>, child_prefix: &str) -> Vec<Sexpr> {
     let mut result = Vec::with_capacity(children.len());
-    let mut unit_groups: std::collections::HashMap<i64, Vec<(i64, Vec<Sexpr>)>> =
-        std::collections::HashMap::new();
+    let mut unit_groups: std::collections::BTreeMap<i64, Vec<(i64, Vec<Sexpr>)>> =
+        std::collections::BTreeMap::new();
 
     for child in children {
         if let Sexpr::List(parts) = &child

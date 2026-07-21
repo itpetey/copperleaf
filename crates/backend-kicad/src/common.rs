@@ -127,6 +127,80 @@ pub fn property_sym_node(
     Sexpr::list(children)
 }
 
+/// Properties passed to [`build_symbol_sexpr`].
+pub struct SymbolProps<'a> {
+    /// Library identifier (e.g. `"copperleaf:RP2354A"`).
+    pub lib_id: &'a str,
+    /// KiCad `Reference` property value.
+    pub reference: &'a str,
+    /// KiCad `Value` property value.
+    pub value: &'a str,
+    /// KiCad `Footprint` property value.
+    pub footprint: &'a str,
+    /// Datasheet URL (or `"~"`).
+    pub datasheet: &'a str,
+    /// Human-readable description.
+    pub description: &'a str,
+    /// Optional `ki_fp_filters` value.
+    pub fp_filter: Option<&'a str>,
+}
+
+/// Build the complete `(symbol …)` S-expression for a symbol definition.
+///
+/// This is the single source of truth for symbol emission — both the
+/// standalone `.kicad_sym` path ([`crate::sym_emitter`]) and the board-
+/// compile path ([`crate::lib_emitter`] / [`crate::schematic`]) call this
+/// function with their respective property values.
+pub fn build_symbol_sexpr(props: &SymbolProps, layout: &crate::sym_layout::SymbolLayout) -> Sexpr {
+    let lib_id = props.lib_id;
+    let mut children = vec![
+        Sexpr::atom("symbol"),
+        Sexpr::str(lib_id),
+        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
+        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
+        property_sym_node(
+            "Reference",
+            props.reference,
+            (layout.x1, layout.y1 + 1.27),
+            false,
+            true,
+        ),
+        property_sym_node(
+            "Value",
+            props.value,
+            (layout.x1, layout.y2 - 1.27),
+            false,
+            true,
+        ),
+        property_sym_node("Footprint", props.footprint, (0.0, 0.0), true, false),
+        property_sym_node("Datasheet", props.datasheet, (0.0, 0.0), true, false),
+        property_sym_node("Description", props.description, (0.0, 0.0), true, false),
+        property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
+    ];
+    if let Some(filter) = props.fp_filter {
+        children.push(property_sym_node(
+            "ki_fp_filters",
+            filter,
+            (0.0, 0.0),
+            true,
+            false,
+        ));
+    }
+
+    // Unit sub-symbol with body and pins.
+    let bare = lib_id.split(':').next_back().unwrap_or(lib_id);
+    let unit_name = format!("{}_0_1", bare);
+    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
+    unit.push(crate::sym_layout::body_rect_sexpr(layout));
+    for pin in &layout.pins {
+        unit.push(crate::sym_layout::placed_pin_sexpr(pin));
+    }
+    children.push(Sexpr::list(unit));
+
+    Sexpr::list(children)
+}
+
 /// Full `lib:symbol` identifier used by schematic instances.
 pub fn symbol_lib_id(comp: &CompiledComponent) -> String {
     match comp.meta.symbol.as_deref() {

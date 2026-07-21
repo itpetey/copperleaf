@@ -12,7 +12,7 @@
 use copperleaf::{CompiledComponent, Role};
 
 use crate::{
-    common::{footprint_ref, property_sym_node, refdes_prefix, symbol_name},
+    common::{SymbolProps, footprint_ref, refdes_prefix, symbol_name},
     deterministic_id, fp_geom,
     sexpr::Sexpr,
     sym_layout::{self, LayoutPin},
@@ -78,62 +78,21 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
     }
 
     let layout = sym_layout::layout_symbol(&layout_pins);
-
     let fp_ref = footprint_ref(comp);
     let fp_filter = footprint_filter(comp);
 
-    let mut children = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(symbol_name),
-        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        // Reference above the body, Value below it (KLC S6.2).
-        property_sym_node(
-            "Reference",
-            &refdes_prefix(&comp.refdes),
-            (layout.x1, layout.y1 + 1.27),
-            false,
-            true,
-        ),
-        property_sym_node(
-            "Value",
-            symbol_name,
-            (layout.x1, layout.y2 - 1.27),
-            false,
-            true,
-        ),
-        property_sym_node("Footprint", &fp_ref, (0.0, 0.0), true, false),
-        property_sym_node(
-            "Datasheet",
-            comp.meta.datasheet.as_deref().unwrap_or("~"),
-            (0.0, 0.0),
-            true,
-            false,
-        ),
-        property_sym_node(
-            "Description",
-            comp.meta.description.as_deref().unwrap_or(""),
-            (0.0, 0.0),
-            true,
-            false,
-        ),
-        property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
-        property_sym_node("ki_fp_filters", &fp_filter, (0.0, 0.0), true, false),
-    ];
-
-    // Unit sub-symbol with body and pins.
-    // KiCad sub-symbol names use the bare symbol name (no library prefix).
-    let bare = symbol_name.split(':').next_back().unwrap_or(symbol_name);
-    let unit_name = format!("{}_0_1", bare);
-    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
-    unit.push(sym_layout::body_rect_sexpr(&layout));
-    for pin in &layout.pins {
-        unit.push(sym_layout::placed_pin_sexpr(pin));
-    }
-    children.push(Sexpr::list(unit));
-
-    Sexpr::list(children)
+    crate::common::build_symbol_sexpr(
+        &SymbolProps {
+            lib_id: symbol_name,
+            reference: &refdes_prefix(&comp.refdes),
+            value: symbol_name,
+            footprint: &fp_ref,
+            datasheet: comp.meta.datasheet.as_deref().unwrap_or("~"),
+            description: comp.meta.description.as_deref().unwrap_or(""),
+            fp_filter: Some(&fp_filter),
+        },
+        &layout,
+    )
 }
 
 fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {

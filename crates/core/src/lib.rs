@@ -5,7 +5,7 @@ pub use board::{
     Board, BoardView, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle,
     Connection, RawNetOverride,
 };
-pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetIdx, NetKind};
+pub use net::{Constraint, Net, NetClass, NetHandle, NetIdx, NetKind};
 pub use pin::{
     DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, Pin, PinBuilder,
     PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SMD_LAYERS, SigKind, SigSpec, SymPin,

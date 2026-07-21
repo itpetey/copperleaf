@@ -2,7 +2,8 @@
 //!
 //! Every function in this module inspects an immutable [`CompiledBoard`] and
 //! returns [`Diagnostic`]s.  None of them mutate the board or produce new
-//! components — that is the job of the [`synth`](crate::synth) module.
+//! components — that is the job of the compilation pipeline in
+//! [`copperleaf_compile`].
 //!
 //! [`run_erc`] is the single entry point used by the compilation pipeline;
 //! the individual rule functions are kept `pub` so they can be unit-tested
@@ -150,7 +151,7 @@ mod tests {
     use super::*;
     use crate::{
         board::{BoardView, CompiledComponent, Connection},
-        net::{Constraint, Net, NetClass, NetIdx},
+        net::{Net, NetClass, NetIdx},
         pin::Pin,
         units::UnitExt,
     };

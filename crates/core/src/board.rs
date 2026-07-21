@@ -155,7 +155,9 @@ pub struct Board {
     pub connections: Vec<RawConnection>,
     pub net_overrides: std::collections::BTreeMap<usize, RawNetOverride>,
     pub next_edge: usize,
-    pub single_pin_nets: Vec<PinHandle>,
+    /// Each entry is `(override_key, PinHandle)`.  The override key is
+    /// allocated from `next_edge` so it never collides with connection edges.
+    pub single_pin_nets: Vec<(usize, PinHandle)>,
     /// Board width in millimetres (default 100.0).
     width: f64,
     /// Board height in millimetres (default 80.0).
@@ -225,7 +227,7 @@ impl Board {
         }
         let edge = self.next_edge;
         self.next_edge += 1;
-        self.connections.push(RawConnection { from, to });
+        self.connections.push(RawConnection { from, to, id: edge });
         self.net_overrides.insert(edge, RawNetOverride::default());
         Ok(NetHandle { id: edge })
     }
@@ -236,19 +238,20 @@ impl Board {
 
     /// Register a single-pin net (e.g. a lone power pin needing a named net).
     ///
-    /// Unlike [`Board::connect`], this does not create a self-connection edge;
+    /// Unlike [`Board::connect`], this does not create a connection edge;
     /// the single-pin net is represented directly during compilation.
+    ///
+    /// The returned [`NetHandle`] carries an id allocated from the same counter
+    /// as [`Board::connect`] so keys never collide regardless of call order.
     pub fn net(&mut self, pin: PinHandle) -> Result<NetHandle, CompileError> {
         if let Some(diag) = self.validate_pin(&pin) {
             return Err(CompileError::new(vec![diag]));
         }
-        let idx = self.single_pin_nets.len();
-        self.single_pin_nets.push(pin);
-        self.net_overrides
-            .insert(self.next_edge + idx, RawNetOverride::default());
-        Ok(NetHandle {
-            id: self.next_edge + idx,
-        })
+        let id = self.next_edge;
+        self.next_edge += 1;
+        self.single_pin_nets.push((id, pin));
+        self.net_overrides.insert(id, RawNetOverride::default());
+        Ok(NetHandle { id })
     }
 
     /// Set an explicit voltage override for a net returned by [`Board::connect`]

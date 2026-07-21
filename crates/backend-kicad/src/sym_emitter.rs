@@ -12,7 +12,6 @@ use copperleaf::Role;
 use copperleaf_part_codegen::Manifest;
 
 use crate::{
-    common::property_sym_node,
     sexpr::Sexpr,
     sym_layout::{self, LayoutPin},
 };
@@ -67,51 +66,24 @@ fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
         .collect();
     let layout = sym_layout::layout_symbol(&layout_pins);
 
-    // ── properties ──
-    let mut children = vec![
-        Sexpr::atom("symbol"),
-        Sexpr::str(lib_id),
-        Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
-        Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        property_sym_node("Reference", "U", (layout.x1, layout.y1 + 1.27), false, true),
-        property_sym_node("Value", lib_id, (layout.x1, layout.y2 - 1.27), false, true),
-        property_sym_node("Footprint", "", (0.0, 0.0), true, false),
-        property_sym_node(
-            "Datasheet",
-            manifest.component.datasheet.as_deref().unwrap_or("~"),
-            (0.0, 0.0),
-            true,
-            false,
-        ),
-        property_sym_node(
-            "Description",
-            manifest.component.description.as_deref().unwrap_or(""),
-            (0.0, 0.0),
-            true,
-            false,
-        ),
-        property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
-    ];
-
-    // ── unit sub-symbol ──
-    // KiCad sub-symbol names use the bare symbol name (no library prefix).
-    let bare = lib_id.split(':').next_back().unwrap_or(lib_id);
-    let unit_name = format!("{}_0_1", bare);
-    let mut unit = vec![Sexpr::atom("symbol"), Sexpr::str(&unit_name)];
-    unit.push(sym_layout::body_rect_sexpr(&layout));
-    for pin in &layout.pins {
-        unit.push(sym_layout::placed_pin_sexpr(pin));
-    }
-    children.push(Sexpr::list(unit));
-
-    Sexpr::list(children)
+    crate::common::build_symbol_sexpr(
+        &crate::common::SymbolProps {
+            lib_id,
+            reference: "U",
+            value: lib_id,
+            footprint: "",
+            datasheet: manifest.component.datasheet.as_deref().unwrap_or("~"),
+            description: manifest.component.description.as_deref().unwrap_or(""),
+            fp_filter: None,
+        },
+        &layout,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_part_codegen::{ComponentMeta, ElectricalFields, PinDef};
+    use copperleaf_part_codegen::{ComponentMeta, PinDef};
 
     fn pin_def(num: usize, name: &str, kind: &str) -> PinDef {
         PinDef {

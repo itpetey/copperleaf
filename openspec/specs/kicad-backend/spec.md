@@ -1,7 +1,7 @@
 # kicad-backend Specification
 
 ## Purpose
-TBD - created by archiving change core-redesign. Update Purpose after archive.
+The KiCad backend converts a [`CompiledBoard`] into a complete KiCad 10 project — `.kicad_pro` (project), `.kicad_sch` (schematic), `.kicad_pcb` (PCB), and `.net` (netlist). All symbol and footprint geometry is auto-generated from component pin/pad data; the backend does not require external library files. A separate CLI path renders standalone `.kicad_sym`/`.kicad_mod` files from part TOML manifests for use as project-local libraries.
 ## Requirements
 ### Requirement: KiCad backend implements Backend trait
 A `KiCad` struct SHALL implement the `Backend` trait. `KiCad::emit(output_dir, &CompiledBoard)` SHALL write a complete KiCad project to the output directory: `.kicad_pro` (project), `.kicad_sch` (schematic), `.kicad_pcb` (PCB), and `.net` (netlist).
@@ -14,17 +14,16 @@ A `KiCad` struct SHALL implement the `Backend` trait. `KiCad::emit(output_dir, &
 - **WHEN** the output directory does not exist
 - **THEN** `emit()` creates it before writing files
 
-### Requirement: Schematic emitter uses embedded symbol data
-The schematic emitter SHALL use each component's `symbol()` S-expression for the `lib_symbols` section when present, falling back to a generic rectangle with algorithmically spaced pins when `None`. Pin positions SHALL be read from `Pin.pos`/`rotation`/`length` fields. The emitter SHALL NOT open any files to resolve symbols.
+### Requirement: Schematic emitter generates symbols from pin roles
+The schematic emitter SHALL generate symbol geometry algorithmically from each component's pin roles and metadata (via [`crate::sym_layout`]). Power pins are placed across the top, ground/thermal pins across the bottom, and signal pins split between left and right edges on the 2.54 mm grid (KLC S4.2). The emitter SHALL NOT open any files to resolve symbols.
 
-#### Scenario: Embedded symbol spliced into lib_symbols
-- **WHEN** a component has `symbol() == Some("(symbol ...)")` and pins with `pos` set
-- **THEN** the `.kicad_sch` file's `lib_symbols` section contains the embedded S-expression
-- **AND** pin `(at x y rotation)` values match the `Pin.pos` and `Pin.rotation` fields
+#### Scenario: Symbols embedded in lib_symbols
+- **WHEN** a compiled board is emitted to schematic
+- **THEN** the `.kicad_sch` file's `lib_symbols` section contains one symbol definition per unique symbol identifier, with pins placed by role
 
-#### Scenario: No symbol falls back to generic
-- **WHEN** a component has `symbol() == None`
-- **THEN** the `.kicad_sch` file's `lib_symbols` section contains a generic rectangle symbol with pins algorithmically spaced
+#### Scenario: Pin count matches PCB pad count
+- **WHEN** a component has thermal vias or mechanical pads
+- **THEN** the schematic symbol includes MECH<n> pins matching each non-electrical pad
 
 ### Requirement: Netlist emitter produces KiCad netlist format
 The netlist emitter SHALL produce a `(export (version "E") ...)` S-expression with `(components ...)` and `(nets ...)` sections. Each component SHALL appear as a `(comp (ref "U1") (value "..."))` entry. Each net SHALL appear as a `(net (code N) (name "...") (node (ref) (pin) (pinfunction) (pintype)))` entry with pin type mapped from `Role`.
