@@ -234,24 +234,26 @@ impl copperleaf::Component for Rp2354a {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("RP2354A")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("RP2354A")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://datasheets.raspberrypi.com/rp2350/rp2350-datasheet.pdf")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:2252196:22996e8efa2743cf>")
-    }
-
-    fn description(&self) -> Option<&'static str> {
-        Some("Raspberry Pi RP2354A microcontroller")
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("RP2354A".into()),
+            
+            footprint: Some("RP2354A".into()),
+            
+            datasheet: Some("https://datasheets.raspberrypi.com/rp2350/rp2350-datasheet.pdf".into()),
+            
+            description: Some("Raspberry Pi RP2354A microcontroller".into()),
+            
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:2252196:22996e8efa2743cf>".into()),
+            
+            
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

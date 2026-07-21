@@ -59,24 +59,26 @@ impl copperleaf::Component for Mcp73831t2atiOt {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("MCP73831T-2ATI_OT")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("MCP73831T-2ATI_OT")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP73831-Family-Data-Sheet-DS20001984H.pdf")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:252876:0aacf1d6589cc2f1>")
-    }
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (-90.0, 0.0, 0.0)
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("MCP73831T-2ATI_OT".into()),
+            
+            footprint: Some("MCP73831T-2ATI_OT".into()),
+            
+            datasheet: Some("https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP73831-Family-Data-Sheet-DS20001984H.pdf".into()),
+            
+            
+            description: None,
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:252876:0aacf1d6589cc2f1>".into()),
+            
+            model_3d_rotation: (-90.0, 0.0, 0.0),
+            
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

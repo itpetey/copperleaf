@@ -106,14 +106,14 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
         property_sym_node("Footprint", &fp_ref, (0.0, 0.0), true, false),
         property_sym_node(
             "Datasheet",
-            comp.datasheet.as_deref().unwrap_or("~"),
+            comp.meta.datasheet.as_deref().unwrap_or("~"),
             (0.0, 0.0),
             true,
             false,
         ),
         property_sym_node(
             "Description",
-            comp.description.as_deref().unwrap_or(""),
+            comp.meta.description.as_deref().unwrap_or(""),
             (0.0, 0.0),
             true,
             false,
@@ -142,7 +142,7 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
     let seed = format!("fp:{}", fp_name);
 
     // KLC F9.1: the description should carry the datasheet URL when known.
-    let descr = match (&comp.description, &comp.datasheet) {
+    let descr = match (&comp.meta.description, &comp.meta.datasheet) {
         (Some(d), Some(url)) => format!("{}, {}", d, url),
         (Some(d), None) => d.clone(),
         (None, Some(url)) => url.clone(),
@@ -193,9 +193,9 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
     children.push(fp_geom::model_sexpr(
         fp_name,
-        comp.model_3d.as_deref(),
-        comp.model_3d_offset,
-        comp.model_3d_rotation,
+        comp.meta.model_3d.as_deref(),
+        comp.meta.model_3d_offset,
+        comp.meta.model_3d_rotation,
     ));
 
     let fp = Sexpr::list(std::iter::once(Sexpr::atom("footprint")).chain(children));
@@ -207,6 +207,7 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
 /// `*`.
 fn footprint_filter(comp: &CompiledComponent) -> String {
     let name = comp
+        .meta
         .footprint
         .as_deref()
         .map(|s| s.split_once(':').map(|(_, n)| n).unwrap_or(s).to_string())
@@ -222,11 +223,18 @@ fn footprint_filter(comp: &CompiledComponent) -> String {
 mod tests {
     use super::*;
     use copperleaf::UnitExt;
-    use copperleaf::{Pad, PadShape, PadType, Pin};
+    use copperleaf::{ComponentMeta, Pad, PadShape, PadType, Pin};
 
     fn make_comp() -> CompiledComponent {
         CompiledComponent {
             refdes: "U1".into(),
+            meta: ComponentMeta {
+                symbol: Some("TestLib:TestPart".into()),
+                footprint: Some("TestFP:QFP-32".into()),
+                datasheet: Some("https://example.com/ds.pdf".into()),
+                description: Some("A test component.".into()),
+                ..ComponentMeta::default()
+            },
             pins: vec![
                 Pin::build("VDD")
                     .number("1")
@@ -241,8 +249,6 @@ mod tests {
                 Pin::build("CLK").number("3").dio(),
             ],
             constraints: vec![],
-            symbol: Some("TestLib:TestPart".into()),
-            footprint: Some("TestFP:QFP-32".into()),
             mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),
@@ -256,12 +262,6 @@ mod tests {
                 drill: None,
                 solder_mask_margin: None,
             }],
-            datasheet: Some("https://example.com/ds.pdf".into()),
-            description: Some("A test component.".into()),
-            model_3d: None,
-            model_3d_data: None,
-            model_3d_rotation: (0.0, 0.0, 0.0),
-            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 
@@ -353,7 +353,7 @@ mod tests {
     #[test]
     fn footprint_lib_falls_back_to_refdes() {
         let mut comp = make_comp();
-        comp.footprint = None;
+        comp.meta.footprint = None;
         let out = emit_footprint_lib(&comp, "U1");
         assert!(out.contains("\"U1\""), "{}", out);
     }

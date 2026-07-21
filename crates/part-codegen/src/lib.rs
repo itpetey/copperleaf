@@ -125,6 +125,23 @@ pub struct ComponentMeta {
     pub model_3d_offset: Option<(f64, f64, f64)>,
 }
 
+impl ComponentMeta {
+    /// Convert to the core [`copperleaf::ComponentMeta`], mapping `lib_id` to
+    /// both `symbol` and `footprint`.
+    pub fn to_core_meta(&self) -> copperleaf::ComponentMeta {
+        copperleaf::ComponentMeta {
+            symbol: self.lib_id.clone(),
+            footprint: self.lib_id.clone(),
+            datasheet: self.datasheet.clone(),
+            description: self.description.clone(),
+            model_3d: self.model_3d.clone(),
+            model_3d_data: self.model_3d_data.clone(),
+            model_3d_rotation: self.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0)),
+            model_3d_offset: self.model_3d_offset.unwrap_or((0.0, 0.0, 0.0)),
+        }
+    }
+}
+
 /// A thermal via that lives inside a pad (e.g. exposed thermal pad).
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ThermalViaDef {
@@ -321,6 +338,8 @@ struct TemplateData {
     builders: Vec<String>,
     constraints: Vec<String>,
     mechanicals: Vec<String>,
+    /// Whether any metadata is present (controls the `has_meta` section in the template).
+    has_meta: bool,
     /// Library identifier emitted by `symbol()`/`footprint()`, if any.
     symbol_id: Option<String>,
     /// Datasheet URL as a Rust string literal (e.g. `"https://..."`).
@@ -828,6 +847,14 @@ fn render_component(
 
     let mechanicals: Vec<String> = manifest.mechanical.iter().map(mechanical_expr).collect();
 
+    let has_meta = manifest.component.lib_id.is_some()
+        || manifest.component.datasheet.is_some()
+        || manifest.component.description.is_some()
+        || manifest.component.model_3d.is_some()
+        || manifest.component.model_3d_data.is_some()
+        || manifest.component.model_3d_rotation.is_some()
+        || manifest.component.model_3d_offset.is_some();
+
     let data = TemplateData {
         title: title.clone(),
         description: manifest.component.description.clone(),
@@ -845,6 +872,7 @@ fn render_component(
         builders,
         constraints: constraints?,
         mechanicals,
+        has_meta,
         symbol_id: manifest.component.lib_id.clone(),
         datasheet_lit: manifest.component.datasheet.clone(),
         model3d_lit: manifest.component.model_3d.clone(),

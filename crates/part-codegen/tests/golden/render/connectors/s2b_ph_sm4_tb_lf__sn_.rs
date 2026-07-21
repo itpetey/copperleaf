@@ -53,24 +53,26 @@ impl copperleaf::Component for S2bPhSm4TbLfSn {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("S2B-PH-SM4-TB_LF__SN_")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("S2B-PH-SM4-TB_LF__SN_")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:504344:6f835a50f9b8e9d0>")
-    }
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (90.0, 0.0, 0.0)
-    }
-
-    fn model_3d_offset(&self) -> (f64, f64, f64) {
-        (0.0, -4.5, 0.0)
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("S2B-PH-SM4-TB_LF__SN_".into()),
+            
+            footprint: Some("S2B-PH-SM4-TB_LF__SN_".into()),
+            
+            
+            datasheet: None,
+            
+            description: None,
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:504344:6f835a50f9b8e9d0>".into()),
+            
+            model_3d_rotation: (90.0, 0.0, 0.0),
+            
+            model_3d_offset: (0.0, -4.5, 0.0),
+            
+        })
     }
 }
 

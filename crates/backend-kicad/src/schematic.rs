@@ -369,6 +369,11 @@ mod tests {
         CompiledBoard {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
+                meta: copperleaf::ComponentMeta {
+                    symbol: Some("MCU:RP2354a".into()),
+                    footprint: Some("Package_QFP:LQFP-64".into()),
+                    ..copperleaf::ComponentMeta::default()
+                },
                 pins: vec![
                     Pin::build("VDD")
                         .number("1")
@@ -376,15 +381,7 @@ mod tests {
                         .pin(),
                 ],
                 constraints: vec![],
-                symbol: Some("MCU:RP2354a".into()),
-                footprint: Some("Package_QFP:LQFP-64".into()),
                 mechanical: vec![],
-                datasheet: None,
-                description: None,
-                model_3d: None,
-                model_3d_data: None,
-                model_3d_rotation: (0.0, 0.0, 0.0),
-                model_3d_offset: (0.0, 0.0, 0.0),
             }],
             nets: vec![Net {
                 name: "V3V3".into(),
@@ -434,7 +431,7 @@ mod tests {
     #[test]
     fn project_local_symbols_get_copperleaf_prefix() {
         let mut board = test_board();
-        board.components[0].symbol = Some("RP2354A".into());
+        board.components[0].meta.symbol = Some("RP2354A".into());
         let out = emit_schematic(&board);
         assert!(out.contains("(lib_id \"copperleaf:RP2354A\")"), "{}", out);
         assert!(out.contains("(symbol \"copperleaf:RP2354A\""), "{}", out);

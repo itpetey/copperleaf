@@ -101,7 +101,8 @@ fn decoupling_caps_have_footprints() {
         .components
         .iter()
         .filter(|c| {
-            c.footprint
+            c.meta
+                .footprint
                 .as_deref()
                 .is_some_and(|fp| fp.contains("Capacitor_SMD"))
         })

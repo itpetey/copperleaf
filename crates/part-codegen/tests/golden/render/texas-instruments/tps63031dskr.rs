@@ -77,24 +77,26 @@ impl copperleaf::Component for Tps63031dskr {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("TPS63031DSKR")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("TPS63031DSKR")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://www.ti.com/lit/gpn/TPS63031")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:395136:663053e6dfee47fa>")
-    }
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (-90.0, 0.0, 0.0)
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("TPS63031DSKR".into()),
+            
+            footprint: Some("TPS63031DSKR".into()),
+            
+            datasheet: Some("https://www.ti.com/lit/gpn/TPS63031".into()),
+            
+            
+            description: None,
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:395136:663053e6dfee47fa>".into()),
+            
+            model_3d_rotation: (-90.0, 0.0, 0.0),
+            
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

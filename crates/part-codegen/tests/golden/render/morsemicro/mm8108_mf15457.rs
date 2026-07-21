@@ -163,32 +163,26 @@ impl copperleaf::Component for Mm8108Mf15457 {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("MM8108-MF15457")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("MM8108-MF15457")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://www.morsemicro.com/resources/datasheets/modules/MM8108-MF15457_Data_Sheet.pdf")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:9068144:6cc8bea1c4ef70d6>")
-    }
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (-90.0, 0.0, 0.0)
-    }
-
-    fn model_3d_offset(&self) -> (f64, f64, f64) {
-        (-5.0, 4.5, 0.0)
-    }
-
-    fn description(&self) -> Option<&'static str> {
-        Some("Morse Micro Wi-Fi HaLow module")
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("MM8108-MF15457".into()),
+            
+            footprint: Some("MM8108-MF15457".into()),
+            
+            datasheet: Some("https://www.morsemicro.com/resources/datasheets/modules/MM8108-MF15457_Data_Sheet.pdf".into()),
+            
+            description: Some("Morse Micro Wi-Fi HaLow module".into()),
+            
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:9068144:6cc8bea1c4ef70d6>".into()),
+            
+            model_3d_rotation: (-90.0, 0.0, 0.0),
+            
+            model_3d_offset: (-5.0, 4.5, 0.0),
+            
+        })
     }
 }
 

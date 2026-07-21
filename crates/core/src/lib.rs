@@ -30,6 +30,42 @@ pub trait Backend {
     fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error>;
 }
 
+/// Non-electrical metadata for a component — symbol/footprint library identifiers,
+/// datasheet URL, description, and 3D model data.
+#[derive(Clone, Debug, Default)]
+pub struct ComponentMeta {
+    /// Symbol library identifier (e.g. `"RP2354A"` or `"MCU_RaspberryPi:RP2354A"`).
+    pub symbol: Option<String>,
+    /// Footprint name. Names without a `:` are project-local.
+    pub footprint: Option<String>,
+    /// Datasheet URL.
+    pub datasheet: Option<String>,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// Path to a 3D model file (`.step` / `.stp`).
+    pub model_3d: Option<String>,
+    /// Base64-encoded 3D model content, decoded during emit.
+    pub model_3d_data: Option<String>,
+    /// 3D model rotation in degrees (x, y, z).
+    pub model_3d_rotation: (f64, f64, f64),
+    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
+    pub model_3d_offset: (f64, f64, f64),
+}
+
+impl ComponentMeta {
+    /// An empty metadata value — all fields `None` / zero.
+    pub const EMPTY: &Self = &ComponentMeta {
+        symbol: None,
+        footprint: None,
+        datasheet: None,
+        description: None,
+        model_3d: None,
+        model_3d_data: None,
+        model_3d_rotation: (0.0, 0.0, 0.0),
+        model_3d_offset: (0.0, 0.0, 0.0),
+    };
+}
+
 /// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
 pub trait Component {
     /// Retrieves all [`Pin`]s attached to the [`Component`].
@@ -45,59 +81,21 @@ pub trait Component {
         self.pins().iter().find(|p| p.name() == name)
     }
 
+    /// Non-electrical metadata: symbol/footprint identifiers, datasheet,
+    /// description, 3D model data.
+    fn meta(&self) -> &ComponentMeta {
+        ComponentMeta::EMPTY
+    }
+
     /// Constraints declared by this component for synthesis and analysis.
     fn constraints(&self) -> Vec<Constraint> {
         vec![]
-    }
-
-    /// Symbol library identifier for this part (e.g. `"RP2354A"` or
-    /// `"MCU_RaspberryPi:RP2354A"`).  Identifiers without a library prefix are
-    /// emitted into the project's own symbol library.
-    fn symbol(&self) -> Option<&str> {
-        None
-    }
-
-    /// Footprint name for this part.  Names without a library prefix are
-    /// generated into the project's own footprint library; names containing a
-    /// `':'` are treated as external library references.
-    fn footprint(&self) -> Option<&str> {
-        None
     }
 
     /// Mechanical (non-electrical) pads belonging to this component's
     /// footprint — mounting holes, fiducials, paste apertures, etc.
     fn mechanical(&self) -> &[Pad] {
         &[]
-    }
-
-    /// Datasheet URL carried through to the symbol library.
-    fn datasheet(&self) -> Option<&str> {
-        None
-    }
-
-    /// Human-readable description carried through to library metadata.
-    fn description(&self) -> Option<&str> {
-        None
-    }
-
-    /// Path to a 3D model file (`.step` / `.stp`) for this part's footprint.
-    fn model_3d(&self) -> Option<&str> {
-        None
-    }
-
-    /// Base64-encoded content of the 3D model file, decoded during emit.
-    fn model_3d_data(&self) -> Option<&str> {
-        None
-    }
-
-    /// 3D model rotation in degrees (x, y, z) to align with the footprint.
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (0.0, 0.0, 0.0)
-    }
-
-    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
-    fn model_3d_offset(&self) -> (f64, f64, f64) {
-        (0.0, 0.0, 0.0)
     }
 }
 

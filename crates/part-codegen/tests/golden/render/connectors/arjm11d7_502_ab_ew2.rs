@@ -90,20 +90,26 @@ impl copperleaf::Component for Arjm11d7502AbEw2 {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("ARJM11D7-502-AB-EW2")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("ARJM11D7-502-AB-EW2")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://abracon.com/Magnetics/ARJM11.pdf")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:12565964:0a68908b10f63fd2>")
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("ARJM11D7-502-AB-EW2".into()),
+            
+            footprint: Some("ARJM11D7-502-AB-EW2".into()),
+            
+            datasheet: Some("https://abracon.com/Magnetics/ARJM11.pdf".into()),
+            
+            
+            description: None,
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:12565964:0a68908b10f63fd2>".into()),
+            
+            
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

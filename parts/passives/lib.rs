@@ -1,8 +1,8 @@
 //! Library of common parts used in examples and tests.
 
 use copperleaf::{
-    Board, CompileError, Component, Farad, Hertz, Ohm, Pin, PinHandle, PinRef, PowerSpec, Qty,
-    Role, UnitExt,
+    Board, CompileError, Component, ComponentMeta, Farad, Hertz, Ohm, Pin, PinHandle, PinRef,
+    PowerSpec, Qty, Role, UnitExt,
 };
 use copperleaf_part_macro::build_component;
 
@@ -19,7 +19,7 @@ pub mod footprint;
 pub struct Capacitor {
     value: Qty<Farad>,
     pins: Vec<Pin>,
-    footprint: Package,
+    meta: ComponentMeta,
 }
 
 /// Standard two-pin resistor.
@@ -32,7 +32,7 @@ pub struct Resistor {
     value: Qty<Ohm>,
     net: String,
     pins: Vec<Pin>,
-    footprint: Package,
+    meta: ComponentMeta,
 }
 
 /// Standard two-pin crystal.
@@ -91,7 +91,10 @@ impl Capacitor {
                 Self::smd_pin("1", package, 0),
                 Self::smd_pin("2", package, 1),
             ],
-            footprint: package,
+            meta: ComponentMeta {
+                footprint: Some(package.capacitor_footprint_name().to_string()),
+                ..ComponentMeta::default()
+            },
         }
     }
 
@@ -137,7 +140,10 @@ impl Capacitor {
         Self {
             value,
             pins: Self::decoupling_pins(package),
-            footprint: package,
+            meta: ComponentMeta {
+                footprint: Some(package.capacitor_footprint_name().to_string()),
+                ..ComponentMeta::default()
+            },
         }
     }
 }
@@ -147,8 +153,8 @@ impl Component for Capacitor {
         &self.pins
     }
 
-    fn footprint(&self) -> Option<&'static str> {
-        Some(self.footprint.capacitor_footprint_name())
+    fn meta(&self) -> &ComponentMeta {
+        &self.meta
     }
 }
 
@@ -197,7 +203,10 @@ impl Resistor {
                 Self::smd_pin("1", package, 0),
                 Self::smd_pin("2", package, 1),
             ],
-            footprint: package,
+            meta: ComponentMeta {
+                footprint: Some(package.resistor_footprint_name().to_string()),
+                ..ComponentMeta::default()
+            },
         }
     }
 
@@ -210,7 +219,10 @@ impl Resistor {
                 Self::smd_pin("1", package, 0),
                 Self::smd_pin("2", package, 1),
             ],
-            footprint: package,
+            meta: ComponentMeta {
+                footprint: Some(package.resistor_footprint_name().to_string()),
+                ..ComponentMeta::default()
+            },
         }
     }
 
@@ -225,8 +237,8 @@ impl Component for Resistor {
         &self.pins
     }
 
-    fn footprint(&self) -> Option<&'static str> {
-        Some(self.footprint.resistor_footprint_name())
+    fn meta(&self) -> &ComponentMeta {
+        &self.meta
     }
 }
 
@@ -377,7 +389,7 @@ mod tests {
     #[test]
     fn capacitor_new_sets_footprint_and_pad_geometry() {
         let c = Capacitor::new(100.0.nf(), Package::M1608);
-        let fp = c.footprint().unwrap();
+        let fp = c.meta().footprint.as_deref().unwrap();
         assert!(fp.contains("0603") || fp.contains("1608"));
         for i in 0..2 {
             assert!(c.pins()[i].pos().is_some());
@@ -395,7 +407,7 @@ mod tests {
     #[test]
     fn capacitor_decoupling_sets_footprint() {
         let c = Capacitor::decoupling(10.0.uf(), Package::M2012);
-        assert!(c.footprint().is_some());
+        assert!(c.meta().footprint.is_some());
         for pin in c.pins() {
             assert_eq!(pin.pad_type(), Some("smd"));
             assert!(pin.pos().is_some());
@@ -405,7 +417,7 @@ mod tests {
     #[test]
     fn resistor_new_sets_footprint_and_geometry() {
         let r = Resistor::new(10.0.kohm(), Package::M1005);
-        let fp = r.footprint().unwrap();
+        let fp = r.meta().footprint.as_deref().unwrap();
         assert!(fp.contains("0402") || fp.contains("1005"));
         for pin in r.pins() {
             assert_eq!(pin.pad_type(), Some("smd"));
@@ -416,14 +428,14 @@ mod tests {
     #[test]
     fn resistor_pullup_sets_footprint() {
         let r = Resistor::pullup(10.0.kohm(), "VCC", Package::M3216);
-        assert!(r.footprint().is_some());
+        assert!(r.meta().footprint.is_some());
         assert_eq!(r.net(), "VCC");
     }
 
     #[test]
     fn resistor_pulldown_sets_footprint() {
         let r = Resistor::pulldown(10.0.kohm(), "GND", Package::M3216);
-        assert!(r.footprint().is_some());
+        assert!(r.meta().footprint.is_some());
         assert_eq!(r.net(), "GND");
     }
 
@@ -441,7 +453,7 @@ mod tests {
             Package::M6332,
         ] {
             let r = Resistor::new(10.0.kohm(), package);
-            assert!(r.footprint().is_some());
+            assert!(r.meta().footprint.is_some());
             for pin in r.pins() {
                 assert_eq!(pin.pad_type(), Some("smd"));
                 assert!(pin.pos().is_some());

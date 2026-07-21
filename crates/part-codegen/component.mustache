@@ -64,52 +64,30 @@ impl copperleaf::Component for {{{struct_name}}} {
     fn mechanical(&self) -> &[copperleaf::Pad] {
         &self.mechanical
     }
-    {{#symbol_id}}
+    {{#has_meta}}
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("{{{symbol_id}}}")
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            {{#symbol_id}}symbol: Some("{{{symbol_id}}}".into()),{{/symbol_id}}
+            {{^symbol_id}}symbol: None,{{/symbol_id}}
+            {{#symbol_id}}footprint: Some("{{{symbol_id}}}".into()),{{/symbol_id}}
+            {{^symbol_id}}footprint: None,{{/symbol_id}}
+            {{#datasheet_lit}}datasheet: Some("{{{datasheet_lit}}}".into()),{{/datasheet_lit}}
+            {{^datasheet_lit}}datasheet: None,{{/datasheet_lit}}
+            {{#description_lit}}description: Some("{{{description_lit}}}".into()),{{/description_lit}}
+            {{^description_lit}}description: None,{{/description_lit}}
+            {{#model3d_lit}}model_3d: Some("{{{model3d_lit}}}".into()),{{/model3d_lit}}
+            {{^model3d_lit}}model_3d: None,{{/model3d_lit}}
+            {{#model3d_data_lit}}model_3d_data: Some("{{{model3d_data_lit}}}".into()),{{/model3d_data_lit}}
+            {{^model3d_data_lit}}model_3d_data: None,{{/model3d_data_lit}}
+            {{#model3d_rotation_lit}}model_3d_rotation: {{{model3d_rotation_lit}}},{{/model3d_rotation_lit}}
+            {{^model3d_rotation_lit}}model_3d_rotation: (0.0, 0.0, 0.0),{{/model3d_rotation_lit}}
+            {{#model3d_offset_lit}}model_3d_offset: {{{model3d_offset_lit}}},{{/model3d_offset_lit}}
+            {{^model3d_offset_lit}}model_3d_offset: (0.0, 0.0, 0.0),{{/model3d_offset_lit}}
+        })
     }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("{{{symbol_id}}}")
-    }
-    {{/symbol_id}}
-    {{#datasheet_lit}}
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("{{{datasheet_lit}}}")
-    }
-    {{/datasheet_lit}}
-    {{#model3d_lit}}
-
-    fn model_3d(&self) -> Option<&'static str> {
-        Some("{{{model3d_lit}}}")
-    }
-    {{/model3d_lit}}
-    {{#model3d_data_lit}}
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("{{{model3d_data_lit}}}")
-    }
-    {{/model3d_data_lit}}
-    {{#model3d_rotation_lit}}
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        {{{model3d_rotation_lit}}}
-    }
-    {{/model3d_rotation_lit}}
-    {{#model3d_offset_lit}}
-
-    fn model_3d_offset(&self) -> (f64, f64, f64) {
-        {{{model3d_offset_lit}}}
-    }
-    {{/model3d_offset_lit}}
-    {{#description_lit}}
-
-    fn description(&self) -> Option<&'static str> {
-        Some("{{{description_lit}}}")
-    }
-    {{/description_lit}}
+    {{/has_meta}}
 }
 
 impl Default for {{{struct_name}}} {

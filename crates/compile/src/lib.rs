@@ -735,22 +735,15 @@ fn synthesise_decoupling(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::units::UnitExt;
+    use copperleaf::{ComponentMeta, units::UnitExt};
 
     fn make_comp(refdes: &str, pins: Vec<Pin>, constraints: Vec<Constraint>) -> CompiledComponent {
         CompiledComponent {
             refdes: refdes.to_owned(),
+            meta: ComponentMeta::default(),
             pins,
-            constraints,
-            symbol: None,
-            footprint: None,
             mechanical: vec![],
-            datasheet: None,
-            description: None,
-            model_3d: None,
-            model_3d_data: None,
-            model_3d_rotation: (0.0, 0.0, 0.0),
-            model_3d_offset: (0.0, 0.0, 0.0),
+            constraints,
         }
     }
 
@@ -823,6 +816,7 @@ mod tests {
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
         let fp = comps[0]
+            .meta
             .footprint
             .as_ref()
             .expect("cap should have a footprint");

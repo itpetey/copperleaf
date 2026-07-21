@@ -174,24 +174,26 @@ impl copperleaf::Component for W5500 {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("W5500")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("W5500")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://docs.wiznet.io/img/products/w5500/W5500_ds_v110e.pdf")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:2260308:3919b63dd7ca54c4>")
-    }
-
-    fn description(&self) -> Option<&'static str> {
-        Some("WIZnet W5500 Ethernet controller")
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("W5500".into()),
+            
+            footprint: Some("W5500".into()),
+            
+            datasheet: Some("https://docs.wiznet.io/img/products/w5500/W5500_ds_v110e.pdf".into()),
+            
+            description: Some("WIZnet W5500 Ethernet controller".into()),
+            
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:2260308:3919b63dd7ca54c4>".into()),
+            
+            
+            model_3d_rotation: (0.0, 0.0, 0.0),
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

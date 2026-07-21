@@ -36,7 +36,7 @@ pub fn fmt_mm(meters: f64) -> String {
 
 /// Full `lib:footprint` reference used in symbol properties and the PCB.
 pub fn footprint_ref(comp: &CompiledComponent) -> String {
-    match comp.footprint.as_deref() {
+    match comp.meta.footprint.as_deref() {
         Some(s) => s.to_owned(),
         None => format!("{}:{}", PROJECT_LIB, comp.refdes),
     }
@@ -67,7 +67,7 @@ pub fn format_grid_float(v: f64) -> String {
 /// The component's footprint name when it refers to a project-local
 /// footprint (`None` for external `lib:name` references).
 pub fn local_footprint_name(comp: &CompiledComponent) -> Option<String> {
-    match comp.footprint.as_deref() {
+    match comp.meta.footprint.as_deref() {
         Some(s) if s.contains(':') => None,
         Some(s) => Some(s.to_string()),
         None => Some(comp.refdes.clone()),
@@ -142,7 +142,7 @@ pub fn property_sym_node(
 
 /// Full `lib:symbol` identifier used by schematic instances.
 pub fn symbol_lib_id(comp: &CompiledComponent) -> String {
-    match comp.symbol.as_deref() {
+    match comp.meta.symbol.as_deref() {
         Some(s) if s.contains(':') => s.to_string(),
         Some(s) => format!("{}:{s}", PROJECT_LIB),
         None => format!("{}:{}", PROJECT_LIB, comp.refdes),
@@ -152,7 +152,8 @@ pub fn symbol_lib_id(comp: &CompiledComponent) -> String {
 /// Symbol library nickname for a component: the prefix of `symbol()` when it
 /// contains a `':'`, otherwise the project-local library.
 pub fn symbol_lib_nick(comp: &CompiledComponent) -> String {
-    comp.symbol
+    comp.meta
+        .symbol
         .as_deref()
         .and_then(|s| s.split_once(':').map(|(l, _)| l.to_string()))
         .unwrap_or_else(|| PROJECT_LIB.to_string())
@@ -160,7 +161,8 @@ pub fn symbol_lib_nick(comp: &CompiledComponent) -> String {
 
 /// Symbol name (without library prefix) for a component.
 pub fn symbol_name(comp: &CompiledComponent) -> &str {
-    comp.symbol
+    comp.meta
+        .symbol
         .as_deref()
         .map(|s| s.split_once(':').map(|(_, n)| n).unwrap_or(s))
         .unwrap_or(&comp.refdes)

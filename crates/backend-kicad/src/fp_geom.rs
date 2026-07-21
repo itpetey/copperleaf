@@ -439,11 +439,16 @@ fn outline_segments(x1: f64, y1: f64, x2: f64, y2: f64) -> [((f64, f64), (f64, f
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::UnitExt;
+    use copperleaf::{ComponentMeta, UnitExt};
 
     fn qfn_comp() -> CompiledComponent {
         CompiledComponent {
             refdes: "U1".into(),
+            meta: ComponentMeta {
+                symbol: Some("TestPart".into()),
+                footprint: Some("TestPart".into()),
+                ..ComponentMeta::default()
+            },
             pins: vec![
                 Pin::build("1")
                     .pos(-3.45, -2.8)
@@ -466,8 +471,6 @@ mod tests {
                     .dio(),
             ],
             constraints: vec![],
-            symbol: Some("TestPart".into()),
-            footprint: Some("TestPart".into()),
             mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),
@@ -481,12 +484,6 @@ mod tests {
                 drill: None,
                 solder_mask_margin: None,
             }],
-            datasheet: None,
-            description: None,
-            model_3d: None,
-            model_3d_data: None,
-            model_3d_rotation: (0.0, 0.0, 0.0),
-            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 
@@ -849,17 +846,10 @@ mod tests {
     fn empty_comp() -> CompiledComponent {
         CompiledComponent {
             refdes: String::new(),
+            meta: ComponentMeta::default(),
             pins: vec![],
             constraints: vec![],
-            symbol: None,
-            footprint: None,
             mechanical: vec![],
-            datasheet: None,
-            description: None,
-            model_3d: None,
-            model_3d_data: None,
-            model_3d_rotation: (0.0, 0.0, 0.0),
-            model_3d_offset: (0.0, 0.0, 0.0),
         }
     }
 }

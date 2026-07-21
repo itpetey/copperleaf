@@ -168,6 +168,7 @@ fn connected_pins(board: &CompiledBoard) -> Vec<(&str, &str)> {
 mod tests {
     use super::*;
     use crate::{
+        ComponentMeta,
         board::{CompiledComponent, Connection},
         net::{Constraint, Net, NetClass, NetId},
         pin::Pin,
@@ -177,17 +178,10 @@ mod tests {
     fn make_comp(refdes: &str, pins: Vec<Pin>, constraints: Vec<Constraint>) -> CompiledComponent {
         CompiledComponent {
             refdes: refdes.to_owned(),
+            meta: ComponentMeta::default(),
             pins,
-            constraints,
-            symbol: None,
-            footprint: None,
             mechanical: vec![],
-            datasheet: None,
-            description: None,
-            model_3d: None,
-            model_3d_data: None,
-            model_3d_rotation: (0.0, 0.0, 0.0),
-            model_3d_offset: (0.0, 0.0, 0.0),
+            constraints,
         }
     }
 

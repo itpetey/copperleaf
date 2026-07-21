@@ -5,7 +5,7 @@
 //! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    CompileError, Component, Constraint, Net, NetId, Pad, Pin,
+    CompileError, Component, ComponentMeta, Constraint, Net, NetId, Pad, Pin,
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
@@ -15,24 +15,11 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct CompiledComponent {
     pub refdes: String,
+    pub meta: ComponentMeta,
     pub pins: Vec<Pin>,
-    pub constraints: Vec<Constraint>,
-    pub symbol: Option<String>,
-    pub footprint: Option<String>,
     /// Mechanical (non-electrical) pads belonging to the component's footprint.
     pub mechanical: Vec<Pad>,
-    /// Datasheet URL carried through to the symbol library.
-    pub datasheet: Option<String>,
-    /// Human-readable description carried through to library metadata.
-    pub description: Option<String>,
-    /// Path to a 3D model file for the footprint.
-    pub model_3d: Option<String>,
-    /// Base64-encoded 3D model data, decoded and written at emit time.
-    pub model_3d_data: Option<String>,
-    /// 3D model rotation in degrees (x, y, z) to align with the footprint.
-    pub model_3d_rotation: (f64, f64, f64),
-    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
-    pub model_3d_offset: (f64, f64, f64),
+    pub constraints: Vec<Constraint>,
 }
 
 impl CompiledComponent {
@@ -49,17 +36,10 @@ impl CompiledComponent {
             .collect();
         Self {
             refdes: refdes.to_owned(),
+            meta: component.meta().clone(),
             pins,
             constraints: component.constraints(),
-            symbol: component.symbol().map(|s| s.to_owned()),
-            footprint: component.footprint().map(|s| s.to_owned()),
             mechanical: component.mechanical().to_vec(),
-            datasheet: component.datasheet().map(|s| s.to_owned()),
-            description: component.description().map(|s| s.to_owned()),
-            model_3d: component.model_3d().map(|s| s.to_owned()),
-            model_3d_data: component.model_3d_data().map(|s| s.to_owned()),
-            model_3d_rotation: component.model_3d_rotation(),
-            model_3d_offset: component.model_3d_offset(),
         }
     }
 }

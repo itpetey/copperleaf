@@ -32,14 +32,14 @@
 
 ## 3. Phase 3 — One component representation (golden: byte-identical)
 
-- [ ] 3.1 Define `ComponentMeta` in core (with `EMPTY` constant) and restructure `CompiledComponent` to `{ refdes, meta, pins, mechanical, constraints }`
-- [ ] 3.2 Collapse the `Component` trait to `pins()`/`meta()`/`mechanical()`/`constraints()`; migrate all impls (passives, tests, generated template)
-- [ ] 3.3 Replace the codegen `ComponentMeta` with the core type; update the TOML schema to serde-map onto core types
-- [ ] 3.4 Migrate `compile_components`/`make_capacitor_component` to `CompiledComponent::from_component` with the meta shape
-- [ ] 3.5 Merge `sym_emitter` + `lib_emitter::symbol_def_sexpr` into one symbol emitter over the unified representation
-- [ ] 3.6 Merge `fp_emitter` + `lib_emitter::footprint_def` into one footprint emitter over the unified representation
-- [ ] 3.7 Regenerate all parts crates; verify goldens are byte-identical (no D2-style reconciliation expected in this phase)
-- [ ] 3.8 Verify `cargo test --workspace`, clippy, fmt
+- [x] 3.1 Define `ComponentMeta` in core (with `EMPTY` constant) and restructure `CompiledComponent` to `{ refdes, meta, pins, mechanical, constraints }`
+- [x] 3.2 Collapse the `Component` trait to `pins()`/`meta()`/`mechanical()`/`constraints()`; migrate all impls (passives, tests, generated template)
+- [x] 3.3 Replace the codegen `ComponentMeta` with the core type; update the TOML schema to serde-map onto core types
+- [x] 3.4 Migrate `compile_components`/`make_capacitor_component` to `CompiledComponent::from_component` with the meta shape
+- [x] 3.5 Merge `sym_emitter` + `lib_emitter::symbol_def_sexpr` into one symbol emitter over the unified representation
+- [x] 3.6 Merge `fp_emitter` + `lib_emitter::footprint_def` into one footprint emitter over the unified representation
+- [x] 3.7 Regenerate all parts crates; verify goldens are byte-identical (no D2-style reconciliation expected in this phase)
+- [x] 3.8 Verify `cargo test --workspace`, clippy, fmt
 
 ## 4. Phase 4 — Connectivity simplification (golden: byte-identical)
 

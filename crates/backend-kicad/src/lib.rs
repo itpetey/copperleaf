@@ -78,13 +78,14 @@ impl Backend for KiCad {
 
         // Write 3D model files from embedded base64 data.
         for comp in &board.components {
-            if let Some(ref data) = comp.model_3d_data {
+            if let Some(ref data) = comp.meta.model_3d_data {
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(data)
                     .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
                 // Derive the filename from model_3d, or fall back to <refdes>.step.
                 let fallback = format!("{}.step", comp.refdes);
                 let filename = comp
+                    .meta
                     .model_3d
                     .as_deref()
                     .and_then(|p| Path::new(p).file_name())

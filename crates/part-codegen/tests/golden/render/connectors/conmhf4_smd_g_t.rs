@@ -56,24 +56,26 @@ impl copperleaf::Component for Conmhf4SmdGT {
         &self.mechanical
     }
 
-    fn symbol(&self) -> Option<&'static str> {
-        Some("CONMHF4-SMD-G-T")
-    }
-
-    fn footprint(&self) -> Option<&'static str> {
-        Some("CONMHF4-SMD-G-T")
-    }
-
-    fn datasheet(&self) -> Option<&'static str> {
-        Some("https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=conmhf4-smd-g-t-ds&DocType=Data%20Sheet&DocLang=English&DocFormat=pdf&PartCntxt=CONMHF4-SMD-G-T")
-    }
-
-    fn model_3d_data(&self) -> Option<&'static str> {
-        Some("<elided:361652:8b1b54454b3624c8>")
-    }
-
-    fn model_3d_rotation(&self) -> (f64, f64, f64) {
-        (90.0, 0.0, 0.0)
+    fn meta(&self) -> &copperleaf::ComponentMeta {
+        static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
+        META.get_or_init(|| copperleaf::ComponentMeta {
+            symbol: Some("CONMHF4-SMD-G-T".into()),
+            
+            footprint: Some("CONMHF4-SMD-G-T".into()),
+            
+            datasheet: Some("https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=conmhf4-smd-g-t-ds&DocType=Data%20Sheet&DocLang=English&DocFormat=pdf&PartCntxt=CONMHF4-SMD-G-T".into()),
+            
+            
+            description: None,
+            
+            model_3d: None,
+            model_3d_data: Some("<elided:361652:8b1b54454b3624c8>".into()),
+            
+            model_3d_rotation: (90.0, 0.0, 0.0),
+            
+            
+            model_3d_offset: (0.0, 0.0, 0.0),
+        })
     }
 }
 

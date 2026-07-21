@@ -227,18 +227,18 @@ fn footprint_node(
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
     // Use just the filename so it resolves relative to the project directory
     // (the file is copied alongside the project output during emit()).
-    let model_path_for_pcb = match comp.model_3d {
+    let model_path_for_pcb = match comp.meta.model_3d {
         Some(ref path) => Path::new(path)
             .file_name()
             .map(|s| s.to_str().unwrap().to_owned()),
-        None if comp.model_3d_data.is_some() => Some(format!("{}.step", comp.refdes)),
+        None if comp.meta.model_3d_data.is_some() => Some(format!("{}.step", comp.refdes)),
         None => None,
     };
     children.push(fp_geom::model_sexpr(
         &fp_name,
         model_path_for_pcb.as_deref(),
-        comp.model_3d_offset,
-        comp.model_3d_rotation,
+        comp.meta.model_3d_offset,
+        comp.meta.model_3d_rotation,
     ));
 
     Sexpr::list(children)
@@ -410,12 +410,15 @@ fn setup_node() -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{CompiledComponent, Connection, Net, NetClass, NetId, NetKind, Pin, UnitExt};
+    use copperleaf::{
+        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetId, NetKind, Pin, UnitExt,
+    };
 
     fn test_board() -> CompiledBoard {
         CompiledBoard {
             components: vec![CompiledComponent {
                 refdes: "U1".into(),
+                meta: ComponentMeta::default(),
                 pins: vec![
                     Pin::build("VDD")
                         .number("1")
@@ -434,15 +437,7 @@ mod tests {
                         .gnd(),
                 ],
                 constraints: vec![],
-                symbol: None,
-                footprint: None,
                 mechanical: vec![],
-                datasheet: None,
-                description: None,
-                model_3d: None,
-                model_3d_data: None,
-                model_3d_rotation: (0.0, 0.0, 0.0),
-                model_3d_offset: (0.0, 0.0, 0.0),
             }],
             nets: vec![Net {
                 name: "V3V3".into(),
