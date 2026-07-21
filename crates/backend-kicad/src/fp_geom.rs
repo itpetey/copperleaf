@@ -9,14 +9,14 @@ use copperleaf::{
     CompiledComponent, Pad, PadShape, PadType, Pin, pad_extent, resolve_mech_pad, resolve_pad,
 };
 
-// Re-exports for backward compatibility with callers.
-pub use copperleaf::{
-    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, SMD_LAYERS, auto_pad_pos, normalise_anchor,
-};
-
 use crate::{
     common::{format_float, format_grid_float},
     sexpr::Sexpr,
+};
+
+// Re-exports for backward compatibility with callers.
+pub use copperleaf::{
+    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, SMD_LAYERS, auto_pad_pos, normalise_anchor,
 };
 
 /// Margin added around the pad bounding box to form the fab outline, in mm.
@@ -25,12 +25,6 @@ const BODY_MARGIN: f64 = 0.25;
 const COURTYARD_OFFSET: f64 = 0.25;
 /// Silkscreen offset from the fab outline, in mm.
 const SILK_OFFSET: f64 = 0.11;
-
-/// See [`copperleaf::pad_extent`].
-#[inline]
-pub fn pads_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
-    pad_extent(pads)
-}
 
 /// KiCad footprint `attr` value for the pad set: `smd` when any pad is
 /// surface-mount (mixed footprints included), `through_hole` only when all
@@ -134,6 +128,19 @@ pub fn fp_text(kind: &str, value: &str, pos: (f64, f64), layer: &str) -> Sexpr {
             ]),
         ]),
     ])
+}
+
+/// Return `(number, MECH_name)` pairs for pads that do not correspond to an
+/// electrical pin (thermal vias and mechanical pads).  Schematic and netlist
+/// emitters add these as extra symbol pins so pin counts match.
+pub fn mech_pad_names(comp: &CompiledComponent) -> Vec<(String, String)> {
+    let (pads, pin_indices) = gather_pads_internal(comp);
+    pads.iter()
+        .zip(pin_indices.iter())
+        .filter(|(_, i)| i.is_none())
+        .enumerate()
+        .map(|(i, (p, _))| (p.number.clone(), format!("MECH{}", i + 1)))
+        .collect()
 }
 
 /// Build the `(model ...)` 3D-model reference for a footprint.
@@ -313,6 +320,68 @@ pub fn pad_sexpr(pad: &Pad, uuid: Option<&str>, net: Option<(usize, &str)>) -> S
     Sexpr::list(children)
 }
 
+/// See [`copperleaf::pad_extent`].
+#[inline]
+pub fn pads_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
+    pad_extent(pads)
+}
+
+/// Collect all pads for a component: electrical pins (with thermal vias)
+/// followed by mechanical pads.  The anchor is normalised per KLC (see
+/// [`normalise_anchor`]).
+///
+/// Un-numbered pads (thermal vias and mechanical pads) are assigned
+/// sequential pad numbers continuing after the last electrical pin so
+/// that every pad has a unique number matching its schematic pin.
+pub fn pads_from_component(comp: &CompiledComponent) -> Vec<Pad> {
+    let (mut pads, _pin_indices) = gather_pads_internal(comp);
+    normalise_anchor(&mut pads);
+    pads
+}
+
+/// Like [`pads_from_component`], but also returns a parallel vector of
+/// pin indices: `Some(i)` for electrical pins (the `i`th pin in
+/// `comp.pins`), `None` for thermal vias and mechanical pads.
+pub fn pads_from_component_with_indices(
+    comp: &CompiledComponent,
+) -> (Vec<Pad>, Vec<Option<usize>>) {
+    let (mut pads, pin_indices) = gather_pads_internal(comp);
+    normalise_anchor(&mut pads);
+    (pads, pin_indices)
+}
+
+/// Position of the first electrical pad, used for the pin-1 marker.
+pub fn pin1_pos(pads: &[Pad]) -> Option<(f64, f64)> {
+    pads.first().map(|p| p.pos)
+}
+
+/// Resolve the physical pad number for a pin: the explicit `number` when
+/// set, otherwise the 1-based pin index.
+pub fn pin_number(pin: &Pin, index: usize) -> String {
+    pin.number()
+        .map(str::to_owned)
+        .unwrap_or_else(|| (index + 1).to_string())
+}
+
+/// Build an un-numbered through-hole pad for a thermal via.
+///
+/// Thermal vias live on all copper layers plus the solder mask (KLC F7.4).
+pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> Pad {
+    Pad {
+        number: String::new(),
+        pos,
+        rotation: 0.0,
+        width: size,
+        height: size,
+        pad_type: PadType::ThruHole,
+        pad_shape: PadShape::Circle,
+        roundrect_rratio: None,
+        layers: Some(PTH_LAYERS.to_string()),
+        drill: Some(drill),
+        solder_mask_margin: None,
+    }
+}
+
 /// Internal helper: gather all pads with pin-index metadata, without
 /// normalisation.  Returns `(pads, pin_indices)` where `pin_indices[i]` is
 /// `Some(pin_index)` for electrical pins and `None` for thermal vias and
@@ -355,75 +424,6 @@ fn gather_pads_internal(comp: &CompiledComponent) -> (Vec<Pad>, Vec<Option<usize
     }
 
     (pads, pin_indices)
-}
-
-/// Collect all pads for a component: electrical pins (with thermal vias)
-/// followed by mechanical pads.  The anchor is normalised per KLC (see
-/// [`normalise_anchor`]).
-///
-/// Un-numbered pads (thermal vias and mechanical pads) are assigned
-/// sequential pad numbers continuing after the last electrical pin so
-/// that every pad has a unique number matching its schematic pin.
-pub fn pads_from_component(comp: &CompiledComponent) -> Vec<Pad> {
-    let (mut pads, _pin_indices) = gather_pads_internal(comp);
-    normalise_anchor(&mut pads);
-    pads
-}
-
-/// Like [`pads_from_component`], but also returns a parallel vector of
-/// pin indices: `Some(i)` for electrical pins (the `i`th pin in
-/// `comp.pins`), `None` for thermal vias and mechanical pads.
-pub fn pads_from_component_with_indices(
-    comp: &CompiledComponent,
-) -> (Vec<Pad>, Vec<Option<usize>>) {
-    let (mut pads, pin_indices) = gather_pads_internal(comp);
-    normalise_anchor(&mut pads);
-    (pads, pin_indices)
-}
-
-/// Return `(number, MECH_name)` pairs for pads that do not correspond to an
-/// electrical pin (thermal vias and mechanical pads).  Schematic and netlist
-/// emitters add these as extra symbol pins so pin counts match.
-pub fn mech_pad_names(comp: &CompiledComponent) -> Vec<(String, String)> {
-    let (pads, pin_indices) = gather_pads_internal(comp);
-    pads.iter()
-        .zip(pin_indices.iter())
-        .filter(|(_, i)| i.is_none())
-        .enumerate()
-        .map(|(i, (p, _))| (p.number.clone(), format!("MECH{}", i + 1)))
-        .collect()
-}
-
-/// Position of the first electrical pad, used for the pin-1 marker.
-pub fn pin1_pos(pads: &[Pad]) -> Option<(f64, f64)> {
-    pads.first().map(|p| p.pos)
-}
-
-/// Resolve the physical pad number for a pin: the explicit `number` when
-/// set, otherwise the 1-based pin index.
-pub fn pin_number(pin: &Pin, index: usize) -> String {
-    pin.number()
-        .map(str::to_owned)
-        .unwrap_or_else(|| (index + 1).to_string())
-}
-
-/// Build an un-numbered through-hole pad for a thermal via.
-///
-/// Thermal vias live on all copper layers plus the solder mask (KLC F7.4).
-pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> Pad {
-    Pad {
-        number: String::new(),
-        pos,
-        rotation: 0.0,
-        width: size,
-        height: size,
-        pad_type: PadType::ThruHole,
-        pad_shape: PadShape::Circle,
-        roundrect_rratio: None,
-        layers: Some(PTH_LAYERS.to_string()),
-        drill: Some(drill),
-        solder_mask_margin: None,
-    }
 }
 
 /// Four line segments forming a rectangle.

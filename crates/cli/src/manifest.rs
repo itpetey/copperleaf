@@ -9,95 +9,6 @@ use copperleaf_part_codegen::{
 
 use crate::kindmap::{KindEntry, KindMap};
 
-/// Guard against passing a file of the wrong type. If `path` has extension
-/// `bad_ext`, return a diagnostic error suggesting `--flag` instead.
-pub(crate) fn check_extension(
-    path: &str,
-    bad_ext: &str,
-    code: &str,
-    wrong_kind: &str,
-    right_kind: &str,
-    flag: &str,
-) -> Result<(), crate::CliError> {
-    if let Some(ext) = std::path::Path::new(path)
-        .extension()
-        .and_then(|s| s.to_str())
-        && ext.eq_ignore_ascii_case(bad_ext)
-    {
-        return Err(crate::CliError::Diagnostic(Diagnostic {
-            code: code.into(),
-            severity: Severity::Error,
-            message: format!(
-                "'{}' is {}, not a {} — use {} instead",
-                path, wrong_kind, right_kind, flag
-            ),
-            entities: vec![],
-            hint: None,
-        }));
-    }
-    Ok(())
-}
-
-/// Read and base64-encode a 3D model file, storing it in the manifest, if a
-/// model path is set and data hasn't already been embedded.
-pub(crate) fn embed_model_data(manifest: &mut Manifest) {
-    if let Some(ref model_path) = manifest.component.model_3d.clone()
-        && manifest.component.model_3d_data.is_none()
-        && let Ok(bytes) = std::fs::read(model_path)
-    {
-        use base64::Engine;
-        manifest.component.model_3d_data =
-            Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
-    }
-}
-
-/// Resolve the lib-id for a symbol source.
-///
-/// Priority: `args_lib_id` → `manifest_lib_id` (for update mode, pass
-/// `None` for new) → auto-detect from a single-symbol file → error.
-pub(crate) fn resolve_symbol_lib_id(
-    args_lib_id: Option<&str>,
-    manifest_lib_id: Option<&str>,
-    symbols: &[SymbolDef],
-    symbol_path: &str,
-) -> Result<String, crate::CliError> {
-    // Explicit via CLI arg or existing manifest.
-    if let Some(id) = args_lib_id.or(manifest_lib_id) {
-        return Ok(id.to_owned());
-    }
-    // Auto-detect from a single-symbol file.
-    if symbols.len() == 1 {
-        return Ok(symbols[0].lib_id.clone());
-    }
-    if symbols.is_empty() {
-        return Err(crate::CliError::Diagnostic(Diagnostic {
-            code: "CLI:NO_SYMBOLS".into(),
-            severity: Severity::Error,
-            message: format!("No symbols found in '{}'", symbol_path),
-            entities: vec![],
-            hint: None,
-        }));
-    }
-    let names: Vec<String> = symbols.iter().map(|s| s.lib_id.clone()).collect();
-    Err(crate::CliError::Diagnostic(Diagnostic {
-        code: "CLI:MISSING_LIB_ID".into(),
-        severity: Severity::Error,
-        message: format!(
-            "Multiple symbols found in '{}', --lib-id is required",
-            symbol_path
-        ),
-        entities: names,
-        hint: Some(format!(
-            "Available symbols: {}",
-            symbols
-                .iter()
-                .map(|s| s.lib_id.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
-    }))
-}
-
 /// Deserialise a TOML string into a manifest.
 pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
     toml::from_str(input).map_err(|e| CodegenError::Toml {
@@ -420,7 +331,47 @@ pub fn serialise(manifest: &Manifest) -> String {
     out
 }
 
-// ── Shared helpers (Phase 5.2) ────────────────────────────────────────
+/// Guard against passing a file of the wrong type. If `path` has extension
+/// `bad_ext`, return a diagnostic error suggesting `--flag` instead.
+pub(crate) fn check_extension(
+    path: &str,
+    bad_ext: &str,
+    code: &str,
+    wrong_kind: &str,
+    right_kind: &str,
+    flag: &str,
+) -> Result<(), crate::CliError> {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|s| s.to_str())
+        && ext.eq_ignore_ascii_case(bad_ext)
+    {
+        return Err(crate::CliError::Diagnostic(Diagnostic {
+            code: code.into(),
+            severity: Severity::Error,
+            message: format!(
+                "'{}' is {}, not a {} — use {} instead",
+                path, wrong_kind, right_kind, flag
+            ),
+            entities: vec![],
+            hint: None,
+        }));
+    }
+    Ok(())
+}
+
+/// Read and base64-encode a 3D model file, storing it in the manifest, if a
+/// model path is set and data hasn't already been embedded.
+pub(crate) fn embed_model_data(manifest: &mut Manifest) {
+    if let Some(ref model_path) = manifest.component.model_3d.clone()
+        && manifest.component.model_3d_data.is_none()
+        && let Ok(bytes) = std::fs::read(model_path)
+    {
+        use base64::Engine;
+        manifest.component.model_3d_data =
+            Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+    }
+}
 
 /// Look for a `.step` file in the same directory as the given path.
 ///
@@ -443,20 +394,94 @@ pub(crate) fn find_step_file_alongside(path: &str) -> Option<String> {
     None
 }
 
-/// Convert a lib-id to a lowercase TOML-safe filename stem.
-pub(crate) fn toml_stem(lib_id: &str) -> String {
-    let mut out = String::new();
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
+/// Return `true` if `pad` is a mechanical (non-electrical) pad.
+pub(crate) fn is_mechanical_pad(pad: &PadDef) -> bool {
+    pad.number.eq_ignore_ascii_case("none")
+        || pad.number.is_empty()
+        || pad.pad_type == "np_thru_hole"
+}
+
+/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
+/// bounding box (i.e. it is a thermal via, not an electrical pad).
+pub(crate) fn is_thermal_via(pad: &PadDef, pins: &[PinDef]) -> bool {
+    pins.iter()
+        .any(|pin| pin.number != pad.number && pin_contains_point(pin, pad.pos))
+}
+
+/// Convert a [`PadDef`] into a [`MechanicalDef`] for TOML storage.
+pub(crate) fn mech_def_from_pad(pad: &PadDef) -> MechanicalDef {
+    MechanicalDef {
+        number: pad.number.clone(),
+        pos: pad.pos,
+        width: pad.width,
+        height: pad.height,
+        pad_type: pad.pad_type.clone(),
+        pad_shape: pad.shape.clone(),
+        roundrect_rratio: pad.roundrect_rratio,
+        layers: if pad.layers.is_empty() {
+            None
         } else {
-            out.push('_');
-        }
+            Some(pad.layers.clone())
+        },
+        drill: pad.drill.unwrap_or(0.0),
     }
-    if out.is_empty() {
-        out.push_str("part");
+}
+
+/// Return `true` if `pos` falls inside the bounding box of a pin.
+pub(crate) fn pin_contains_point(pin: &PinDef, pos: (f64, f64)) -> bool {
+    let Some((px, py)) = pin.pos else {
+        return false;
+    };
+    let half_w = pin.width.unwrap_or(0.0) / 2.0;
+    let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+    pos.0 >= px - half_w && pos.0 <= px + half_w && pos.1 >= py - half_h && pos.1 <= py + half_h
+}
+
+/// Resolve the lib-id for a symbol source.
+///
+/// Priority: `args_lib_id` → `manifest_lib_id` (for update mode, pass
+/// `None` for new) → auto-detect from a single-symbol file → error.
+pub(crate) fn resolve_symbol_lib_id(
+    args_lib_id: Option<&str>,
+    manifest_lib_id: Option<&str>,
+    symbols: &[SymbolDef],
+    symbol_path: &str,
+) -> Result<String, crate::CliError> {
+    // Explicit via CLI arg or existing manifest.
+    if let Some(id) = args_lib_id.or(manifest_lib_id) {
+        return Ok(id.to_owned());
     }
-    out
+    // Auto-detect from a single-symbol file.
+    if symbols.len() == 1 {
+        return Ok(symbols[0].lib_id.clone());
+    }
+    if symbols.is_empty() {
+        return Err(crate::CliError::Diagnostic(Diagnostic {
+            code: "CLI:NO_SYMBOLS".into(),
+            severity: Severity::Error,
+            message: format!("No symbols found in '{}'", symbol_path),
+            entities: vec![],
+            hint: None,
+        }));
+    }
+    let names: Vec<String> = symbols.iter().map(|s| s.lib_id.clone()).collect();
+    Err(crate::CliError::Diagnostic(Diagnostic {
+        code: "CLI:MISSING_LIB_ID".into(),
+        severity: Severity::Error,
+        message: format!(
+            "Multiple symbols found in '{}', --lib-id is required",
+            symbol_path
+        ),
+        entities: names,
+        hint: Some(format!(
+            "Available symbols: {}",
+            symbols
+                .iter()
+                .map(|s| s.lib_id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }))
 }
 
 /// Convert a lib-id into a PascalCase Rust struct name.
@@ -481,51 +506,24 @@ pub(crate) fn struct_name(lib_id: &str) -> String {
     out
 }
 
-/// Return `true` if `pad` is a mechanical (non-electrical) pad.
-pub(crate) fn is_mechanical_pad(pad: &PadDef) -> bool {
-    pad.number.eq_ignore_ascii_case("none")
-        || pad.number.is_empty()
-        || pad.pad_type == "np_thru_hole"
-}
-
-/// Convert a [`PadDef`] into a [`MechanicalDef`] for TOML storage.
-pub(crate) fn mech_def_from_pad(pad: &PadDef) -> MechanicalDef {
-    MechanicalDef {
-        number: pad.number.clone(),
-        pos: pad.pos,
-        width: pad.width,
-        height: pad.height,
-        pad_type: pad.pad_type.clone(),
-        pad_shape: pad.shape.clone(),
-        roundrect_rratio: pad.roundrect_rratio,
-        layers: if pad.layers.is_empty() {
-            None
+/// Convert a lib-id to a lowercase TOML-safe filename stem.
+pub(crate) fn toml_stem(lib_id: &str) -> String {
+    let mut out = String::new();
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
         } else {
-            Some(pad.layers.clone())
-        },
-        drill: pad.drill.unwrap_or(0.0),
+            out.push('_');
+        }
     }
-}
-
-/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
-/// bounding box (i.e. it is a thermal via, not an electrical pad).
-pub(crate) fn is_thermal_via(pad: &PadDef, pins: &[PinDef]) -> bool {
-    pins.iter()
-        .any(|pin| pin.number != pad.number && pin_contains_point(pin, pad.pos))
+    if out.is_empty() {
+        out.push_str("part");
+    }
+    out
 }
 
 fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
     pin.electrical.merge_from(entry);
-}
-
-/// Return `true` if `pos` falls inside the bounding box of a pin.
-pub(crate) fn pin_contains_point(pin: &PinDef, pos: (f64, f64)) -> bool {
-    let Some((px, py)) = pin.pos else {
-        return false;
-    };
-    let half_w = pin.width.unwrap_or(0.0) / 2.0;
-    let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
-    pos.0 >= px - half_w && pos.0 <= px + half_w && pos.1 >= py - half_h && pos.1 <= py + half_h
 }
 
 /// Find the first pin in the manifest whose bounding box contains `pad`'s

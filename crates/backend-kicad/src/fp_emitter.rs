@@ -4,12 +4,11 @@
 //! TOML can serve as the single source of truth for a component's footprint.
 
 use base64::Engine as _;
-use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
-
 use copperleaf::{
     DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, SMD_LAYERS,
     resolve_mech_pad,
 };
+use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
 
 use crate::{
     fp_geom::{self},
@@ -180,6 +179,28 @@ pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
     pads
 }
 
+/// Convert a [`MechanicalDef`] into a raw [`Pad`] (before
+/// [`resolve_mech_pad`] fills in remaining defaults).
+fn mech_to_pad(mech: &MechanicalDef) -> Pad {
+    Pad {
+        number: mech.number.clone(),
+        pos: mech.pos,
+        rotation: 0.0,
+        width: mech.width,
+        height: mech.height,
+        pad_type: PadType::parse(&mech.pad_type).unwrap_or(PadType::Smd),
+        pad_shape: PadShape::parse(&mech.pad_shape).unwrap_or(PadShape::Rect),
+        roundrect_rratio: mech.roundrect_rratio,
+        layers: mech.layers.clone(),
+        drill: if mech.drill > 0.0 {
+            Some(mech.drill)
+        } else {
+            None
+        },
+        solder_mask_margin: None,
+    }
+}
+
 /// Resolve one pin's pad from TOML data, applying the exact same defaulting
 /// rules as [`copperleaf::resolve_pad`] (design D2).  This is the only place
 /// the generate-path pad defaulting lives.
@@ -254,28 +275,6 @@ fn resolve_pin_def_pad(pin_def: &PinDef, index: usize) -> Pad {
         layers: Some(layers),
         drill,
         solder_mask_margin: pin_def.solder_mask_margin,
-    }
-}
-
-/// Convert a [`MechanicalDef`] into a raw [`Pad`] (before
-/// [`resolve_mech_pad`] fills in remaining defaults).
-fn mech_to_pad(mech: &MechanicalDef) -> Pad {
-    Pad {
-        number: mech.number.clone(),
-        pos: mech.pos,
-        rotation: 0.0,
-        width: mech.width,
-        height: mech.height,
-        pad_type: PadType::parse(&mech.pad_type).unwrap_or(PadType::Smd),
-        pad_shape: PadShape::parse(&mech.pad_shape).unwrap_or(PadShape::Rect),
-        roundrect_rratio: mech.roundrect_rratio,
-        layers: mech.layers.clone(),
-        drill: if mech.drill > 0.0 {
-            Some(mech.drill)
-        } else {
-            None
-        },
-        solder_mask_margin: None,
     }
 }
 

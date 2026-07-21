@@ -22,6 +22,71 @@ pub struct CompiledComponent {
     pub constraints: Vec<Constraint>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Connection {
+    pub component: usize,
+    pub pin: String,
+    pub net: NetIdx,
+}
+
+/// An immutable structure representing a finished [`Board`](crate::Board) that is ready for export.
+#[derive(Clone, Debug)]
+pub struct CompiledBoard {
+    pub components: Vec<CompiledComponent>,
+    pub nets: Vec<Net>,
+    pub connections: Vec<Connection>,
+    pub constraints: Vec<Constraint>,
+    /// Board width in millimetres.
+    pub width: f64,
+    /// Board height in millimetres.
+    pub height: f64,
+}
+
+/// Precomputed connectivity index for a [`CompiledBoard`].
+///
+/// Maps component/pin pairs to their owning net and tracks which pins are
+/// connected.  Built once during compilation and consumed by ERC and emitters.
+#[derive(Clone, Debug)]
+pub struct BoardView<'a> {
+    /// Reference to the underlying board.
+    pub board: &'a CompiledBoard,
+    /// Map from (component_index, pin_index) to the owning net.
+    pub net_of: std::collections::HashMap<(usize, usize), NetIdx>,
+    /// Set of (component_index, pin_index) pairs that are connected to a net.
+    pub connected: std::collections::HashSet<(usize, usize)>,
+}
+
+/// Handle to a component instance on a [`Board`].
+#[derive(Clone, Copy, Debug)]
+pub struct ComponentHandle(pub usize);
+
+pub struct ComponentEntry {
+    pub name: String,
+    pub component: Box<dyn Component>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RawNetOverride {
+    pub voltage: Option<Qty<Volt>>,
+    pub name: Option<String>,
+}
+
+/// Top level structure representing the PCB being designed.
+pub struct Board {
+    name: String,
+    pub components: Vec<ComponentEntry>,
+    pub connections: Vec<RawConnection>,
+    pub net_overrides: std::collections::BTreeMap<usize, RawNetOverride>,
+    pub next_edge: usize,
+    /// Each entry is `(override_key, PinHandle)`.  The override key is
+    /// allocated from `next_edge` so it never collides with connection edges.
+    pub single_pin_nets: Vec<(usize, PinHandle)>,
+    /// Board width in millimetres (default 100.0).
+    width: f64,
+    /// Board height in millimetres (default 80.0).
+    height: f64,
+}
+
 impl CompiledComponent {
     /// Build a compiled component from a refdes and any [`Component`] impl,
     /// assigning deterministic pin IDs.
@@ -67,26 +132,6 @@ impl CompiledComponent {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Connection {
-    pub component: usize,
-    pub pin: String,
-    pub net: NetIdx,
-}
-
-/// An immutable structure representing a finished [`Board`](crate::Board) that is ready for export.
-#[derive(Clone, Debug)]
-pub struct CompiledBoard {
-    pub components: Vec<CompiledComponent>,
-    pub nets: Vec<Net>,
-    pub connections: Vec<Connection>,
-    pub constraints: Vec<Constraint>,
-    /// Board width in millimetres.
-    pub width: f64,
-    /// Board height in millimetres.
-    pub height: f64,
-}
-
 impl CompiledBoard {
     /// Get a reference to the net at the given index.
     pub fn net(&self, idx: NetIdx) -> &Net {
@@ -97,20 +142,6 @@ impl CompiledBoard {
     pub fn find_net(&self, name: &str) -> Option<NetIdx> {
         self.nets.iter().position(|n| n.name == name).map(NetIdx)
     }
-}
-
-/// Precomputed connectivity index for a [`CompiledBoard`].
-///
-/// Maps component/pin pairs to their owning net and tracks which pins are
-/// connected.  Built once during compilation and consumed by ERC and emitters.
-#[derive(Clone, Debug)]
-pub struct BoardView<'a> {
-    /// Reference to the underlying board.
-    pub board: &'a CompiledBoard,
-    /// Map from (component_index, pin_index) to the owning net.
-    pub net_of: std::collections::HashMap<(usize, usize), NetIdx>,
-    /// Set of (component_index, pin_index) pairs that are connected to a net.
-    pub connected: std::collections::HashSet<(usize, usize)>,
 }
 
 impl<'a> BoardView<'a> {
@@ -131,37 +162,6 @@ impl<'a> BoardView<'a> {
             connected,
         }
     }
-}
-
-/// Handle to a component instance on a [`Board`].
-#[derive(Clone, Copy, Debug)]
-pub struct ComponentHandle(pub usize);
-
-pub struct ComponentEntry {
-    pub name: String,
-    pub component: Box<dyn Component>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct RawNetOverride {
-    pub voltage: Option<Qty<Volt>>,
-    pub name: Option<String>,
-}
-
-/// Top level structure representing the PCB being designed.
-pub struct Board {
-    name: String,
-    pub components: Vec<ComponentEntry>,
-    pub connections: Vec<RawConnection>,
-    pub net_overrides: std::collections::BTreeMap<usize, RawNetOverride>,
-    pub next_edge: usize,
-    /// Each entry is `(override_key, PinHandle)`.  The override key is
-    /// allocated from `next_edge` so it never collides with connection edges.
-    pub single_pin_nets: Vec<(usize, PinHandle)>,
-    /// Board width in millimetres (default 100.0).
-    width: f64,
-    /// Board height in millimetres (default 80.0).
-    height: f64,
 }
 
 impl ComponentHandle {

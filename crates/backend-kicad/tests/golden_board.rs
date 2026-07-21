@@ -17,39 +17,13 @@ use std::{
 use copperleaf::{Backend, Board, ComponentHandle, PinRef, Role, UnitExt};
 use copperleaf_backend_kicad::KiCad;
 
-const PROJECT: &str = "golden";
 const FILES: [&str; 4] = [
     "golden.kicad_pro",
     "golden.kicad_sch",
     "golden.kicad_pcb",
     "golden.net",
 ];
-
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/board")
-}
-
-/// Compare `actual` against the golden file at `path`, or overwrite the
-/// golden file when running with `COPPERLEAF_BLESS=1`.
-fn compare_or_bless(path: &Path, actual: &str) {
-    if std::env::var_os("COPPERLEAF_BLESS").is_some() {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, actual).unwrap();
-        return;
-    }
-    let expected = std::fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!(
-            "missing golden {}: {e} — run with COPPERLEAF_BLESS=1 to create it",
-            path.display()
-        )
-    });
-    assert_eq!(
-        expected,
-        actual,
-        "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
-        path.display()
-    );
-}
+const PROJECT: &str = "golden";
 
 /// Wire a component's power and ground pins into nets without hand-written
 /// per-part knowledge:
@@ -103,6 +77,28 @@ fn check_board(name: &str, board: Board) {
         let actual = std::fs::read_to_string(dir.path().join(file)).unwrap();
         compare_or_bless(&golden_dir().join(name).join(file), &actual);
     }
+}
+
+/// Compare `actual` against the golden file at `path`, or overwrite the
+/// golden file when running with `COPPERLEAF_BLESS=1`.
+fn compare_or_bless(path: &Path, actual: &str) {
+    if std::env::var_os("COPPERLEAF_BLESS").is_some() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, actual).unwrap();
+        return;
+    }
+    let expected = std::fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!(
+            "missing golden {}: {e} — run with COPPERLEAF_BLESS=1 to create it",
+            path.display()
+        )
+    });
+    assert_eq!(
+        expected,
+        actual,
+        "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
+        path.display()
+    );
 }
 
 #[test]
@@ -182,4 +178,8 @@ fn golden_board_wiznet() {
     let u1 = board.add("U1", copperleaf_parts_wiznet::W5500::new());
     auto_wire(&mut board, u1);
     check_board("wiznet", board);
+}
+
+fn golden_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/board")
 }

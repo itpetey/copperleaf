@@ -12,45 +12,6 @@ use std::path::{Path, PathBuf};
 
 use copperleaf_part_codegen::generate_component_to_string;
 
-fn parts_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts")
-}
-
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/render")
-}
-
-/// All parts-crate TOML files, as `(crate_name, file_stem, path)` triples in
-/// sorted order.
-fn parts_tomls() -> Vec<(String, String, PathBuf)> {
-    let mut out = Vec::new();
-    let vendors = std::fs::read_dir(parts_dir()).expect("parts directory");
-    for vendor in vendors.flatten() {
-        let vendor_name = vendor.file_name().to_string_lossy().into_owned();
-        let Ok(entries) = std::fs::read_dir(vendor.path()) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("toml") {
-                continue;
-            }
-            // Only component definition TOMLs — skip crate manifests.
-            if path.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml") {
-                continue;
-            }
-            let stem = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default()
-                .to_string();
-            out.push((vendor_name.clone(), stem, path));
-        }
-    }
-    out.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-    out
-}
-
 /// Compare `actual` against the golden file at `path`, or overwrite the
 /// golden file when running with `COPPERLEAF_BLESS=1`.
 fn compare_or_bless(path: &Path, actual: &str) {
@@ -123,6 +84,45 @@ fn fnv1a(s: &str) -> u64 {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     hash
+}
+
+fn golden_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/render")
+}
+
+fn parts_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts")
+}
+
+/// All parts-crate TOML files, as `(crate_name, file_stem, path)` triples in
+/// sorted order.
+fn parts_tomls() -> Vec<(String, String, PathBuf)> {
+    let mut out = Vec::new();
+    let vendors = std::fs::read_dir(parts_dir()).expect("parts directory");
+    for vendor in vendors.flatten() {
+        let vendor_name = vendor.file_name().to_string_lossy().into_owned();
+        let Ok(entries) = std::fs::read_dir(vendor.path()) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("toml") {
+                continue;
+            }
+            // Only component definition TOMLs — skip crate manifests.
+            if path.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml") {
+                continue;
+            }
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_string();
+            out.push((vendor_name.clone(), stem, path));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    out
 }
 
 #[test]

@@ -125,23 +125,6 @@ pub struct ComponentMeta {
     pub model_3d_offset: Option<(f64, f64, f64)>,
 }
 
-impl ComponentMeta {
-    /// Convert to the core [`copperleaf::ComponentMeta`], mapping `lib_id` to
-    /// both `symbol` and `footprint`.
-    pub fn to_core_meta(&self) -> copperleaf::ComponentMeta {
-        copperleaf::ComponentMeta {
-            symbol: self.lib_id.clone(),
-            footprint: self.lib_id.clone(),
-            datasheet: self.datasheet.clone(),
-            description: self.description.clone(),
-            model_3d: self.model_3d.clone(),
-            model_3d_data: self.model_3d_data.clone(),
-            model_3d_rotation: self.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0)),
-            model_3d_offset: self.model_3d_offset.unwrap_or((0.0, 0.0, 0.0)),
-        }
-    }
-}
-
 /// Shared electrical fields used by both `PinDef` and the kind-map system.
 ///
 /// Flattened into `PinDef` via `#[serde(flatten)]` so the TOML schema remains
@@ -171,35 +154,6 @@ pub struct ElectricalFields {
     /// True if the pin is a no-connect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nc: Option<bool>,
-}
-
-impl ElectricalFields {
-    /// Merge `other`'s values into `self`, preserving any explicitly-set values.
-    /// `kind` is always overwritten; other fields use `or` semantics.
-    pub fn merge_from(&mut self, other: &Self) {
-        self.kind = other.kind.clone();
-        if let Some(bw) = other.bw_mhz {
-            self.bw_mhz = self.bw_mhz.or(Some(bw));
-        }
-        if let Some(v) = other.v {
-            self.v = self.v.or(Some(v));
-        }
-        if let Some(v_min) = other.v_min {
-            self.v_min = self.v_min.or(Some(v_min));
-        }
-        if let Some(v_max) = other.v_max {
-            self.v_max = self.v_max.or(Some(v_max));
-        }
-        if let Some(i) = other.i {
-            self.i = self.i.or(Some(i));
-        }
-        if let Some(i_max) = other.i_max {
-            self.i_max = self.i_max.or(Some(i_max));
-        }
-        if let Some(nc) = other.nc {
-            self.nc = self.nc.or(Some(nc));
-        }
-    }
 }
 
 /// A thermal via that lives inside a pad (e.g. exposed thermal pad).
@@ -420,6 +374,56 @@ impl Serialize for CodegenError {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
     }
+}
+
+impl ComponentMeta {
+    /// Convert to the core [`copperleaf::ComponentMeta`], mapping `lib_id` to
+    /// both `symbol` and `footprint`.
+    pub fn to_core_meta(&self) -> copperleaf::ComponentMeta {
+        copperleaf::ComponentMeta {
+            symbol: self.lib_id.clone(),
+            footprint: self.lib_id.clone(),
+            datasheet: self.datasheet.clone(),
+            description: self.description.clone(),
+            model_3d: self.model_3d.clone(),
+            model_3d_data: self.model_3d_data.clone(),
+            model_3d_rotation: self.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0)),
+            model_3d_offset: self.model_3d_offset.unwrap_or((0.0, 0.0, 0.0)),
+        }
+    }
+}
+
+impl ElectricalFields {
+    /// Merge `other`'s values into `self`, preserving any explicitly-set values.
+    /// `kind` is always overwritten; other fields use `or` semantics.
+    pub fn merge_from(&mut self, other: &Self) {
+        self.kind = other.kind.clone();
+        if let Some(bw) = other.bw_mhz {
+            self.bw_mhz = self.bw_mhz.or(Some(bw));
+        }
+        if let Some(v) = other.v {
+            self.v = self.v.or(Some(v));
+        }
+        if let Some(v_min) = other.v_min {
+            self.v_min = self.v_min.or(Some(v_min));
+        }
+        if let Some(v_max) = other.v_max {
+            self.v_max = self.v_max.or(Some(v_max));
+        }
+        if let Some(i) = other.i {
+            self.i = self.i.or(Some(i));
+        }
+        if let Some(i_max) = other.i_max {
+            self.i_max = self.i_max.or(Some(i_max));
+        }
+        if let Some(nc) = other.nc {
+            self.nc = self.nc.or(Some(nc));
+        }
+    }
+}
+
+pub fn fmt_f64(v: f64) -> String {
+    format!("{:?}", v)
 }
 
 /// Generate a Rust source file from all `*.toml` files in `definitions_dir`.
@@ -711,10 +715,6 @@ fn default_mech_pad_type() -> String {
 
 fn default_mech_shape() -> String {
     "circle".into()
-}
-
-pub fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
 }
 
 fn load_template(path: &str) -> Result<MustacheRenderer, CodegenError> {

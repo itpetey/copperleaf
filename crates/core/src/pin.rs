@@ -2,6 +2,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::units::{Amp, Hertz, Ohm, Qty, Second, UnitExt, Volt};
 
+/// Default drill for through-hole pads, in mm (0.3 in).
+pub const DEFAULT_DRILL: f64 = 0.762;
+/// Default pad size when no geometry is present, in mm.
+pub const DEFAULT_PAD_SIZE: f64 = 1.524;
+/// Default layers for through-hole pads.
+pub const PTH_LAYERS: &str = "*.Cu *.Mask";
+/// Default layers for SMD pads.
+pub const SMD_LAYERS: &str = "F.Cu F.Mask F.Paste";
+
 /// Footprint pad type as defined by KiCad.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PadType {
@@ -221,6 +230,52 @@ pub struct RawConnection {
     pub id: usize,
 }
 
+impl PadType {
+    /// Return the KiCad string representation of this pad type.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PadType::Smd => "smd",
+            PadType::ThruHole => "thru_hole",
+            PadType::NpThruHole => "np_thru_hole",
+            PadType::Connect => "connect",
+        }
+    }
+
+    /// Parse a KiCad pad-type string.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "smd" => Some(PadType::Smd),
+            "thru_hole" => Some(PadType::ThruHole),
+            "np_thru_hole" => Some(PadType::NpThruHole),
+            "connect" => Some(PadType::Connect),
+            _ => None,
+        }
+    }
+}
+
+impl PadShape {
+    /// Return the KiCad string representation of this pad shape.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PadShape::Rect => "rect",
+            PadShape::RoundRect => "roundrect",
+            PadShape::Circle => "circle",
+            PadShape::Oval => "oval",
+        }
+    }
+
+    /// Parse a KiCad pad-shape string.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "rect" => Some(PadShape::Rect),
+            "roundrect" => Some(PadShape::RoundRect),
+            "circle" => Some(PadShape::Circle),
+            "oval" => Some(PadShape::Oval),
+            _ => None,
+        }
+    }
+}
+
 impl SigSpec {
     pub fn new(
         kind: SigKind,
@@ -373,52 +428,6 @@ impl Pin {
     /// Drill diameter in millimetres (thru-hole pads only).
     pub fn drill(&self) -> Option<f64> {
         self.pad.as_ref().and_then(|p| p.drill)
-    }
-}
-
-impl PadType {
-    /// Return the KiCad string representation of this pad type.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            PadType::Smd => "smd",
-            PadType::ThruHole => "thru_hole",
-            PadType::NpThruHole => "np_thru_hole",
-            PadType::Connect => "connect",
-        }
-    }
-
-    /// Parse a KiCad pad-type string.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "smd" => Some(PadType::Smd),
-            "thru_hole" => Some(PadType::ThruHole),
-            "np_thru_hole" => Some(PadType::NpThruHole),
-            "connect" => Some(PadType::Connect),
-            _ => None,
-        }
-    }
-}
-
-impl PadShape {
-    /// Return the KiCad string representation of this pad shape.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            PadShape::Rect => "rect",
-            PadShape::RoundRect => "roundrect",
-            PadShape::Circle => "circle",
-            PadShape::Oval => "oval",
-        }
-    }
-
-    /// Parse a KiCad pad-shape string.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "rect" => Some(PadShape::Rect),
-            "roundrect" => Some(PadShape::RoundRect),
-            "circle" => Some(PadShape::Circle),
-            "oval" => Some(PadShape::Oval),
-            _ => None,
-        }
     }
 }
 
@@ -769,24 +778,99 @@ impl PinBuilder {
     }
 }
 
-// ── Pad resolution (the single source of truth for all defaulting rules) ──
-
-/// Default drill for through-hole pads, in mm (0.3 in).
-pub const DEFAULT_DRILL: f64 = 0.762;
-
-/// Default pad size when no geometry is present, in mm.
-pub const DEFAULT_PAD_SIZE: f64 = 1.524;
-
-/// Default layers for through-hole pads.
-pub const PTH_LAYERS: &str = "*.Cu *.Mask";
-
-/// Default layers for SMD pads.
-pub const SMD_LAYERS: &str = "F.Cu F.Mask F.Paste";
-
 /// Auto-layout position for pins without explicit pad positions: a single
 /// horizontal row at 2.54 mm pitch with pad 1 at the origin (KLC F7.2).
 pub fn auto_pad_pos(index: usize) -> (f64, f64) {
     (index as f64 * 2.54, 0.0)
+}
+
+/// Normalise footprint pad anchor positions per KLC:
+///
+/// - Footprints with any SMD pad are recentred so the pad bounding box is
+///   centred on the origin (KLC F6.2).
+/// - Pure through-hole footprints with explicit positions are translated so
+///   pad 1 sits at the origin (KLC F7.2).
+/// - Fully automatic footprints (all pads on the 2.54 mm auto-row grid
+///   starting from origin) are left untouched.
+pub fn normalise_anchor(pads: &mut [Pad]) {
+    if pads.is_empty() {
+        return;
+    }
+
+    // Check if every pad follows the pure auto-row pattern (i * 2.54, 0.0).
+    // If they do, pad 1 is already at the origin and no normalisation is needed.
+    let all_auto = pads.iter().all(|p| (p.pos.1 * 1000.0).round() == 0.0)
+        && pads
+            .iter()
+            .enumerate()
+            .all(|(i, p)| ((p.pos.0 - auto_pad_pos(i).0) * 1000.0).round() == 0.0);
+    if all_auto {
+        return;
+    }
+
+    let any_smd = pads.iter().any(|p| p.pad_type == PadType::Smd);
+    if any_smd {
+        // Recentre on the pad bounding box.
+        if let Some((x1, y1, x2, y2)) = pad_extent(pads) {
+            let cx = (x1 + x2) / 2.0;
+            let cy = (y1 + y2) / 2.0;
+            for p in pads.iter_mut() {
+                p.pos.0 -= cx;
+                p.pos.1 -= cy;
+            }
+        }
+    } else if let Some(anchor) = pads.first().map(|p| p.pos) {
+        // Through-hole: first pad (the first electrical pin) at the origin.
+        for p in pads.iter_mut() {
+            p.pos.0 -= anchor.0;
+            p.pos.1 -= anchor.1;
+        }
+    }
+}
+
+/// Compute the axis-aligned bounding box of a set of pads.
+///
+/// Returns `(min_x, min_y, max_x, max_y)` or `None` if the slice is empty.
+pub fn pad_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
+    if pads.is_empty() {
+        return None;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for p in pads {
+        let hw = p.width / 2.0;
+        let hh = p.height / 2.0;
+        min_x = min_x.min(p.pos.0 - hw);
+        min_y = min_y.min(p.pos.1 - hh);
+        max_x = max_x.max(p.pos.0 + hw);
+        max_y = max_y.max(p.pos.1 + hh);
+    }
+    Some((min_x, min_y, max_x, max_y))
+}
+
+/// Resolve a mechanical pad to fully-populated geometry for emission.
+///
+/// Mechanical pads receive:
+/// - Number normalisation: `"None"` → empty string.
+/// - Layer default: `"*.Cu *.Mask"` when not set.
+/// - Drill: values ≤ 0 normalised to `None`.
+pub fn resolve_mech_pad(pad: &Pad) -> Pad {
+    let number = if pad.number.eq_ignore_ascii_case("none") {
+        String::new()
+    } else {
+        pad.number.clone()
+    };
+    let layers = pad.layers.clone().unwrap_or_else(|| PTH_LAYERS.to_string());
+    let drill = pad.drill.filter(|&d| d > 0.0);
+
+    Pad {
+        number,
+        layers: Some(layers),
+        drill,
+        ..pad.clone()
+    }
 }
 
 /// Resolve a pin's pad to fully-populated geometry for emission.
@@ -912,95 +996,6 @@ pub fn resolve_pad(pin: &Pin, index: usize) -> Pad {
         layers: Some(layers),
         drill,
     }
-}
-
-/// Resolve a mechanical pad to fully-populated geometry for emission.
-///
-/// Mechanical pads receive:
-/// - Number normalisation: `"None"` → empty string.
-/// - Layer default: `"*.Cu *.Mask"` when not set.
-/// - Drill: values ≤ 0 normalised to `None`.
-pub fn resolve_mech_pad(pad: &Pad) -> Pad {
-    let number = if pad.number.eq_ignore_ascii_case("none") {
-        String::new()
-    } else {
-        pad.number.clone()
-    };
-    let layers = pad.layers.clone().unwrap_or_else(|| PTH_LAYERS.to_string());
-    let drill = pad.drill.filter(|&d| d > 0.0);
-
-    Pad {
-        number,
-        layers: Some(layers),
-        drill,
-        ..pad.clone()
-    }
-}
-
-/// Normalise footprint pad anchor positions per KLC:
-///
-/// - Footprints with any SMD pad are recentred so the pad bounding box is
-///   centred on the origin (KLC F6.2).
-/// - Pure through-hole footprints with explicit positions are translated so
-///   pad 1 sits at the origin (KLC F7.2).
-/// - Fully automatic footprints (all pads on the 2.54 mm auto-row grid
-///   starting from origin) are left untouched.
-pub fn normalise_anchor(pads: &mut [Pad]) {
-    if pads.is_empty() {
-        return;
-    }
-
-    // Check if every pad follows the pure auto-row pattern (i * 2.54, 0.0).
-    // If they do, pad 1 is already at the origin and no normalisation is needed.
-    let all_auto = pads.iter().all(|p| (p.pos.1 * 1000.0).round() == 0.0)
-        && pads
-            .iter()
-            .enumerate()
-            .all(|(i, p)| ((p.pos.0 - auto_pad_pos(i).0) * 1000.0).round() == 0.0);
-    if all_auto {
-        return;
-    }
-
-    let any_smd = pads.iter().any(|p| p.pad_type == PadType::Smd);
-    if any_smd {
-        // Recentre on the pad bounding box.
-        if let Some((x1, y1, x2, y2)) = pad_extent(pads) {
-            let cx = (x1 + x2) / 2.0;
-            let cy = (y1 + y2) / 2.0;
-            for p in pads.iter_mut() {
-                p.pos.0 -= cx;
-                p.pos.1 -= cy;
-            }
-        }
-    } else if let Some(anchor) = pads.first().map(|p| p.pos) {
-        // Through-hole: first pad (the first electrical pin) at the origin.
-        for p in pads.iter_mut() {
-            p.pos.0 -= anchor.0;
-            p.pos.1 -= anchor.1;
-        }
-    }
-}
-
-/// Compute the axis-aligned bounding box of a set of pads.
-///
-/// Returns `(min_x, min_y, max_x, max_y)` or `None` if the slice is empty.
-pub fn pad_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
-    if pads.is_empty() {
-        return None;
-    }
-    let mut min_x = f64::INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-    for p in pads {
-        let hw = p.width / 2.0;
-        let hh = p.height / 2.0;
-        min_x = min_x.min(p.pos.0 - hw);
-        min_y = min_y.min(p.pos.1 - hh);
-        max_x = max_x.max(p.pos.0 + hw);
-        max_y = max_y.max(p.pos.1 + hh);
-    }
-    Some((min_x, min_y, max_x, max_y))
 }
 
 #[cfg(test)]

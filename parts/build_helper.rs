@@ -1,12 +1,12 @@
-// Shared build helper for parts crates.
-//
-// The `build_component!` proc-macro reads `.toml` files at compile time via
-// `std::fs::read_to_string`, but cargo does not track those file reads
-// automatically.  This script emits `cargo:rerun-if-changed` directives for
-// every TOML file in the crate root so editing a part manifest triggers a
-// recompile.
-//
-// Included by every `parts/*/build.rs`.
+/// Shared build helper for parts crates.
+///
+/// The `build_component!` proc-macro reads `.toml` files at compile time via
+/// `std::fs::read_to_string`, but cargo does not track those file reads
+/// automatically.  This script emits `cargo:rerun-if-changed` directives for
+/// every TOML file in the crate root so editing a part manifest triggers a
+/// recompile.
+///
+/// Included by every `parts/*/build.rs`.
 
 use std::{env, fs, path::Path};
 

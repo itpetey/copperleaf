@@ -30,42 +30,6 @@ pub trait Backend {
     fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error>;
 }
 
-/// Non-electrical metadata for a component — symbol/footprint library identifiers,
-/// datasheet URL, description, and 3D model data.
-#[derive(Clone, Debug, Default)]
-pub struct ComponentMeta {
-    /// Symbol library identifier (e.g. `"RP2354A"` or `"MCU_RaspberryPi:RP2354A"`).
-    pub symbol: Option<String>,
-    /// Footprint name. Names without a `:` are project-local.
-    pub footprint: Option<String>,
-    /// Datasheet URL.
-    pub datasheet: Option<String>,
-    /// Human-readable description.
-    pub description: Option<String>,
-    /// Path to a 3D model file (`.step` / `.stp`).
-    pub model_3d: Option<String>,
-    /// Base64-encoded 3D model content, decoded during emit.
-    pub model_3d_data: Option<String>,
-    /// 3D model rotation in degrees (x, y, z).
-    pub model_3d_rotation: (f64, f64, f64),
-    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
-    pub model_3d_offset: (f64, f64, f64),
-}
-
-impl ComponentMeta {
-    /// An empty metadata value — all fields `None` / zero.
-    pub const EMPTY: &Self = &ComponentMeta {
-        symbol: None,
-        footprint: None,
-        datasheet: None,
-        description: None,
-        model_3d: None,
-        model_3d_data: None,
-        model_3d_rotation: (0.0, 0.0, 0.0),
-        model_3d_offset: (0.0, 0.0, 0.0),
-    };
-}
-
 /// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
 pub trait Component {
     /// Retrieves all [`Pin`]s attached to the [`Component`].
@@ -99,6 +63,28 @@ pub trait Component {
     }
 }
 
+/// Non-electrical metadata for a component — symbol/footprint library identifiers,
+/// datasheet URL, description, and 3D model data.
+#[derive(Clone, Debug, Default)]
+pub struct ComponentMeta {
+    /// Symbol library identifier (e.g. `"RP2354A"` or `"MCU_RaspberryPi:RP2354A"`).
+    pub symbol: Option<String>,
+    /// Footprint name. Names without a `:` are project-local.
+    pub footprint: Option<String>,
+    /// Datasheet URL.
+    pub datasheet: Option<String>,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// Path to a 3D model file (`.step` / `.stp`).
+    pub model_3d: Option<String>,
+    /// Base64-encoded 3D model content, decoded during emit.
+    pub model_3d_data: Option<String>,
+    /// 3D model rotation in degrees (x, y, z).
+    pub model_3d_rotation: (f64, f64, f64),
+    /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
+    pub model_3d_offset: (f64, f64, f64),
+}
+
 /// Common backend errors.
 #[derive(Debug, thiserror::Error)]
 pub enum BackendError {
@@ -112,6 +98,20 @@ pub enum BackendError {
 #[derive(Clone, Debug, thiserror::Error)]
 pub struct CompileError {
     pub errors: Vec<Diagnostic>,
+}
+
+impl ComponentMeta {
+    /// An empty metadata value — all fields `None` / zero.
+    pub const EMPTY: &Self = &ComponentMeta {
+        symbol: None,
+        footprint: None,
+        datasheet: None,
+        description: None,
+        model_3d: None,
+        model_3d_data: None,
+        model_3d_rotation: (0.0, 0.0, 0.0),
+        model_3d_offset: (0.0, 0.0, 0.0),
+    };
 }
 
 impl CompileError {

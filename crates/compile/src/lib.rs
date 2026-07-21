@@ -26,6 +26,9 @@ use copperleaf::{
 };
 use copperleaf_parts_passives::footprint::Package;
 
+/// Re-exported from `copperleaf` so callers have a single `CompileError` type.
+pub use copperleaf::CompileError;
+
 /// Default footprint package for synthesised decoupling capacitors.
 const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
 
@@ -49,9 +52,6 @@ pub struct CompileReport {
     pub warnings: Vec<Diagnostic>,
     pub summary: CompileSummary,
 }
-
-/// Re-exported from `copperleaf` so callers have a single `CompileError` type.
-pub use copperleaf::CompileError;
 
 /// Intermediate data structure produced by a union-find pass over the raw
 /// connections.  Maps connected pins into equivalence classes (nets).
@@ -314,6 +314,106 @@ fn build_summary(board: &CompiledBoard) -> CompileSummary {
     }
 }
 
+/// Type-erase [`Component`] trait objects into [`CompiledComponent`]s with
+/// deterministic pin IDs.
+fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
+    entries
+        .iter()
+        .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
+        .collect()
+}
+
+fn ground_net_idx_and_fallback(board: &CompiledBoard) -> (NetIdx, Option<Net>) {
+    if let Some(idx) = board.find_net("GND") {
+        return (idx, None);
+    }
+    if let Some(idx) = board.nets.iter().position(|n| n.is_ground()) {
+        return (NetIdx(idx), None);
+    }
+    // Fallback: fresh ground net will be appended at current length.
+    let idx = NetIdx(board.nets.len());
+    let net = Net {
+        name: "GND".into(),
+        kind: NetKind::Power {
+            v_nom: 0.0.volt(),
+            ripple: None,
+        },
+        class: NetClass::default(),
+        constraints: vec![],
+    };
+    (idx, Some(net))
+}
+
+/// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
+/// footprint from the passives library.
+fn make_capacitor_component(
+    refdes: &str,
+    value: Qty<Farad>,
+    package: Package,
+) -> CompiledComponent {
+    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
+    CompiledComponent::from_component(refdes, &cap)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn place_decoupling_set(
+    board: &CompiledBoard,
+    comp_idx: usize,
+    comp: &CompiledComponent,
+    pin: &Pin,
+    values: &[Qty<Farad>],
+    package: Package,
+    gnd_net_idx: NetIdx,
+    components: &mut Vec<CompiledComponent>,
+    connections: &mut Vec<Connection>,
+    diagnostics: &mut Vec<Diagnostic>,
+    next_c: &mut u32,
+) {
+    let net_idx = board
+        .connections
+        .iter()
+        .find(|c| c.component == comp_idx && c.pin == pin.name())
+        .map(|c| c.net);
+
+    let Some(net_idx) = net_idx else {
+        diagnostics.push(Diagnostic {
+            code: "DECOUPLE:UNCONNECTED".into(),
+            severity: Severity::Warning,
+            message: format!(
+                "power pin {}.{} is not connected to a net",
+                comp.refdes,
+                pin.name()
+            ),
+            entities: vec![format!("{}.{}", comp.refdes, pin.name())],
+            hint: Some("connect the pin to a power net".into()),
+        });
+        return;
+    };
+
+    // Skip pins that are tied directly to ground (e.g. VDD_USB in SPI mode).
+    if board.net(net_idx).is_ground() {
+        return;
+    }
+
+    for value in values {
+        let refdes = format!("C{}", *next_c);
+        *next_c += 1;
+
+        let comp_idx_in_final = board.components.len() + components.len();
+        components.push(make_capacitor_component(&refdes, *value, package));
+        connections.push(Connection {
+            component: comp_idx_in_final,
+            pin: "1".into(),
+            net: net_idx,
+        });
+        connections.push(Connection {
+            component: comp_idx_in_final,
+            pin: "2".into(),
+            net: gnd_net_idx,
+        });
+    }
+}
+
 /// Resolve one net's name and kind in a single pass.
 ///
 /// Precedence, in order:
@@ -465,106 +565,6 @@ fn resolve_net(
     };
 
     (name, kind)
-}
-
-/// Type-erase [`Component`] trait objects into [`CompiledComponent`]s with
-/// deterministic pin IDs.
-fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
-    entries
-        .iter()
-        .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
-        .collect()
-}
-
-fn ground_net_idx_and_fallback(board: &CompiledBoard) -> (NetIdx, Option<Net>) {
-    if let Some(idx) = board.find_net("GND") {
-        return (idx, None);
-    }
-    if let Some(idx) = board.nets.iter().position(|n| n.is_ground()) {
-        return (NetIdx(idx), None);
-    }
-    // Fallback: fresh ground net will be appended at current length.
-    let idx = NetIdx(board.nets.len());
-    let net = Net {
-        name: "GND".into(),
-        kind: NetKind::Power {
-            v_nom: 0.0.volt(),
-            ripple: None,
-        },
-        class: NetClass::default(),
-        constraints: vec![],
-    };
-    (idx, Some(net))
-}
-
-/// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
-/// footprint from the passives library.
-fn make_capacitor_component(
-    refdes: &str,
-    value: Qty<Farad>,
-    package: Package,
-) -> CompiledComponent {
-    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
-    CompiledComponent::from_component(refdes, &cap)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn place_decoupling_set(
-    board: &CompiledBoard,
-    comp_idx: usize,
-    comp: &CompiledComponent,
-    pin: &Pin,
-    values: &[Qty<Farad>],
-    package: Package,
-    gnd_net_idx: NetIdx,
-    components: &mut Vec<CompiledComponent>,
-    connections: &mut Vec<Connection>,
-    diagnostics: &mut Vec<Diagnostic>,
-    next_c: &mut u32,
-) {
-    let net_idx = board
-        .connections
-        .iter()
-        .find(|c| c.component == comp_idx && c.pin == pin.name())
-        .map(|c| c.net);
-
-    let Some(net_idx) = net_idx else {
-        diagnostics.push(Diagnostic {
-            code: "DECOUPLE:UNCONNECTED".into(),
-            severity: Severity::Warning,
-            message: format!(
-                "power pin {}.{} is not connected to a net",
-                comp.refdes,
-                pin.name()
-            ),
-            entities: vec![format!("{}.{}", comp.refdes, pin.name())],
-            hint: Some("connect the pin to a power net".into()),
-        });
-        return;
-    };
-
-    // Skip pins that are tied directly to ground (e.g. VDD_USB in SPI mode).
-    if board.net(net_idx).is_ground() {
-        return;
-    }
-
-    for value in values {
-        let refdes = format!("C{}", *next_c);
-        *next_c += 1;
-
-        let comp_idx_in_final = board.components.len() + components.len();
-        components.push(make_capacitor_component(&refdes, *value, package));
-        connections.push(Connection {
-            component: comp_idx_in_final,
-            pin: "1".into(),
-            net: net_idx,
-        });
-        connections.push(Connection {
-            component: comp_idx_in_final,
-            pin: "2".into(),
-            net: gnd_net_idx,
-        });
-    }
 }
 
 /// Synthesise decoupling capacitors from part-level [`Constraint::Decoupling`] rules.

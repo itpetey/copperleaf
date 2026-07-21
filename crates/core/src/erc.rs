@@ -16,14 +16,6 @@ use crate::{
     units::{Diagnostic, Severity},
 };
 
-/// Returns `true` if the pin is intentionally no-connect.
-///
-/// Checks the semantic `nc` flag first; falls back to name-prefix matching
-/// for hand-written parts that use `NC`/`NC_*` naming convention.
-fn is_nc_pin(pin: &Pin) -> bool {
-    pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_")
-}
-
 /// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
 pub fn erc_floating_inputs(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
@@ -144,6 +136,14 @@ pub fn run_erc(board: &CompiledBoard) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
     errors.extend(erc_nc_pin_connected(&view));
 
     (warnings, errors)
+}
+
+/// Returns `true` if the pin is intentionally no-connect.
+///
+/// Checks the semantic `nc` flag first; falls back to name-prefix matching
+/// for hand-written parts that use `NC`/`NC_*` naming convention.
+fn is_nc_pin(pin: &Pin) -> bool {
+    pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_")
 }
 
 #[cfg(test)]

@@ -19,9 +19,9 @@ use copperleaf_backend_kicad::KiCad;
 
 /// When set, the test runs in child mode: emit the board into this directory.
 const ENV_OUT_DIR: &str = "COPPERLEAF_DETERMINISM_OUT";
-const TEST_NAME: &str = "emit_is_byte_identical_across_processes";
-const PROJECT: &str = "det";
 const FILES: [&str; 4] = ["det.kicad_pro", "det.kicad_sch", "det.kicad_pcb", "det.net"];
+const PROJECT: &str = "det";
+const TEST_NAME: &str = "emit_is_byte_identical_across_processes";
 
 struct PwrSource {
     pins: Vec<Pin>,

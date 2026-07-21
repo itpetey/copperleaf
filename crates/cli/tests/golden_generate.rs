@@ -13,16 +13,70 @@ use std::{
     process::Command,
 };
 
+/// Compare `actual` against the golden file at `path`, or overwrite the
+/// golden file when running with `COPPERLEAF_BLESS=1`.
+fn compare_or_bless(path: &Path, actual: &str) {
+    if std::env::var_os("COPPERLEAF_BLESS").is_some() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, actual).unwrap();
+        return;
+    }
+    let expected = std::fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!(
+            "missing golden {}: {e} — run with COPPERLEAF_BLESS=1 to create it",
+            path.display()
+        )
+    });
+    assert_eq!(
+        expected,
+        actual,
+        "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
+        path.display()
+    );
+}
+
 fn copperleaf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cl"))
 }
 
-fn parts_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts")
+#[test]
+fn generate_footprint_matches_goldens() {
+    let tomls = parts_tomls();
+    assert!(!tomls.is_empty(), "no parts TOMLs found");
+    let dir = tempfile::tempdir().unwrap();
+    for (vendor, stem, path) in &tomls {
+        let out = dir.path().join(format!("{vendor}-{stem}.kicad_mod"));
+        run_generate("footprint", path, &out);
+        let actual = std::fs::read_to_string(&out).unwrap();
+        compare_or_bless(
+            &golden_dir().join(vendor).join(format!("{stem}.kicad_mod")),
+            &actual,
+        );
+    }
+}
+
+#[test]
+fn generate_symbol_matches_goldens() {
+    let tomls = parts_tomls();
+    assert!(!tomls.is_empty(), "no parts TOMLs found");
+    let dir = tempfile::tempdir().unwrap();
+    for (vendor, stem, path) in &tomls {
+        let out = dir.path().join(format!("{vendor}-{stem}.kicad_sym"));
+        run_generate("symbol", path, &out);
+        let actual = std::fs::read_to_string(&out).unwrap();
+        compare_or_bless(
+            &golden_dir().join(vendor).join(format!("{stem}.kicad_sym")),
+            &actual,
+        );
+    }
 }
 
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/generate")
+}
+
+fn parts_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts")
 }
 
 /// All parts-crate TOML files, as `(crate_name, file_stem, path)` triples in
@@ -56,28 +110,6 @@ fn parts_tomls() -> Vec<(String, String, PathBuf)> {
     out
 }
 
-/// Compare `actual` against the golden file at `path`, or overwrite the
-/// golden file when running with `COPPERLEAF_BLESS=1`.
-fn compare_or_bless(path: &Path, actual: &str) {
-    if std::env::var_os("COPPERLEAF_BLESS").is_some() {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, actual).unwrap();
-        return;
-    }
-    let expected = std::fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!(
-            "missing golden {}: {e} — run with COPPERLEAF_BLESS=1 to create it",
-            path.display()
-        )
-    });
-    assert_eq!(
-        expected,
-        actual,
-        "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
-        path.display()
-    );
-}
-
 fn run_generate(kind: &str, toml: &Path, out: &Path) {
     let status = copperleaf()
         .arg("generate")
@@ -92,36 +124,4 @@ fn run_generate(kind: &str, toml: &Path, out: &Path) {
         "cl generate {kind} failed for {}",
         toml.display()
     );
-}
-
-#[test]
-fn generate_footprint_matches_goldens() {
-    let tomls = parts_tomls();
-    assert!(!tomls.is_empty(), "no parts TOMLs found");
-    let dir = tempfile::tempdir().unwrap();
-    for (vendor, stem, path) in &tomls {
-        let out = dir.path().join(format!("{vendor}-{stem}.kicad_mod"));
-        run_generate("footprint", path, &out);
-        let actual = std::fs::read_to_string(&out).unwrap();
-        compare_or_bless(
-            &golden_dir().join(vendor).join(format!("{stem}.kicad_mod")),
-            &actual,
-        );
-    }
-}
-
-#[test]
-fn generate_symbol_matches_goldens() {
-    let tomls = parts_tomls();
-    assert!(!tomls.is_empty(), "no parts TOMLs found");
-    let dir = tempfile::tempdir().unwrap();
-    for (vendor, stem, path) in &tomls {
-        let out = dir.path().join(format!("{vendor}-{stem}.kicad_sym"));
-        run_generate("symbol", path, &out);
-        let actual = std::fs::read_to_string(&out).unwrap();
-        compare_or_bless(
-            &golden_dir().join(vendor).join(format!("{stem}.kicad_sym")),
-            &actual,
-        );
-    }
 }
