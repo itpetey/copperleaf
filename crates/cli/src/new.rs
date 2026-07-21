@@ -4,7 +4,7 @@ use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{find_symbol, parse_symbol_lib};
 use copperleaf_part_codegen::{ComponentMeta, Manifest};
 
-use crate::{CliError, NewArgs, kindmap::KindMap, manifest, update, vendor};
+use crate::{CliError, NewArgs, kindmap::KindMap, manifest, vendor};
 
 pub fn run(args: NewArgs) -> Result<(), CliError> {
     let kindmap = KindMap::load(args.kind_map.as_deref())?;
@@ -27,7 +27,6 @@ pub fn run(args: NewArgs) -> Result<(), CliError> {
 fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
     let manifest = crate::llm::new_from_datasheet(path, args)?;
 
-    // Determine the identifier to use for filenames and scaffolding.
     let lib_id = args
         .lib_id
         .clone()
@@ -88,13 +87,13 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
         .model_3d
         .clone()
         .or(extracted_model)
-        .or_else(|| update::find_step_file_alongside(footprint_path));
+        .or_else(|| manifest::find_step_file_alongside(footprint_path));
     let title = args.title.clone().unwrap_or_else(|| lib_id.clone());
     let description = args.description.clone();
     let mut manifest = manifest::manifest_from_footprint(
         &pads,
         ComponentMeta {
-            name: struct_name(&lib_id),
+            name: manifest::struct_name(&lib_id),
             title,
             description,
             datasheet: None,
@@ -150,7 +149,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
     let description = args.description.clone();
     let mut manifest = Manifest {
         component: ComponentMeta {
-            name: struct_name(&lib_id),
+            name: manifest::struct_name(&lib_id),
             title,
             description,
             datasheet: symbol.datasheet.clone(),
@@ -173,42 +172,6 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
     Ok(())
 }
 
-fn struct_name(lib_id: &str) -> String {
-    let mut out = String::new();
-    let mut first = true;
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            if first {
-                out.push(ch.to_ascii_uppercase());
-            } else {
-                out.push(ch.to_ascii_lowercase());
-            }
-            first = false;
-        } else {
-            first = true;
-        }
-    }
-    if out.is_empty() {
-        out.push_str("Part");
-    }
-    out
-}
-
-fn toml_filename(lib_id: &str) -> String {
-    let mut out = String::new();
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        out.push_str("part");
-    }
-    format!("{}.toml", out)
-}
-
 fn write_output(
     args: &NewArgs,
     lib_id: &str,
@@ -226,7 +189,7 @@ fn write_output(
         vendor::scaffold(&root, vendor, lib_id)?;
         PathBuf::from("parts")
             .join(vendor)
-            .join(toml_filename(lib_id))
+            .join(format!("{}.toml", manifest::toml_stem(lib_id)))
     } else {
         print!("{}", output);
         return Ok(());
@@ -244,14 +207,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn toml_filename_normalises() {
-        assert_eq!(toml_filename("RP2354A"), "rp2354a.toml");
-        assert_eq!(toml_filename("MM8108-MF15457"), "mm8108_mf15457.toml");
+    fn toml_stem_normalises() {
+        assert_eq!(manifest::toml_stem("RP2354A"), "rp2354a");
+        assert_eq!(manifest::toml_stem("MM8108-MF15457"), "mm8108_mf15457");
     }
 
     #[test]
     fn struct_name_normalises() {
-        assert_eq!(struct_name("RP2354A"), "Rp2354a");
-        assert_eq!(struct_name("MM8108-MF15457"), "Mm8108Mf15457");
+        assert_eq!(manifest::struct_name("RP2354A"), "Rp2354a");
+        assert_eq!(manifest::struct_name("MM8108-MF15457"), "Mm8108Mf15457");
     }
 }

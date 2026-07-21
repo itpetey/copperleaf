@@ -11,16 +11,24 @@
 use crate::{
     board::{BoardView, CompiledBoard},
     net::NetKind,
-    pin::Role,
+    pin::{Pin, Role},
     units::{Diagnostic, Severity},
 };
+
+/// Returns `true` if the pin is intentionally no-connect.
+///
+/// Checks the semantic `nc` flag first; falls back to name-prefix matching
+/// for hand-written parts that use `NC`/`NC_*` naming convention.
+fn is_nc_pin(pin: &Pin) -> bool {
+    pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_")
+}
 
 /// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
 pub fn erc_floating_inputs(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for (comp_idx, comp) in view.board.components.iter().enumerate() {
         for (pin_idx, pin) in comp.pins.iter().enumerate() {
-            if pin.name() == "NC" || pin.name().starts_with("NC_") {
+            if is_nc_pin(pin) {
                 continue;
             }
             if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn)
@@ -69,9 +77,7 @@ pub fn erc_nc_pin_connected(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     for (comp_idx, comp) in view.board.components.iter().enumerate() {
         for (pin_idx, pin) in comp.pins.iter().enumerate() {
-            if (pin.name() == "NC" || pin.name().starts_with("NC_"))
-                && view.connected.contains(&(comp_idx, pin_idx))
-            {
+            if is_nc_pin(pin) && view.connected.contains(&(comp_idx, pin_idx)) {
                 diags.push(Diagnostic {
                     code: "ERC:NC_CONNECTED".into(),
                     severity: Severity::Error,
@@ -143,30 +149,18 @@ pub fn run_erc(board: &CompiledBoard) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
 mod tests {
     use super::*;
     use crate::{
-        ComponentMeta,
         board::{BoardView, CompiledComponent, Connection},
         net::{Constraint, Net, NetClass, NetIdx},
         pin::Pin,
         units::UnitExt,
     };
 
-    fn make_comp(refdes: &str, pins: Vec<Pin>, constraints: Vec<Constraint>) -> CompiledComponent {
-        CompiledComponent {
-            refdes: refdes.to_owned(),
-            meta: ComponentMeta::default(),
-            pins,
-            mechanical: vec![],
-            constraints,
-        }
-    }
-
     #[test]
     fn overvoltage_detected() {
         let board = CompiledBoard {
-            components: vec![make_comp(
+            components: vec![CompiledComponent::test(
                 "U1",
                 vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],
-                vec![],
             )],
             nets: vec![Net {
                 name: "VBUS".into(),
@@ -195,7 +189,7 @@ mod tests {
     #[test]
     fn nc_pin_connected_flags_connected_nc_pin() {
         let board = CompiledBoard {
-            components: vec![make_comp("U1", vec![Pin::build("NC").dio()], vec![])],
+            components: vec![CompiledComponent::test("U1", vec![Pin::build("NC").dio()])],
             nets: vec![Net {
                 name: "NET".into(),
                 kind: NetKind::Power {
@@ -223,7 +217,10 @@ mod tests {
     #[test]
     fn floating_input_flags_unconnected_digital_io() {
         let board = CompiledBoard {
-            components: vec![make_comp("U1", vec![Pin::build("GPIO").dio()], vec![])],
+            components: vec![CompiledComponent::test(
+                "U1",
+                vec![Pin::build("GPIO").dio()],
+            )],
             nets: vec![],
             connections: vec![],
             constraints: vec![],

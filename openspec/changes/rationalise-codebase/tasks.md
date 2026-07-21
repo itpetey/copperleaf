@@ -55,18 +55,18 @@
 
 ## 5. Phase 5 — CLI rationalisation (golden: byte-identical + TOML round-trip)
 
-- [ ] 5.1 Replace the hand-rolled `manifest.rs::serialise` with derived `toml::to_string` plus a `# TODO: fill …` post-pass; add round-trip goldens for every parts TOML before switching
-- [ ] 5.2 Unify `new`/`update` into one merge pipeline over a `Source` enum (new = merge into empty manifest), reusing Phase 1's shared helpers
-- [ ] 5.3 Flatten `KindEntry` onto the shared electrical-fields struct via `#[serde(flatten)]`
-- [ ] 5.4 Honour `nc`: codegen emits the marker on `Pin`; ERC checks `pin.nc()` with name-prefix fallback; merge/auto-wire tooling skips `nc` pins via the flag
-- [ ] 5.5 Replace the seven identical `parts/*/build.rs` files with a call into a shared helper
-- [ ] 5.6 Verify `cargo test --workspace`, clippy, fmt; confirm TOML round-trip goldens pass for all parts
+- [x] 5.1 Replace the hand-rolled `manifest.rs::serialise` with derived `toml::to_string` plus a `# TODO: fill …` post-pass; add round-trip goldens for every parts TOML before switching
+- [x] 5.2 Unify `new`/`update` into one merge pipeline over a `Source` enum (new = merge into empty manifest), reusing Phase 1's shared helpers
+- [x] 5.3 Flatten `KindEntry` onto the shared electrical-fields struct via `#[serde(flatten)]`
+- [x] 5.4 Honour `nc`: codegen emits the marker on `Pin`; ERC checks `pin.nc()` with name-prefix fallback; merge/auto-wire tooling skips `nc` pins via the flag
+- [x] 5.5 Replace the seven identical `parts/*/build.rs` files with a call into a shared helper
+- [x] 5.6 Verify `cargo test --workspace`, clippy, fmt; confirm TOML round-trip goldens pass for all parts
 
 ## 6. Phase 6 — Model honesty, docs, and close-out
 
-- [ ] 6.1 Refresh stale spec prose (e.g. `kicad-backend` Purpose, all `Purpose: TBD` sections) to match the rationalised reality
-- [ ] 6.2 Add a `CompiledComponent` test builder; delete the repeated 12-field test literals across ~8 test modules
-- [ ] 6.3 Sweep for remaining stringly-typed lookups and sentinel values; remove or document survivors
-- [ ] 6.4 Migrate the known downstream project (`halow-sta`) to the final API; verify its build and emission
-- [ ] 6.5 Final verification: `cargo test --workspace`, clippy (`-D warnings`), fmt, and a two-process determinism run
-- [ ] 6.6 Archive this change and sync the updated specs into `openspec/specs/`
+- [x] 6.1 Refresh stale spec prose (e.g. `kicad-backend` Purpose, all `Purpose: TBD` sections) to match the rationalised reality
+- [x] 6.2 Add a `CompiledComponent` test builder; delete the repeated 12-field test literals across ~8 test modules
+- [x] 6.3 Sweep for remaining stringly-typed lookups and sentinel values; remove or document survivors
+- [x] 6.4 Migrate the known downstream project (`halow-sta`) to the final API; verify its build and emission
+- [x] 6.5 Final verification: `cargo test --workspace`, clippy (`-D warnings`), fmt, and a two-process determinism run
+- [x] 6.6 Archive this change and sync the updated specs into `openspec/specs/`

@@ -379,7 +379,7 @@ fn new_symbol_matches_existing_rp2354a_part() {
             continue;
         };
         assert_eq!(generated_pin.num, existing_pin.num);
-        assert!(!generated_pin.kind.is_empty());
+        assert!(!generated_pin.electrical.kind.is_empty());
     }
 }
 

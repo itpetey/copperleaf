@@ -62,7 +62,7 @@ fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
             } else {
                 p.number.clone()
             },
-            role: kind_to_role(&p.kind),
+            role: kind_to_role(&p.electrical.kind),
         })
         .collect();
     let layout = sym_layout::layout_symbol(&layout_pins);
@@ -111,7 +111,7 @@ fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_part_codegen::{ComponentMeta, PinDef};
+    use copperleaf_part_codegen::{ComponentMeta, ElectricalFields, PinDef};
 
     fn pin_def(num: usize, name: &str, kind: &str) -> PinDef {
         PinDef {
@@ -120,17 +120,13 @@ mod tests {
             name: name.into(),
             purpose: "Test".into(),
             notes: String::new(),
-            kind: kind.into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
+            electrical: copperleaf_part_codegen::ElectricalFields {
+                kind: kind.into(),
+                ..Default::default()
+            },
             pos: None,
             rotation: None,
             length: None,
-            nc: None,
             width: None,
             height: None,
             pad_type: None,

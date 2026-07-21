@@ -142,6 +142,66 @@ impl ComponentMeta {
     }
 }
 
+/// Shared electrical fields used by both `PinDef` and the kind-map system.
+///
+/// Flattened into `PinDef` via `#[serde(flatten)]` so the TOML schema remains
+/// flat — no extra nesting.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ElectricalFields {
+    /// Pin kind selecting the builder expression to emit.
+    pub kind: String,
+    /// Bandwidth in MHz for clock and SPI pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bw_mhz: Option<f64>,
+    /// Fixed voltage for `pwr_fixed` pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<f64>,
+    /// Minimum voltage for flexible power pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v_min: Option<f64>,
+    /// Maximum voltage for flexible power pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v_max: Option<f64>,
+    /// Current for `pwr_fixed` pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i: Option<f64>,
+    /// Maximum current for flexible power pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i_max: Option<f64>,
+    /// True if the pin is a no-connect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nc: Option<bool>,
+}
+
+impl ElectricalFields {
+    /// Merge `other`'s values into `self`, preserving any explicitly-set values.
+    /// `kind` is always overwritten; other fields use `or` semantics.
+    pub fn merge_from(&mut self, other: &Self) {
+        self.kind = other.kind.clone();
+        if let Some(bw) = other.bw_mhz {
+            self.bw_mhz = self.bw_mhz.or(Some(bw));
+        }
+        if let Some(v) = other.v {
+            self.v = self.v.or(Some(v));
+        }
+        if let Some(v_min) = other.v_min {
+            self.v_min = self.v_min.or(Some(v_min));
+        }
+        if let Some(v_max) = other.v_max {
+            self.v_max = self.v_max.or(Some(v_max));
+        }
+        if let Some(i) = other.i {
+            self.i = self.i.or(Some(i));
+        }
+        if let Some(i_max) = other.i_max {
+            self.i_max = self.i_max.or(Some(i_max));
+        }
+        if let Some(nc) = other.nc {
+            self.nc = self.nc.or(Some(nc));
+        }
+    }
+}
+
 /// A thermal via that lives inside a pad (e.g. exposed thermal pad).
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ThermalViaDef {
@@ -169,26 +229,9 @@ pub struct PinDef {
     /// Additional notes rendered in the documentation table.
     #[serde(default)]
     pub notes: String,
-    /// Pin kind selecting the builder expression to emit.
-    pub kind: String,
-    /// Bandwidth in MHz for clock and SPI pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bw_mhz: Option<f64>,
-    /// Fixed voltage for `pwr_fixed` pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v: Option<f64>,
-    /// Minimum voltage for flexible power pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v_min: Option<f64>,
-    /// Maximum voltage for flexible power pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v_max: Option<f64>,
-    /// Current for `pwr_fixed` pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub i: Option<f64>,
-    /// Maximum current for flexible power pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub i_max: Option<f64>,
+    /// Electrical specification fields, flattened into the TOML table.
+    #[serde(flatten)]
+    pub electrical: ElectricalFields,
     /// Physical position in millimetres, extracted from KiCad symbols/footprints.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pos: Option<(f64, f64)>,
@@ -198,9 +241,6 @@ pub struct PinDef {
     /// Pin length in millimetres (largest dimension of the pad, for codegen).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub length: Option<f64>,
-    /// True if the pin is a no-connect.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nc: Option<bool>,
     // ── pad geometry (from footprint) ──
     /// Pad width in millimetres (X dimension from KiCad `(size W H)`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -447,14 +487,14 @@ pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
 
         // Required fields per kind.
         let mut missing = None;
-        for &field in required_fields(&pin.kind) {
+        for &field in required_fields(&pin.electrical.kind) {
             let ok = match field {
-                "bw_mhz" => pin.bw_mhz.is_some(),
-                "v_min" => pin.v_min.is_some(),
-                "v_max" => pin.v_max.is_some(),
-                "i_max" => pin.i_max.is_some(),
-                "v" => pin.v.is_some(),
-                "i" => pin.i.is_some(),
+                "bw_mhz" => pin.electrical.bw_mhz.is_some(),
+                "v_min" => pin.electrical.v_min.is_some(),
+                "v_max" => pin.electrical.v_max.is_some(),
+                "i_max" => pin.electrical.i_max.is_some(),
+                "v" => pin.electrical.v.is_some(),
+                "i" => pin.electrical.i.is_some(),
                 _ => true,
             };
             if !ok {
@@ -468,7 +508,7 @@ pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
                 severity: Severity::Error,
                 message: format!(
                     "Pin '{}' (kind '{}') is missing required field '{}'",
-                    pin.name, pin.kind, field
+                    pin.name, pin.electrical.kind, field
                 ),
                 entities: vec![pin.name.clone()],
                 hint: None,
@@ -476,7 +516,10 @@ pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
         }
 
         // Unresolved power pins.
-        if pin.kind == "pwr" && (pin.v_min.is_none() || pin.v_max.is_none() || pin.i_max.is_none())
+        if pin.electrical.kind == "pwr"
+            && (pin.electrical.v_min.is_none()
+                || pin.electrical.v_max.is_none()
+                || pin.electrical.i_max.is_none())
         {
             diags.push(Diagnostic {
                 code: "VALIDATE:UNRESOLVED_POWER".into(),
@@ -514,11 +557,11 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
     let missing = |field: &str| {
         Err(CodegenError::MissingField {
             name: pin.name.clone(),
-            kind: pin.kind.clone(),
+            kind: pin.electrical.kind.clone(),
             field: field.to_string(),
         })
     };
-    match pin.kind.as_str() {
+    match pin.electrical.kind.as_str() {
         "gnd" => Ok(format!("{}{}.gnd()", base, suffix)),
         "dio" => Ok(format!("{}{}.dio()", base, suffix)),
         "analog_in" => Ok(format!("{}{}.analog_in()", base, suffix)),
@@ -527,25 +570,25 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
             base, suffix
         )),
         "clk" => {
-            let Some(bw) = pin.bw_mhz else {
+            let Some(bw) = pin.electrical.bw_mhz else {
                 return missing("bw_mhz");
             };
             Ok(format!("{}{}.clk({})", base, suffix, fmt_f64(bw)))
         }
         "spi" => {
-            let Some(bw) = pin.bw_mhz else {
+            let Some(bw) = pin.electrical.bw_mhz else {
                 return missing("bw_mhz");
             };
             Ok(format!("{}{}.spi({})", base, suffix, fmt_f64(bw)))
         }
         "pwr" => {
-            let Some(vmin) = pin.v_min else {
+            let Some(vmin) = pin.electrical.v_min else {
                 return missing("v_min");
             };
-            let Some(vmax) = pin.v_max else {
+            let Some(vmax) = pin.electrical.v_max else {
                 return missing("v_max");
             };
-            let Some(imax) = pin.i_max else {
+            let Some(imax) = pin.electrical.i_max else {
                 return missing("i_max");
             };
             Ok(format!(
@@ -558,10 +601,10 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
             ))
         }
         "pwr_fixed" => {
-            let Some(v) = pin.v else {
+            let Some(v) = pin.electrical.v else {
                 return missing("v");
             };
-            let Some(i) = pin.i else {
+            let Some(i) = pin.electrical.i else {
                 return missing("i");
             };
             Ok(format!(
@@ -573,10 +616,10 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
             ))
         }
         "pwr_out" => {
-            let Some(v) = pin.v else {
+            let Some(v) = pin.electrical.v else {
                 return missing("v");
             };
-            let Some(i) = pin.i else {
+            let Some(i) = pin.electrical.i else {
                 return missing("i");
             };
             Ok(format!(
@@ -591,7 +634,7 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
         }
         _ => Err(CodegenError::UnknownKind {
             name: pin.name.clone(),
-            kind: pin.kind.clone(),
+            kind: pin.electrical.kind.clone(),
         }),
     }
 }
@@ -788,6 +831,9 @@ fn physical_suffix(pin: &PinDef) -> String {
     if let Some(d) = pin.drill {
         suffix.push_str(&format!(".drill({})", fmt_f64(d)));
     }
+    if pin.electrical.nc == Some(true) {
+        suffix.push_str(".nc(true)");
+    }
     for via in &pin.thermal_vias {
         suffix.push_str(&format!(
             ".thermal_via(({}, {}), {}, {})",
@@ -917,17 +963,13 @@ mod tests {
             name: "TXN".into(),
             purpose: "Test".into(),
             notes: String::new(),
-            kind: "dio".into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
+            electrical: ElectricalFields {
+                kind: "dio".into(),
+                ..Default::default()
+            },
             pos: Some((101.6, 12.7)),
             rotation: Some(90.0),
             length: Some(2.54),
-            nc: None,
             width: None,
             height: None,
             pad_type: None,
@@ -979,17 +1021,13 @@ mod tests {
                 name: "VDD".into(),
                 purpose: "Supply".into(),
                 notes: String::new(),
-                kind: "pwr".into(),
-                bw_mhz: None,
-                v: None,
-                v_min: None,
-                v_max: None,
-                i: None,
-                i_max: None,
+                electrical: ElectricalFields {
+                    kind: "pwr".into(),
+                    ..Default::default()
+                },
                 pos: None,
                 rotation: None,
                 length: None,
-                nc: None,
                 width: None,
                 height: None,
                 pad_type: None,
@@ -1027,17 +1065,16 @@ mod tests {
                 name: "VDD".into(),
                 purpose: "Supply".into(),
                 notes: String::new(),
-                kind: "pwr".into(),
-                bw_mhz: None,
-                v: None,
-                v_min: Some(1.8),
-                v_max: Some(3.3),
-                i: None,
-                i_max: Some(0.1),
+                electrical: ElectricalFields {
+                    kind: "pwr".into(),
+                    v_min: Some(1.8),
+                    v_max: Some(3.3),
+                    i_max: Some(0.1),
+                    ..Default::default()
+                },
                 pos: None,
                 rotation: None,
                 length: None,
-                nc: None,
                 width: None,
                 height: None,
                 pad_type: None,

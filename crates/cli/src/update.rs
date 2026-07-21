@@ -159,9 +159,6 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             copperleaf_backend_kicad::parse_footprint(footprint_path)?
         };
         // Idiot check: warn if pad count doesn't match pin count.
-        // Exclude mechanical pads (np_thru_hole, "None"-numbered, unnamed
-        // paste-only stencil apertures, and thru_hole thermal vias that sit
-        // inside an existing pad's bounding box).
         let electrical_pad_count = pads
             .iter()
             .filter(|p| {
@@ -171,9 +168,8 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                 {
                     return false;
                 }
-                // Thru-hole pads inside an existing pad are thermal vias.
                 if p.pad_type.eq_ignore_ascii_case("thru_hole") {
-                    return !is_thermal_via(p, &manifest.pins);
+                    return !manifest::is_thermal_via(p, &manifest.pins);
                 }
                 true
             })
@@ -206,10 +202,8 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             };
             manifest.component.model_3d = extracted_model;
 
-            // If no model found in the footprint S-expression, look for a
-            // .step file alongside the footprint file.
             if manifest.component.model_3d.is_none() {
-                manifest.component.model_3d = find_step_file_alongside(footprint_path);
+                manifest.component.model_3d = manifest::find_step_file_alongside(footprint_path);
             }
         }
     }
@@ -234,37 +228,4 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
 
     std::fs::write(&out_path, output)?;
     Ok(())
-}
-
-/// Look for a `.step` file in the same directory as `footprint_path`.
-///
-/// If the footprint path is a directory (`.pretty` library), searches for any
-/// `.step` file inside it.  Returns the first match as a `Some(String)`, or
-/// `None` if nothing is found.
-pub(crate) fn find_step_file_alongside(footprint_path: &str) -> Option<String> {
-    let path = std::path::Path::new(footprint_path);
-    let dir = if path.is_dir() {
-        path.to_path_buf()
-    } else {
-        path.parent()?.to_path_buf()
-    };
-
-    for entry in std::fs::read_dir(&dir).ok()? {
-        let entry = entry.ok()?;
-        let p = entry.path();
-        if p.extension().and_then(|s| s.to_str()) == Some("step") {
-            return p.to_str().map(|s| s.to_string());
-        }
-    }
-    None
-}
-
-/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
-/// bounding box (i.e. it is a thermal via, not an electrical pad).
-fn is_thermal_via(
-    pad: &copperleaf_backend_kicad::PadDef,
-    pins: &[copperleaf_part_codegen::PinDef],
-) -> bool {
-    pins.iter()
-        .any(|pin| pin.number != pad.number && manifest::pin_contains_point(pin, pad.pos))
 }

@@ -2,30 +2,14 @@
 
 use std::collections::HashMap;
 
+use copperleaf_part_codegen::ElectricalFields;
 use serde::Deserialize;
 
 use crate::CliError;
 
-/// A kind mapping entry, mirroring the optional fields on `PinDef` that a
-/// mapping can set.
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct KindEntry {
-    pub kind: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bw_mhz: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v_min: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub i: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub i_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nc: Option<bool>,
-}
+/// A kind mapping entry — shares the same shape as the electrical fields on
+/// `PinDef` so they can be merged with a single call.
+pub type KindEntry = ElectricalFields;
 
 /// Mapping from KiCad pin types/names to Copperleaf kinds.
 #[derive(Clone, Debug, Default)]

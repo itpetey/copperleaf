@@ -74,18 +74,7 @@ fn add_workspace_member(root_cargo: &Path, member: &str) -> Result<(), CliError>
 }
 
 fn toml_filename(lib_id: &str) -> String {
-    let mut out = String::new();
-    for ch in lib_id.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        out.push_str("part");
-    }
-    out
+    crate::manifest::toml_stem(lib_id)
 }
 
 #[cfg(test)]

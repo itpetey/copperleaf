@@ -62,7 +62,7 @@ fn compare_or_bless(path: &Path, actual: &str) {
 fn auto_wire(board: &mut Board, handle: ComponentHandle) {
     let mut groups: BTreeMap<(bool, i64), Vec<&'static str>> = BTreeMap::new();
     for pin in board.components[handle.0].component.pins() {
-        if pin.name() == "NC" || pin.name().starts_with("NC_") {
+        if pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_") {
             continue;
         }
         let key = match pin.role() {

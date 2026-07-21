@@ -42,6 +42,29 @@ impl CompiledComponent {
             mechanical: component.mechanical().to_vec(),
         }
     }
+
+    /// Minimal constructor for tests.  Returns a component with empty metadata
+    /// and mechanical pad list.
+    pub fn test(refdes: &str, pins: Vec<Pin>) -> Self {
+        Self {
+            refdes: refdes.to_owned(),
+            meta: ComponentMeta::default(),
+            pins,
+            mechanical: vec![],
+            constraints: vec![],
+        }
+    }
+
+    /// Same as [`test`] but with constraints.
+    pub fn test_with(refdes: &str, pins: Vec<Pin>, constraints: Vec<Constraint>) -> Self {
+        Self {
+            refdes: refdes.to_owned(),
+            meta: ComponentMeta::default(),
+            pins,
+            mechanical: vec![],
+            constraints,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

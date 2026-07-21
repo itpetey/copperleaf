@@ -706,22 +706,12 @@ fn synthesise_decoupling(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{ComponentMeta, units::UnitExt};
-
-    fn make_comp(refdes: &str, pins: Vec<Pin>, constraints: Vec<Constraint>) -> CompiledComponent {
-        CompiledComponent {
-            refdes: refdes.to_owned(),
-            meta: ComponentMeta::default(),
-            pins,
-            mechanical: vec![],
-            constraints,
-        }
-    }
+    use copperleaf::units::UnitExt;
 
     #[test]
     fn synthesises_decoupling_caps() {
         let board = CompiledBoard {
-            components: vec![make_comp(
+            components: vec![CompiledComponent::test_with(
                 "U1",
                 vec![Pin::build("VIN").pwr_fixed(3.3.volt(), 1.0.amp()).pin()],
                 vec![Constraint::Decoupling {
@@ -758,7 +748,7 @@ mod tests {
     #[test]
     fn synthesised_caps_have_footprints() {
         let board = CompiledBoard {
-            components: vec![make_comp(
+            components: vec![CompiledComponent::test_with(
                 "U1",
                 vec![Pin::build("VIN").pwr_fixed(3.3.volt(), 1.0.amp()).pin()],
                 vec![Constraint::Decoupling {
@@ -800,7 +790,7 @@ mod tests {
     #[test]
     fn skips_ground_tied_power_pin() {
         let board = CompiledBoard {
-            components: vec![make_comp(
+            components: vec![CompiledComponent::test_with(
                 "U1",
                 vec![
                     Pin::build("VDD").pwr_fixed(3.3.volt(), 1.0.amp()).pin(),
@@ -856,7 +846,7 @@ mod tests {
     #[test]
     fn groups_per_net_when_not_per_pin() {
         let board = CompiledBoard {
-            components: vec![make_comp(
+            components: vec![CompiledComponent::test_with(
                 "U1",
                 vec![
                     Pin::build("AVDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin(),

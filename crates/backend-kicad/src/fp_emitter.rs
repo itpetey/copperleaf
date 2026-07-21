@@ -255,7 +255,7 @@ fn pad_from_pin_def(pin: &PinDef, index: usize) -> Pad {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf_part_codegen::{ComponentMeta, PinDef};
+    use copperleaf_part_codegen::{ComponentMeta, ElectricalFields, PinDef};
 
     fn pin_def(num: usize, name: &str, pos: (f64, f64)) -> PinDef {
         PinDef {
@@ -264,17 +264,13 @@ mod tests {
             name: name.into(),
             purpose: "Test".into(),
             notes: String::new(),
-            kind: "dio".into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
+            electrical: ElectricalFields {
+                kind: "dio".into(),
+                ..Default::default()
+            },
             pos: Some(pos),
             rotation: Some(0.0),
             length: Some(1.0),
-            nc: None,
             width: Some(0.5),
             height: Some(1.0),
             pad_type: Some("smd".into()),
@@ -646,17 +642,13 @@ mod tests {
             name: "P1".into(),
             purpose: "Test".into(),
             notes: String::new(),
-            kind: "dio".into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
+            electrical: ElectricalFields {
+                kind: "dio".into(),
+                ..Default::default()
+            },
             pos: None,
             rotation: None,
             length: None,
-            nc: None,
             width: None,
             height: None,
             pad_type: None,

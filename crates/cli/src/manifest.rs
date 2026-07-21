@@ -3,7 +3,7 @@
 use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{PadDef, sym_parser::PinDef as SymPinDef, sym_parser::SymbolDef};
 use copperleaf_part_codegen::{
-    CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef, fmt_f64,
+    CodegenError, ComponentMeta, ElectricalFields, Manifest, MechanicalDef, PinDef, ThermalViaDef,
     required_fields,
 };
 
@@ -144,17 +144,13 @@ pub fn manifest_from_footprint(
             name: format!("PAD_{}", pad.number),
             purpose: "Pad".into(),
             notes: String::new(),
-            kind: default_kind.into(),
-            bw_mhz: None,
-            v: None,
-            v_min: None,
-            v_max: None,
-            i: None,
-            i_max: None,
+            electrical: ElectricalFields {
+                kind: default_kind.into(),
+                ..Default::default()
+            },
             pos: Some(pad.pos),
             rotation: Some(pad.rotation),
             length: Some(pad.width.max(pad.height)),
-            nc: None,
             width: Some(pad.width),
             height: Some(pad.height),
             pad_type: if pad.pad_type.is_empty() {
@@ -339,7 +335,7 @@ pub fn merge_symbol(
             if is_placeholder_name(&pin.name) && !sym_pin.name.is_empty() {
                 pin.name = sym_pin.name.clone();
             }
-            if pin.kind == default_kind || pin.kind.is_empty() {
+            if pin.electrical.kind == default_kind || pin.electrical.kind.is_empty() {
                 apply_entry(pin, &entry);
             }
         } else {
@@ -350,17 +346,10 @@ pub fn merge_symbol(
                 name: sym_pin.name.clone(),
                 purpose: purpose_for_kind(&entry.kind).into(),
                 notes: String::new(),
-                kind: String::new(),
-                bw_mhz: None,
-                v: None,
-                v_min: None,
-                v_max: None,
-                i: None,
-                i_max: None,
+                electrical: ElectricalFields::default(),
                 pos: Some(sym_pin.pos),
                 rotation: Some(sym_pin.rotation),
                 length: Some(sym_pin.length),
-                nc: None,
                 width: None,
                 height: None,
                 pad_type: None,
@@ -420,126 +409,25 @@ pub fn pin_number(number: &str, counter: &mut usize) -> usize {
 
 /// Serialise a manifest to TOML, with `# TODO` comments for power pins that
 /// still need voltage or current limits.
+///
+/// Serialisation is driven entirely by `toml::to_string` (via serde derives on
+/// the manifest types) so that the TOML schema and its serialised form cannot
+/// drift apart.  The only manual step is injecting `# TODO: fill …` advice
+/// after power pins that still lack required fields.
 pub fn serialise(manifest: &Manifest) -> String {
     let mut out = String::new();
 
+    // ── [component] ────────────────────────────────────────────────
     out.push_str("[component]\n");
-    out.push_str(&format!("name = \"{}\"\n", manifest.component.name));
-    out.push_str(&format!("title = \"{}\"\n", manifest.component.title));
-    if let Some(desc) = &manifest.component.description {
-        out.push_str(&format!("description = \"{}\"\n", desc));
-    }
-    if let Some(ds) = &manifest.component.datasheet {
-        out.push_str(&format!("datasheet = \"{}\"\n", ds));
-    }
-    if let Some(lib_id) = &manifest.component.lib_id {
-        out.push_str(&format!("lib_id = \"{}\"\n", escape_toml_string(lib_id)));
-    }
-    if let Some(model_3d) = &manifest.component.model_3d {
-        out.push_str(&format!(
-            "model_3d = \"{}\"\n",
-            escape_toml_string(model_3d)
-        ));
-    }
-    if let Some(model_3d_data) = &manifest.component.model_3d_data {
-        out.push_str("model_3d_data = \"\"\"\n");
-        out.push_str(model_3d_data);
-        out.push_str("\"\"\"\n");
-    }
-    if let Some((x, y, z)) = manifest.component.model_3d_rotation {
-        out.push_str(&format!("model_3d_rotation = [{x}, {y}, {z}]\n"));
-    }
-    if let Some((x, y, z)) = manifest.component.model_3d_offset {
-        out.push_str(&format!("model_3d_offset = [{x}, {y}, {z}]\n"));
-    }
+    out.push_str(
+        &toml::to_string(&manifest.component).expect("ComponentMeta serialisation is infallible"),
+    );
     out.push('\n');
 
+    // ── [[pin]] ────────────────────────────────────────────────────
     for pin in &manifest.pins {
         out.push_str("[[pin]]\n");
-        out.push_str(&format!("num = {}\n", pin.num));
-        if !pin.number.is_empty() {
-            out.push_str(&format!(
-                "number = \"{}\"\n",
-                escape_toml_string(&pin.number)
-            ));
-        }
-        out.push_str(&format!("name = \"{}\"\n", pin.name));
-        if !pin.purpose.is_empty() {
-            out.push_str(&format!("purpose = \"{}\"\n", pin.purpose));
-        }
-        if !pin.notes.is_empty() {
-            out.push_str(&format!("notes = \"{}\"\n", escape_toml_string(&pin.notes)));
-        }
-        out.push_str(&format!("kind = \"{}\"\n", pin.kind));
-
-        if let Some(v) = pin.v {
-            out.push_str(&format!("v = {}\n", fmt_f64(v)));
-        }
-        if let Some(v_min) = pin.v_min {
-            out.push_str(&format!("v_min = {}\n", fmt_f64(v_min)));
-        }
-        if let Some(v_max) = pin.v_max {
-            out.push_str(&format!("v_max = {}\n", fmt_f64(v_max)));
-        }
-        if let Some(i) = pin.i {
-            out.push_str(&format!("i = {}\n", fmt_f64(i)));
-        }
-        if let Some(i_max) = pin.i_max {
-            out.push_str(&format!("i_max = {}\n", fmt_f64(i_max)));
-        }
-        if let Some(bw) = pin.bw_mhz {
-            out.push_str(&format!("bw_mhz = {}\n", fmt_f64(bw)));
-        }
-        if let Some(nc) = pin.nc {
-            out.push_str(&format!("nc = {}\n", nc));
-        }
-        if let Some((x, y)) = pin.pos {
-            out.push_str(&format!("pos = [{}, {}]\n", fmt_f64(x), fmt_f64(y)));
-        }
-        if let Some(r) = pin.rotation {
-            out.push_str(&format!("rotation = {}\n", fmt_f64(r)));
-        }
-        if let Some(l) = pin.length {
-            out.push_str(&format!("length = {}\n", fmt_f64(l)));
-        }
-        if let Some(w) = pin.width {
-            out.push_str(&format!("width = {}\n", fmt_f64(w)));
-        }
-        if let Some(h) = pin.height {
-            out.push_str(&format!("height = {}\n", fmt_f64(h)));
-        }
-        if let Some(ref pt) = pin.pad_type {
-            out.push_str(&format!("pad_type = \"{}\"\n", pt));
-        }
-        if let Some(ref ps) = pin.pad_shape {
-            out.push_str(&format!("pad_shape = \"{}\"\n", ps));
-        }
-        if let Some(rr) = pin.roundrect_rratio {
-            out.push_str(&format!("roundrect_rratio = {}\n", fmt_f64(rr)));
-        }
-        if let Some(smm) = pin.solder_mask_margin {
-            out.push_str(&format!("solder_mask_margin = {}\n", fmt_f64(smm)));
-        }
-        if let Some(ref layers) = pin.layers {
-            out.push_str(&format!("layers = \"{}\"\n", escape_toml_string(layers)));
-        }
-        if let Some(drill) = pin.drill {
-            out.push_str(&format!("drill = {}\n", fmt_f64(drill)));
-        }
-        if !pin.thermal_vias.is_empty() {
-            out.push_str("thermal_vias = [\n");
-            for via in &pin.thermal_vias {
-                out.push_str(&format!(
-                    "  {{ pos = [{}, {}], drill = {}, size = {} }},\n",
-                    fmt_f64(via.pos.0),
-                    fmt_f64(via.pos.1),
-                    fmt_f64(via.drill),
-                    fmt_f64(via.size)
-                ));
-            }
-            out.push_str("]\n");
-        }
-
+        out.push_str(&toml::to_string(pin).expect("PinDef serialisation is infallible"));
         let missing = missing_power_fields(pin);
         if !missing.is_empty() {
             out.push_str(&format!("# TODO: fill {}\n", missing.join(", ")));
@@ -547,122 +435,97 @@ pub fn serialise(manifest: &Manifest) -> String {
         out.push('\n');
     }
 
+    // ── [[constraint]] ─────────────────────────────────────────────
     for constraint in &manifest.constraints {
         out.push_str("[[constraint]]\n");
-        out.push_str(&format!("type = \"{}\"\n", constraint.ty));
-        if let Some(values) = &constraint.values {
-            out.push_str("values = [");
-            for (i, v) in values.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                out.push_str(&format!("\"{}\"", escape_toml_string(v)));
-            }
-            out.push_str("]\n");
-        }
-        if let Some(per_pin) = constraint.per_pin {
-            out.push_str(&format!("per_pin = {}\n", per_pin));
-        }
-        if let Some(temp) = &constraint.temp {
-            out.push_str(&format!("temp = \"{}\"\n", temp));
-        }
-        if let Some(group) = &constraint.group {
-            out.push_str(&format!("group = \"{}\"\n", group));
-        }
-        if let Some(skew) = constraint.skew_ps {
-            out.push_str(&format!("skew_ps = {}\n", fmt_f64(skew)));
-        }
-        if let Some(target) = &constraint.target {
-            out.push_str(&format!("target = \"{}\"\n", target));
-        }
-        if let Some(tol) = constraint.tol_pct {
-            out.push_str(&format!("tol_pct = {}\n", fmt_f64(tol)));
-        }
-        if let Some(requires_plane) = constraint.requires_plane {
-            out.push_str(&format!("requires_plane = {}\n", requires_plane));
-        }
-        if let Some(min_width) = &constraint.min_width {
-            out.push_str(&format!("min_width = \"{}\"\n", min_width));
-        }
-        if let Some(clearance) = &constraint.clearance {
-            out.push_str(&format!("clearance = \"{}\"\n", clearance));
-        }
-        if let Some(min) = &constraint.min {
-            out.push_str(&format!("min = \"{}\"\n", min));
-        }
-        if let Some(voltage) = &constraint.voltage {
-            out.push_str(&format!("voltage = \"{}\"\n", voltage));
-        }
-        if let Some(max) = constraint.max {
-            out.push_str(&format!("max = {}\n", fmt_f64(max)));
-        }
+        out.push_str(
+            &toml::to_string(constraint).expect("ConstraintDef serialisation is infallible"),
+        );
         out.push('\n');
     }
 
+    // ── [[mechanical]] ─────────────────────────────────────────────
     for mech in &manifest.mechanical {
         out.push_str("[[mechanical]]\n");
-        if mech.number != "None" {
-            out.push_str(&format!(
-                "number = \"{}\"\n",
-                escape_toml_string(&mech.number)
-            ));
-        }
-        out.push_str(&format!(
-            "pos = [{}, {}]\n",
-            fmt_f64(mech.pos.0),
-            fmt_f64(mech.pos.1)
-        ));
-        out.push_str(&format!("width = {}\n", fmt_f64(mech.width)));
-        out.push_str(&format!("height = {}\n", fmt_f64(mech.height)));
-        out.push_str(&format!("pad_type = \"{}\"\n", mech.pad_type));
-        out.push_str(&format!("pad_shape = \"{}\"\n", mech.pad_shape));
-        if let Some(rr) = mech.roundrect_rratio {
-            out.push_str(&format!("roundrect_rratio = {}\n", fmt_f64(rr)));
-        }
-        if let Some(ref layers) = mech.layers {
-            out.push_str(&format!("layers = \"{}\"\n", escape_toml_string(layers)));
-        }
-        if mech.drill > 0.0 {
-            out.push_str(&format!("drill = {}\n", fmt_f64(mech.drill)));
-        }
+        out.push_str(&toml::to_string(mech).expect("MechanicalDef serialisation is infallible"));
         out.push('\n');
     }
 
-    // Ensure the file ends with exactly one newline.
-    let trimmed = out.trim_end_matches('\n');
-    format!("{trimmed}\n")
+    out
+}
+
+// ── Shared helpers (Phase 5.2) ────────────────────────────────────────
+
+/// Look for a `.step` file in the same directory as the given path.
+///
+/// If the path is a directory (`.pretty` library), searches for any `.step`
+/// file inside it.  Returns the first match, or `None`.
+pub(crate) fn find_step_file_alongside(path: &str) -> Option<String> {
+    let p = std::path::Path::new(path);
+    let dir = if p.is_dir() {
+        p.to_path_buf()
+    } else {
+        p.parent()?.to_path_buf()
+    };
+    for entry in std::fs::read_dir(&dir).ok()? {
+        let entry = entry.ok()?;
+        let fp = entry.path();
+        if fp.extension().and_then(|s| s.to_str()) == Some("step") {
+            return fp.to_str().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+/// Convert a lib-id to a lowercase TOML-safe filename stem.
+pub(crate) fn toml_stem(lib_id: &str) -> String {
+    let mut out = String::new();
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        out.push_str("part");
+    }
+    out
+}
+
+/// Convert a lib-id into a PascalCase Rust struct name.
+pub(crate) fn struct_name(lib_id: &str) -> String {
+    let mut out = String::new();
+    let mut first = true;
+    for ch in lib_id.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if first {
+                out.push(ch.to_ascii_uppercase());
+            } else {
+                out.push(ch.to_ascii_lowercase());
+            }
+            first = false;
+        } else {
+            first = true;
+        }
+    }
+    if out.is_empty() {
+        out.push_str("Part");
+    }
+    out
+}
+
+/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
+/// bounding box (i.e. it is a thermal via, not an electrical pad).
+pub(crate) fn is_thermal_via(pad: &PadDef, pins: &[PinDef]) -> bool {
+    pins.iter()
+        .any(|pin| pin.number != pad.number && pin_contains_point(pin, pad.pos))
 }
 
 fn apply_entry(pin: &mut PinDef, entry: &KindEntry) {
-    pin.kind = entry.kind.clone();
-    if let Some(bw) = entry.bw_mhz {
-        pin.bw_mhz = pin.bw_mhz.or(Some(bw));
-    }
-    if let Some(v) = entry.v {
-        pin.v = pin.v.or(Some(v));
-    }
-    if let Some(v_min) = entry.v_min {
-        pin.v_min = pin.v_min.or(Some(v_min));
-    }
-    if let Some(v_max) = entry.v_max {
-        pin.v_max = pin.v_max.or(Some(v_max));
-    }
-    if let Some(i) = entry.i {
-        pin.i = pin.i.or(Some(i));
-    }
-    if let Some(i_max) = entry.i_max {
-        pin.i_max = pin.i_max.or(Some(i_max));
-    }
-    if let Some(nc) = entry.nc {
-        pin.nc = pin.nc.or(Some(nc));
-    }
+    pin.electrical.merge_from(entry);
 }
 
-fn escape_toml_string(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-/// Return a mutable reference to the first pin whose bounding box contains
 /// Return `true` if `pos` falls inside the bounding box of a pin.
 pub(crate) fn pin_contains_point(pin: &PinDef, pos: (f64, f64)) -> bool {
     let Some((px, py)) = pin.pos else {
@@ -687,15 +550,15 @@ fn is_placeholder_name(name: &str) -> bool {
 }
 
 fn missing_power_fields(pin: &PinDef) -> Vec<&'static str> {
-    required_fields(&pin.kind)
+    required_fields(&pin.electrical.kind)
         .iter()
         .filter(|&&field| match field {
-            "bw_mhz" => pin.bw_mhz.is_none(),
-            "v_min" => pin.v_min.is_none(),
-            "v_max" => pin.v_max.is_none(),
-            "i_max" => pin.i_max.is_none(),
-            "v" => pin.v.is_none(),
-            "i" => pin.i.is_none(),
+            "bw_mhz" => pin.electrical.bw_mhz.is_none(),
+            "v_min" => pin.electrical.v_min.is_none(),
+            "v_max" => pin.electrical.v_max.is_none(),
+            "i_max" => pin.electrical.i_max.is_none(),
+            "v" => pin.electrical.v.is_none(),
+            "i" => pin.electrical.i.is_none(),
             _ => false,
         })
         .copied()
@@ -734,17 +597,13 @@ mod tests {
                 name: "PAD_1".into(),
                 purpose: "Pad".into(),
                 notes: String::new(),
-                kind: "dio".into(),
-                bw_mhz: None,
-                v: None,
-                v_min: None,
-                v_max: None,
-                i: None,
-                i_max: None,
+                electrical: copperleaf_part_codegen::ElectricalFields {
+                    kind: "dio".into(),
+                    ..Default::default()
+                },
                 pos: None,
                 rotation: None,
                 length: None,
-                nc: None,
                 width: None,
                 height: None,
                 pad_type: None,
@@ -791,7 +650,7 @@ mod tests {
         let diags = merge_symbol(&mut manifest, &sym, &kindmap, "dio");
         assert!(diags.is_empty(), "{:?}", diags);
         assert_eq!(manifest.pins[0].name, "VDD");
-        assert_eq!(manifest.pins[0].kind, "pwr");
+        assert_eq!(manifest.pins[0].electrical.kind, "pwr");
     }
 
     #[test]
@@ -799,10 +658,10 @@ mod tests {
         let mut manifest = make_manifest();
         manifest.pins[0].number = "1".into();
         manifest.pins[0].name = "VDD".into();
-        manifest.pins[0].kind = "pwr".into();
-        manifest.pins[0].v_min = Some(1.8);
-        manifest.pins[0].v_max = Some(3.3);
-        manifest.pins[0].i_max = Some(0.1);
+        manifest.pins[0].electrical.kind = "pwr".into();
+        manifest.pins[0].electrical.v_min = Some(1.8);
+        manifest.pins[0].electrical.v_max = Some(3.3);
+        manifest.pins[0].electrical.i_max = Some(0.1);
         let sym = vec![SymPinDef {
             name: "VDD".into(),
             number: "1".into(),
@@ -813,9 +672,9 @@ mod tests {
         }];
         let kindmap = KindMap::load(None).unwrap();
         merge_symbol(&mut manifest, &sym, &kindmap, "dio");
-        assert_eq!(manifest.pins[0].v_min, Some(1.8));
-        assert_eq!(manifest.pins[0].v_max, Some(3.3));
-        assert_eq!(manifest.pins[0].i_max, Some(0.1));
+        assert_eq!(manifest.pins[0].electrical.v_min, Some(1.8));
+        assert_eq!(manifest.pins[0].electrical.v_max, Some(3.3));
+        assert_eq!(manifest.pins[0].electrical.i_max, Some(0.1));
     }
 
     #[test]
@@ -823,7 +682,7 @@ mod tests {
         let mut manifest = make_manifest();
         manifest.pins[0].number = "1".into();
         manifest.pins[0].name = "VDD".into();
-        manifest.pins[0].kind = "pwr".into();
+        manifest.pins[0].electrical.kind = "pwr".into();
         let pads = vec![PadDef {
             number: "1".into(),
             pos: (10.0, 20.0),
@@ -839,7 +698,7 @@ mod tests {
         }];
         let diags = merge_footprint(&mut manifest, &pads);
         assert!(diags.is_empty());
-        assert_eq!(manifest.pins[0].kind, "pwr");
+        assert_eq!(manifest.pins[0].electrical.kind, "pwr");
         assert_eq!(manifest.pins[0].pos, Some((10.0, 20.0)));
         assert_eq!(manifest.pins[0].rotation, Some(45.0));
         assert_eq!(manifest.pins[0].length, Some(0.5));
@@ -860,6 +719,89 @@ mod tests {
         assert_eq!(pin_number("TD3-", &mut c), 2);
         assert_eq!(pin_number("RD2+", &mut c), 3);
         assert_eq!(c, 4);
+    }
+
+    #[test]
+    fn all_parts_toml_round_trip() {
+        // Walk every parts TOML in the repository, deserialise it, serialise
+        // it back, and verify the result deserialises to the same manifest.
+        let parts_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts");
+        for entry in std::fs::read_dir(&parts_root).unwrap() {
+            let vendor_dir = entry.unwrap().path();
+            if !vendor_dir.is_dir() {
+                continue;
+            }
+            for entry in std::fs::read_dir(&vendor_dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|s| s.to_str()) != Some("toml") {
+                    continue;
+                }
+                // Skip Cargo.toml — it's not a part manifest.
+                if path.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml") {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).unwrap();
+                let manifest: Manifest = toml::from_str(&source).unwrap_or_else(|e| {
+                    panic!("deserialise {}: {e}", path.display());
+                });
+                let serialised = serialise(&manifest);
+                let round_tripped: Manifest = toml::from_str(&serialised).unwrap_or_else(|e| {
+                    panic!("round-trip deserialise {}: {e}", path.display());
+                });
+                // Compare field-by-field so we get a useful panic.
+                assert_eq!(
+                    round_tripped.component.name,
+                    manifest.component.name,
+                    "component.name mismatch for {}",
+                    path.display()
+                );
+                assert_eq!(
+                    round_tripped.pins.len(),
+                    manifest.pins.len(),
+                    "pin count mismatch for {}",
+                    path.display()
+                );
+                for (i, (a, b)) in round_tripped
+                    .pins
+                    .iter()
+                    .zip(manifest.pins.iter())
+                    .enumerate()
+                {
+                    assert_eq!(a.num, b.num, "pin[{i}].num mismatch for {}", path.display());
+                    assert_eq!(
+                        a.name,
+                        b.name,
+                        "pin[{i}].name mismatch for {}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        a.electrical.kind,
+                        b.electrical.kind,
+                        "pin[{i}].kind mismatch for {}",
+                        path.display()
+                    );
+                    assert_eq!(a.pos, b.pos, "pin[{i}].pos mismatch for {}", path.display());
+                    assert_eq!(
+                        a.electrical.v,
+                        b.electrical.v,
+                        "pin[{i}].v mismatch for {}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        a.electrical.v_min,
+                        b.electrical.v_min,
+                        "pin[{i}].v_min mismatch for {}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        a.electrical.nc,
+                        b.electrical.nc,
+                        "pin[{i}].nc mismatch for {}",
+                        path.display()
+                    );
+                }
+            }
+        }
     }
 
     #[test]
