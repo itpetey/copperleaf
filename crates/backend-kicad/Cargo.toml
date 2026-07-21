@@ -14,4 +14,11 @@ serde_json = { workspace = true, features = ["std"] }
 thiserror.workspace = true
 
 [dev-dependencies]
+copperleaf-parts-connectors.path = "../../parts/connectors"
+copperleaf-parts-microchip.path = "../../parts/microchip"
+copperleaf-parts-morsemicro.path = "../../parts/morsemicro"
+copperleaf-parts-passives.path = "../../parts/passives"
+copperleaf-parts-raspberrypi.path = "../../parts/raspberrypi"
+copperleaf-parts-texas-instruments.path = "../../parts/texas-instruments"
+copperleaf-parts-wiznet.path = "../../parts/wiznet"
 tempfile.workspace = true

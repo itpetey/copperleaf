@@ -1,0 +1,74 @@
+(export
+  (version "E")
+  (design
+    (source "copperleaf")
+    (date "")
+    (tool "copperleaf" version 0.1)
+    (sheet
+      (number "1")
+      (name "/")
+      (tstamps "/")))
+  (components
+    (comp
+      (ref "U1")
+      (value "U")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "VOUT"))
+        (pin "2"
+          (type "bidirectional")
+          (name "L2"))
+        (pin "3"
+          (type "power_in")
+          (name "PGND"))
+        (pin "4"
+          (type "bidirectional")
+          (name "L1"))
+        (pin "5"
+          (type "bidirectional")
+          (name "VIN"))
+        (pin "6"
+          (type "bidirectional")
+          (name "EN"))
+        (pin "7"
+          (type "bidirectional")
+          (name "PS/SYNC"))
+        (pin "8"
+          (type "bidirectional")
+          (name "VINA"))
+        (pin "9"
+          (type "power_in")
+          (name "GND"))
+        (pin "10"
+          (type "bidirectional")
+          (name "FB"))
+        (pin "11"
+          (type "bidirectional")
+          (name "EXP"))
+        (pin "12"
+          (type "passive")
+          (name "MECH1"))
+        (pin "13"
+          (type "passive")
+          (name "MECH2"))
+        (pin "14"
+          (type "passive")
+          (name "MECH3"))
+        (pin "15"
+          (type "passive")
+          (name "MECH4")))))
+  (nets
+    (net
+      (code 1)
+      (name "NET_U1_PGND")
+      (node
+        (ref "U1")
+        (pin "3")
+        (pinfunction "PGND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "9")
+        (pinfunction "GND")
+        (pintype "power_in")))))

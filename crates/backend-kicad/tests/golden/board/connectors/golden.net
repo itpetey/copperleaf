@@ -1,0 +1,185 @@
+(export
+  (version "E")
+  (design
+    (source "copperleaf")
+    (date "")
+    (tool "copperleaf" version 0.1)
+    (sheet
+      (number "1")
+      (name "/")
+      (tstamps "/")))
+  (components
+    (comp
+      (ref "J1")
+      (value "J")
+      (pins
+        (pin "P3"
+          (type "bidirectional")
+          (name "TD2+"))
+        (pin "P1"
+          (type "bidirectional")
+          (name "TD1+"))
+        (pin "P8"
+          (type "bidirectional")
+          (name "TD3-"))
+        (pin "P5"
+          (type "bidirectional")
+          (name "CT_1"))
+        (pin "P12"
+          (type "bidirectional")
+          (name "~"))
+        (pin "P11"
+          (type "bidirectional")
+          (name "~"))
+        (pin "P2"
+          (type "bidirectional")
+          (name "TD1-"))
+        (pin "S1"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "S2"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "P7"
+          (type "bidirectional")
+          (name "TD3+"))
+        (pin "P14"
+          (type "bidirectional")
+          (name "~"))
+        (pin "P13"
+          (type "bidirectional")
+          (name "~"))
+        (pin "P9"
+          (type "bidirectional")
+          (name "TD4+"))
+        (pin "P10"
+          (type "bidirectional")
+          (name "TD4-"))
+        (pin "P4"
+          (type "bidirectional")
+          (name "TD2-"))
+        (pin "P6"
+          (type "bidirectional")
+          (name "CT_2"))
+        (pin "1"
+          (type "passive")
+          (name "MECH1"))
+        (pin "2"
+          (type "passive")
+          (name "MECH2"))))
+    (comp
+      (ref "J2")
+      (value "J")
+      (pins
+        (pin "1"
+          (type "input")
+          (name "Signal"))
+        (pin "2"
+          (type "power_in")
+          (name "GND1"))
+        (pin "3"
+          (type "power_in")
+          (name "GND2"))
+        (pin "4"
+          (type "power_in")
+          (name "GND3"))))
+    (comp
+      (ref "J3")
+      (value "J")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "1"))
+        (pin "S1"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "2"
+          (type "bidirectional")
+          (name "2"))
+        (pin "S2"
+          (type "bidirectional")
+          (name "SHIELD"))))
+    (comp
+      (ref "J4")
+      (value "J")
+      (pins
+        (pin "A1/B12"
+          (type "power_in")
+          (name "GND_A"))
+        (pin "A4/B9"
+          (type "power_in")
+          (name "VBUS_A"))
+        (pin "A6"
+          (type "bidirectional")
+          (name "DP1"))
+        (pin "A5"
+          (type "bidirectional")
+          (name "CC1"))
+        (pin "A8"
+          (type "bidirectional")
+          (name "SBU1"))
+        (pin "A7"
+          (type "bidirectional")
+          (name "DN1"))
+        (pin "SH1"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "SH2"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "SH3"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "SH4"
+          (type "bidirectional")
+          (name "SHIELD"))
+        (pin "B1/A12"
+          (type "power_in")
+          (name "GND_B"))
+        (pin "B4/AP"
+          (type "power_in")
+          (name "VBUS_B"))
+        (pin "B6"
+          (type "bidirectional")
+          (name "DP2"))
+        (pin "B5"
+          (type "bidirectional")
+          (name "CC2"))
+        (pin "B8"
+          (type "bidirectional")
+          (name "SBU2"))
+        (pin "B7"
+          (type "bidirectional")
+          (name "DN2")))))
+  (nets
+    (net
+      (code 1)
+      (name "NET_J2_GND1")
+      (node
+        (ref "J2")
+        (pin "2")
+        (pinfunction "GND1")
+        (pintype "power_in"))
+      (node
+        (ref "J2")
+        (pin "3")
+        (pinfunction "GND2")
+        (pintype "power_in"))
+      (node
+        (ref "J2")
+        (pin "4")
+        (pinfunction "GND3")
+        (pintype "power_in")))
+    (net
+      (code 2)
+      (name "NET_J4_GND_A")
+      (node
+        (ref "J4")
+        (pin "A1/B12")
+        (pinfunction "GND_A")
+        (pintype "power_in"))
+      (node
+        (ref "J4")
+        (pin "B1/A12")
+        (pinfunction "GND_B")
+        (pintype "power_in")))))

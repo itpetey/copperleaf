@@ -1,0 +1,228 @@
+(kicad_symbol_lib
+  (version 20251024)
+  (generator "copperleaf")
+  (symbol "ARJM11D7-502-AB-EW2"
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "U"
+      (at -5.08 13.97 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left)))
+    (property "Value" "ARJM11D7-502-AB-EW2"
+      (at -5.08 -13.97 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left)))
+    (property "Footprint" ""
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" "https://abracon.com/Magnetics/ARJM11.pdf"
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Description" ""
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "ki_keywords" "copperleaf"
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (symbol "ARJM11D7-502-AB-EW2_0_1"
+      (rectangle
+        (start -5.08 12.7)
+        (end 5.08 -12.7)
+        (stroke
+          (width 0.254)
+          (type default))
+        (fill
+          (type background)))
+      (pin bidirectional line
+        (at -7.62 7.62 0)
+        (length 2.54)
+        (name "TD2+"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P3"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 5.08 0)
+        (length 2.54)
+        (name "TD1+"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P1"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 2.54 0)
+        (length 2.54)
+        (name "TD3-"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P8"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 0 0)
+        (length 2.54)
+        (name "CT_1"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P5"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 -2.54 0)
+        (length 2.54)
+        (name "~"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P12"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 -5.08 0)
+        (length 2.54)
+        (name "~"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P11"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 -7.62 0)
+        (length 2.54)
+        (name "TD1-"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P2"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 -10.16 0)
+        (length 2.54)
+        (name "SHIELD"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "S1"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 7.62 180)
+        (length 2.54)
+        (name "SHIELD"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "S2"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 5.08 180)
+        (length 2.54)
+        (name "TD3+"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P7"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 2.54 180)
+        (length 2.54)
+        (name "~"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P14"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 0 180)
+        (length 2.54)
+        (name "~"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P13"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 -2.54 180)
+        (length 2.54)
+        (name "TD4+"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P9"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 -5.08 180)
+        (length 2.54)
+        (name "TD4-"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P10"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 -7.62 180)
+        (length 2.54)
+        (name "TD2-"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P4"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 -10.16 180)
+        (length 2.54)
+        (name "CT_2"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "P6"
+          (effects
+            (font
+              (size 1.27 1.27))))))))

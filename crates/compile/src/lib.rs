@@ -13,7 +13,10 @@
 //! The returned `CompiledBoard` is constructed exactly once and never rebuilt
 //! or mutated afterwards.
 
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use copperleaf::{
     CompiledComponent, Component, Farad,
@@ -61,7 +64,10 @@ pub struct CompileError {
 struct NetGrouping {
     pin_to_node: HashMap<(usize, &'static str), usize>,
     nodes: Vec<(usize, &'static str)>,
-    groups: HashMap<usize, Vec<usize>>,
+    /// Groups keyed by union-find root.  A `BTreeMap` is used so iteration
+    /// order (and therefore net ordering in the compiled board) is
+    /// deterministic across processes.
+    groups: BTreeMap<usize, Vec<usize>>,
     /// Map from node index to its union-find root.
     roots: Vec<usize>,
 }
@@ -115,7 +121,7 @@ impl NetGrouping {
             uf.union(a, b);
         }
 
-        let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
         let mut roots = Vec::with_capacity(nodes.len());
         for i in 0..nodes.len() {
             let root = uf.find(i);
@@ -735,7 +741,9 @@ fn synthesise_decoupling(
                 }
             } else {
                 // One set of decoupling capacitors per unique power net.
-                let mut pins_by_net: HashMap<String, Vec<&Pin>> = HashMap::new();
+                // A `BTreeMap` keeps iteration (and hence capacitor refdes
+                // assignment) deterministic across processes.
+                let mut pins_by_net: BTreeMap<String, Vec<&Pin>> = BTreeMap::new();
                 for pin in power_pins {
                     let net_name = board
                         .connections

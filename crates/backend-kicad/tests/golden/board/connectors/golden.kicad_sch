@@ -1,0 +1,878 @@
+(kicad_sch
+  (version 20260306)
+  (generator "copperleaf")
+  (generator_version "10.0")
+  (uuid "c03958cf-0c1f-5189-d806-14e000c8b373")
+  (paper "A4")
+  (title_block
+    (title "")
+    (company "")
+    (rev "")
+    (date ""))
+  (lib_symbols
+    (symbol "copperleaf:ARJM11D7-502-AB-EW2"
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "J"
+        (at -5.08 13.97 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Value" "copperleaf:ARJM11D7-502-AB-EW2"
+        (at -5.08 -13.97 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "ARJM11D7-502-AB-EW2"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Datasheet" "https://abracon.com/Magnetics/ARJM11.pdf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Description" ""
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_keywords" "copperleaf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_fp_filters" "ARJM11D7?502?AB?EW2*"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (symbol "ARJM11D7-502-AB-EW2_0_1"
+        (rectangle
+          (start -5.08 12.7)
+          (end 5.08 -12.7)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background)))
+        (pin bidirectional line
+          (at -7.62 7.62 0)
+          (length 2.54)
+          (name "TD2+"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P3"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 5.08 0)
+          (length 2.54)
+          (name "TD1+"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 2.54 0)
+          (length 2.54)
+          (name "TD3-"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P8"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "CT_1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P5"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P12"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -5.08 0)
+          (length 2.54)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P11"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -7.62 0)
+          (length 2.54)
+          (name "TD1-"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -10.16 0)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "S1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 7.62 180)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "S2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 5.08 180)
+          (length 2.54)
+          (name "TD3+"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P7"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 2.54 180)
+          (length 2.54)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P14"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P13"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -2.54 180)
+          (length 2.54)
+          (name "TD4+"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P9"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -5.08 180)
+          (length 2.54)
+          (name "TD4-"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P10"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -7.62 180)
+          (length 2.54)
+          (name "TD2-"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P4"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -10.16 180)
+          (length 2.54)
+          (name "CT_2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "P6"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at 0 -15.24 90)
+          (length 2.54)
+          (name "MECH1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at 2.54 -15.24 90)
+          (length 2.54)
+          (name "MECH2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "copperleaf:CONMHF4-SMD-G-T"
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "J"
+        (at -5.08 3.81 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Value" "copperleaf:CONMHF4-SMD-G-T"
+        (at -5.08 -3.81 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "CONMHF4-SMD-G-T"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Datasheet" "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=conmhf4-smd-g-t-ds&DocType=Data%20Sheet&DocLang=English&DocFormat=pdf&PartCntxt=CONMHF4-SMD-G-T"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Description" ""
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_keywords" "copperleaf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_fp_filters" "CONMHF4?SMD?G?T*"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (symbol "CONMHF4-SMD-G-T_0_1"
+        (rectangle
+          (start -5.08 2.54)
+          (end 5.08 -2.54)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background)))
+        (pin input line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "Signal"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at -2.54 -5.08 90)
+          (length 2.54)
+          (name "GND1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 0 -5.08 90)
+          (length 2.54)
+          (name "GND2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "3"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 2.54 -5.08 90)
+          (length 2.54)
+          (name "GND3"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "4"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "copperleaf:S2B-PH-SM4-TB_LF__SN_"
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "J"
+        (at -5.08 6.35 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Value" "copperleaf:S2B-PH-SM4-TB_LF__SN_"
+        (at -5.08 -6.35 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "S2B-PH-SM4-TB_LF__SN_"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Description" ""
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_keywords" "copperleaf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_fp_filters" "S2B?PH?SM4?TB?LF??SN?*"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (symbol "S2B-PH-SM4-TB_LF__SN__0_1"
+        (rectangle
+          (start -5.08 5.08)
+          (end 5.08 -5.08)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background)))
+        (pin bidirectional line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "S1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name "2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -2.54 180)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "S2"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "copperleaf:2340901-1"
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "J"
+        (at -5.08 11.43 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Value" "copperleaf:2340901-1"
+        (at -5.08 -11.43 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "2340901-1"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Datasheet" "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=2340901&DocType=Customer+Drawing&DocLang=English&PartCntxt=2340901-1&DocFormat=pdf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Description" ""
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_keywords" "copperleaf"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "ki_fp_filters" "2340901?1*"
+        (at 0 0 0)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (symbol "2340901-1_0_1"
+        (rectangle
+          (start -5.08 10.16)
+          (end 5.08 -10.16)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background)))
+        (pin bidirectional line
+          (at -7.62 5.08 0)
+          (length 2.54)
+          (name "DP1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A6"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 2.54 0)
+          (length 2.54)
+          (name "CC1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A5"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "SBU1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A8"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name "DN1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A7"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -5.08 0)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "SH1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at -7.62 -7.62 0)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "SH2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 5.08 180)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "SH3"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 2.54 180)
+          (length 2.54)
+          (name "SHIELD"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "SH4"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name "DP2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B6"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -2.54 180)
+          (length 2.54)
+          (name "CC2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B5"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -5.08 180)
+          (length 2.54)
+          (name "SBU2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B8"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin bidirectional line
+          (at 7.62 -7.62 180)
+          (length 2.54)
+          (name "DN2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B7"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 0 12.7 270)
+          (length 2.54)
+          (name "VBUS_A"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A4/B9"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 2.54 12.7 270)
+          (length 2.54)
+          (name "VBUS_B"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B4/AP"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 0 -12.7 90)
+          (length 2.54)
+          (name "GND_A"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "A1/B12"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 2.54 -12.7 90)
+          (length 2.54)
+          (name "GND_B"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "B1/A12"
+            (effects
+              (font
+                (size 1.27 1.27))))))))
+  (symbol
+    (lib_id "copperleaf:ARJM11D7-502-AB-EW2")
+    (at 35.56 43.18 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "68b33301-226f-3da0-4992-fd1501474c4a")
+    (property "Reference" "J1"
+      (at 35.56 29.21 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "J"
+      (at 35.56 57.15 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "ARJM11D7-502-AB-EW2"
+      (at 35.56 43.18 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project ""
+        (path "/ c03958cf-0c1f-5189-d806-14e000c8b373"
+          (reference "J1")
+          (unit 1)))))
+  (symbol
+    (lib_id "copperleaf:CONMHF4-SMD-G-T")
+    (at 68.58 33.02 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "68b33601-226f-42b9-4992-fc1501474a97")
+    (property "Reference" "J2"
+      (at 68.58 29.21 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "J"
+      (at 68.58 36.83 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "CONMHF4-SMD-G-T"
+      (at 68.58 33.02 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project ""
+        (path "/ c03958cf-0c1f-5189-d806-14e000c8b373"
+          (reference "J2")
+          (unit 1)))))
+  (symbol
+    (lib_id "copperleaf:S2B-PH-SM4-TB_LF__SN_")
+    (at 101.6 35.56 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "68b33501-226f-4106-4992-fb15014748e4")
+    (property "Reference" "J3"
+      (at 101.6 29.21 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "J"
+      (at 101.6 41.91 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "S2B-PH-SM4-TB_LF__SN_"
+      (at 101.6 35.56 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project ""
+        (path "/ c03958cf-0c1f-5189-d806-14e000c8b373"
+          (reference "J3")
+          (unit 1)))))
+  (symbol
+    (lib_id "copperleaf:2340901-1")
+    (at 134.62 40.64 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "68b33801-226f-461f-4992-fa1501474731")
+    (property "Reference" "J4"
+      (at 134.62 29.21 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "J"
+      (at 134.62 52.07 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "2340901-1"
+      (at 134.62 40.64 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project ""
+        (path "/ c03958cf-0c1f-5189-d806-14e000c8b373"
+          (reference "J4")
+          (unit 1)))))
+  (wire
+    (pts
+      (xy 66.04 38.1)
+      (xy 66.04 40.64))
+    (stroke
+      (width 0))
+    (uuid "2cc73511-ca37-c3cf-783a-ad97bb8d1f2d"))
+  (label "NET_J2_GND1"
+    (at 66.04 40.64 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "5bfb6ccf-25cf-9612-e231-f4079516b0c4"))
+  (wire
+    (pts
+      (xy 68.58 38.1)
+      (xy 68.58 40.64))
+    (stroke
+      (width 0))
+    (uuid "802f5ce2-9ac5-73ff-a276-8315b1b89f25"))
+  (label "NET_J2_GND1"
+    (at 68.58 40.64 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "6a681c35-7dfd-77d1-db0e-1ff0d75aba87"))
+  (wire
+    (pts
+      (xy 71.12 38.1)
+      (xy 71.12 40.64))
+    (stroke
+      (width 0))
+    (uuid "7a01b740-0121-800b-0bb4-6f25450a5e89"))
+  (label "NET_J2_GND1"
+    (at 71.12 40.64 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "9c338a9e-b492-44cd-d988-f6aa32784d37"))
+  (wire
+    (pts
+      (xy 134.62 53.34)
+      (xy 134.62 55.88))
+    (stroke
+      (width 0))
+    (uuid "233a5adc-6575-1457-c940-100eb7472b01"))
+  (label "NET_J4_GND_A"
+    (at 134.62 55.88 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "3b219caa-286b-35bf-7aa4-88b638c36411"))
+  (wire
+    (pts
+      (xy 137.16 53.34)
+      (xy 137.16 55.88))
+    (stroke
+      (width 0))
+    (uuid "2aabdc89-6b50-2597-6a2d-a7d3bc43fc79"))
+  (label "NET_J4_GND_A"
+    (at 137.16 55.88 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "1b616d51-8c88-721b-fbd3-34a48046f67d"))
+  (sheet_instances
+    (path "/"
+      (page "1"))))

@@ -1,0 +1,207 @@
+(footprint "ARJM11D7-502-AB-EW2"
+  (version 20231218)
+  (generator "copperleaf")
+  (layer F.Cu)
+  (tedit 00000000)
+  (descr "https://abracon.com/Magnetics/ARJM11.pdf")
+  (tags "copperleaf")
+  (attr through_hole)
+  (fp_text reference "REF**"
+    (at -3.18 -4.79)
+    (layer F.SilkS)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text value "ARJM11D7-502-AB-EW2"
+    (at -3.18 13.24)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text user "${REFERENCE}"
+    (at -3.18 0)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (pad "P3" thru_hole circle
+    (at 0 0)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P1" thru_hole rect
+    (at 2.54 0)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P8" thru_hole circle
+    (at -6.35 -2.54)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P5" thru_hole circle
+    (at -2.54 0)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P12" thru_hole circle
+    (at -9.96 10.92)
+    (size 1.605 1.605)
+    (drill 1.07)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P11" thru_hole circle
+    (at -9.96 8.89)
+    (size 1.605 1.605)
+    (drill 1.07)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P2" thru_hole circle
+    (at 1.27 -2.54)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "S1" thru_hole circle
+    (at 4.575 3.3)
+    (size 2.475 2.475)
+    (drill 1.65)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "S2" thru_hole circle
+    (at -10.925 3.3)
+    (size 2.475 2.475)
+    (drill 1.65)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P7" thru_hole circle
+    (at -5.08 0)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P14" thru_hole circle
+    (at 3.61 10.92)
+    (size 1.605 1.605)
+    (drill 1.07)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P13" thru_hole circle
+    (at 3.61 8.89)
+    (size 1.605 1.605)
+    (drill 1.07)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P9" thru_hole circle
+    (at -7.62 0)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P10" thru_hole circle
+    (at -8.89 -2.54)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P4" thru_hole circle
+    (at -1.27 -2.54)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "P6" thru_hole circle
+    (at -3.81 -2.54)
+    (size 1.458 1.458)
+    (drill 0.95)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "" np_thru_hole circle
+    (at 2.54 6.35)
+    (size 3.3 3.3)
+    (drill 3.3)
+    (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle
+    (at -8.89 6.35)
+    (size 3.3 3.3)
+    (drill 3.3)
+    (layers *.Cu *.Mask))
+  (fp_line
+    (start -12.41 -3.52)
+    (end 6.06 -3.52)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 6.06 -3.52)
+    (end 6.06 11.97)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 6.06 11.97)
+    (end -12.41 11.97)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -12.41 11.97)
+    (end -12.41 -3.52)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -12.52 -3.63)
+    (end 6.17 -3.63)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 6.17 -3.63)
+    (end 6.17 12.08)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 6.17 12.08)
+    (end -12.52 12.08)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -12.52 12.08)
+    (end -12.52 -3.63)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -12.66 -3.77)
+    (end 6.31 -3.77)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 6.31 -3.77)
+    (end 6.31 12.22)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 6.31 12.22)
+    (end -12.66 12.22)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start -12.66 12.22)
+    (end -12.66 -3.77)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_circle
+    (center -12.41 -3.52)
+    (end -12.31 -3.52)
+    (layer F.SilkS)
+    (width 0.12))
+  (model "ARJM11D7-502-AB-EW2.step"
+    (offset
+      (xyz 0 0 0))
+    (scale
+      (xyz 1 1 1))
+    (rotate
+      (xyz 0 0 0))))

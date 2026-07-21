@@ -1,0 +1,173 @@
+(export
+  (version "E")
+  (design
+    (source "copperleaf")
+    (date "")
+    (tool "copperleaf" version 0.1)
+    (sheet
+      (number "1")
+      (name "/")
+      (tstamps "/")))
+  (components
+    (comp
+      (ref "U1")
+      (value "U")
+      (pins
+        (pin "1"
+          (type "power_in")
+          (name "GND_8"))
+        (pin "2"
+          (type "input")
+          (name "ANT"))
+        (pin "3"
+          (type "power_in")
+          (name "GND_3"))
+        (pin "4"
+          (type "bidirectional")
+          (name "RESET_N"))
+        (pin "5"
+          (type "bidirectional")
+          (name "WAKE"))
+        (pin "6"
+          (type "bidirectional")
+          (name "JTAG_TMS"))
+        (pin "7"
+          (type "bidirectional")
+          (name "JTAG_TCK"))
+        (pin "8"
+          (type "bidirectional")
+          (name "JTAG_TDO"))
+        (pin "9"
+          (type "bidirectional")
+          (name "JTAG_TDI"))
+        (pin "10"
+          (type "power_in")
+          (name "VBAT"))
+        (pin "11"
+          (type "power_in")
+          (name "GND_7"))
+        (pin "12"
+          (type "bidirectional")
+          (name "SDIO_D0/SPI_MISO"))
+        (pin "13"
+          (type "bidirectional")
+          (name "SDIO_D3/SPI_CS"))
+        (pin "14"
+          (type "bidirectional")
+          (name "SDIO_D1/SPI_INT"))
+        (pin "15"
+          (type "bidirectional")
+          (name "SDIO_D2"))
+        (pin "16"
+          (type "bidirectional")
+          (name "SDIO_CMD/SPI_MOSI"))
+        (pin "17"
+          (type "bidirectional")
+          (name "SDIO_CLK/SPI_SCK"))
+        (pin "18"
+          (type "bidirectional")
+          (name "GPIO5"))
+        (pin "19"
+          (type "bidirectional")
+          (name "GPIO4"))
+        (pin "20"
+          (type "power_in")
+          (name "GND_6"))
+        (pin "21"
+          (type "bidirectional")
+          (name "GPIO3"))
+        (pin "22"
+          (type "power_in")
+          (name "VDDIO"))
+        (pin "23"
+          (type "power_in")
+          (name "GND_5"))
+        (pin "24"
+          (type "power_in")
+          (name "VBAT_TX"))
+        (pin "25"
+          (type "power_in")
+          (name "VDD_USB"))
+        (pin "26"
+          (type "power_in")
+          (name "GND_4"))
+        (pin "27"
+          (type "bidirectional")
+          (name "USB_D_N"))
+        (pin "28"
+          (type "bidirectional")
+          (name "USB_D_P"))
+        (pin "29"
+          (type "bidirectional")
+          (name "BUSY"))
+        (pin "30"
+          (type "power_in")
+          (name "GND_2"))
+        (pin "31"
+          (type "bidirectional")
+          (name "GPIO1"))
+        (pin "32"
+          (type "bidirectional")
+          (name "GPIO0"))
+        (pin "33"
+          (type "bidirectional")
+          (name "GPIO6"))
+        (pin "34"
+          (type "bidirectional")
+          (name "GPIO7"))
+        (pin "35"
+          (type "bidirectional")
+          (name "GPIO8"))
+        (pin "36"
+          (type "bidirectional")
+          (name "GPIO9"))
+        (pin "37"
+          (type "bidirectional")
+          (name "GPIO10"))
+        (pin "38"
+          (type "power_in")
+          (name "GND_1")))))
+  (nets
+    (net
+      (code 1)
+      (name "NET_U1_GND_8")
+      (node
+        (ref "U1")
+        (pin "1")
+        (pinfunction "GND_8")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "3")
+        (pinfunction "GND_3")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "11")
+        (pinfunction "GND_7")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "20")
+        (pinfunction "GND_6")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "23")
+        (pinfunction "GND_5")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "26")
+        (pinfunction "GND_4")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "30")
+        (pinfunction "GND_2")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "38")
+        (pinfunction "GND_1")
+        (pintype "power_in")))))

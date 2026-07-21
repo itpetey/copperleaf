@@ -1,0 +1,96 @@
+(kicad_symbol_lib
+  (version 20251024)
+  (generator "copperleaf")
+  (symbol "S2B-PH-SM4-TB_LF__SN_"
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "U"
+      (at -5.08 6.35 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left)))
+    (property "Value" "S2B-PH-SM4-TB_LF__SN_"
+      (at -5.08 -6.35 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left)))
+    (property "Footprint" ""
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" "~"
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Description" ""
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "ki_keywords" "copperleaf"
+      (at 0 0 0)
+      (hide yes)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (symbol "S2B-PH-SM4-TB_LF__SN__0_1"
+      (rectangle
+        (start -5.08 5.08)
+        (end 5.08 -5.08)
+        (stroke
+          (width 0.254)
+          (type default))
+        (fill
+          (type background)))
+      (pin bidirectional line
+        (at -7.62 0 0)
+        (length 2.54)
+        (name "1"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "1"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at -7.62 -2.54 0)
+        (length 2.54)
+        (name "SHIELD"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "S1"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 0 180)
+        (length 2.54)
+        (name "2"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "2"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 -2.54 180)
+        (length 2.54)
+        (name "SHIELD"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "S2"
+          (effects
+            (font
+              (size 1.27 1.27))))))))

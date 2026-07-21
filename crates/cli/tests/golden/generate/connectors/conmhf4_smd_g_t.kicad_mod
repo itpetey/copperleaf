@@ -1,0 +1,121 @@
+(footprint "CONMHF4-SMD-G-T"
+  (version 20231218)
+  (generator "copperleaf")
+  (layer F.Cu)
+  (tedit 00000000)
+  (descr "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=conmhf4-smd-g-t-ds&DocType=Data%20Sheet&DocLang=English&DocFormat=pdf&PartCntxt=CONMHF4-SMD-G-T")
+  (tags "copperleaf")
+  (attr smd)
+  (fp_text reference "REF**"
+    (at 0 -2.77)
+    (layer F.SilkS)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text value "CONMHF4-SMD-G-T"
+    (at 0 2.77)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text user "${REFERENCE}"
+    (at 0 0)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (pad "1" smd rect
+    (at 0 0.95)
+    (size 0.6 0.6)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "2" smd rect
+    (at -0.96 0)
+    (size 0.58 1.58)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "3" smd rect
+    (at 0.96 0)
+    (size 0.58 1.58)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "4" smd rect
+    (at 0 -1)
+    (size 0.5 0.5)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (fp_line
+    (start -1.5 -1.5)
+    (end 1.5 -1.5)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 1.5 -1.5)
+    (end 1.5 1.5)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 1.5 1.5)
+    (end -1.5 1.5)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -1.5 1.5)
+    (end -1.5 -1.5)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -1.61 -1.61)
+    (end 1.61 -1.61)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 1.61 -1.61)
+    (end 1.61 1.61)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 1.61 1.61)
+    (end -1.61 1.61)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -1.61 1.61)
+    (end -1.61 -1.61)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -1.75 -1.75)
+    (end 1.75 -1.75)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 1.75 -1.75)
+    (end 1.75 1.75)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 1.75 1.75)
+    (end -1.75 1.75)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start -1.75 1.75)
+    (end -1.75 -1.75)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_circle
+    (center -1.5 -1.5)
+    (end -1.4 -1.5)
+    (layer F.SilkS)
+    (width 0.12))
+  (model "CONMHF4-SMD-G-T.step"
+    (offset
+      (xyz 0 0 0))
+    (scale
+      (xyz 1 1 1))
+    (rotate
+      (xyz 90 0 0))))

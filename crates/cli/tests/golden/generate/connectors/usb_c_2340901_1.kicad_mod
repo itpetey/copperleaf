@@ -1,0 +1,181 @@
+(footprint "2340901-1"
+  (version 20231218)
+  (generator "copperleaf")
+  (layer F.Cu)
+  (tedit 00000000)
+  (descr "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=2340901&DocType=Customer+Drawing&DocLang=English&PartCntxt=2340901-1&DocFormat=pdf")
+  (tags "copperleaf")
+  (attr smd)
+  (fp_text reference "REF**"
+    (at 0 -5.01)
+    (layer F.SilkS)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text value "2340901-1"
+    (at 0 5.01)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (fp_text user "${REFERENCE}"
+    (at 0 0)
+    (layer F.Fab)
+    (effects
+      (font
+        (size 1.0 1.0)
+        (thickness 0.15))))
+  (pad "A1/B12" smd rect
+    (at -3.2 -2.9125)
+    (size 0.6 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "A4/B9" smd rect
+    (at -2.4 -2.9125)
+    (size 0.6 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "A6" smd rect
+    (at -0.25 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "A5" smd rect
+    (at -1.25 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "A8" smd rect
+    (at 1.25 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "A7" smd rect
+    (at 0.25 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "SH1" thru_hole oval
+    (at -5.62 -1.6375)
+    (size 1.05 1.85)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "SH2" thru_hole oval
+    (at 5.62 -1.6375)
+    (size 1.05 1.85)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "SH3" thru_hole oval
+    (at -5.62 2.3625)
+    (size 1.05 2.25)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "SH4" thru_hole oval
+    (at 5.62 2.3625)
+    (size 1.05 2.25)
+    (layers *.Cu *.Mask)
+    (solder_mask_margin 0.102))
+  (pad "B1/A12" smd rect
+    (at 3.2 -2.9125)
+    (size 0.6 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "B4/AP" smd rect
+    (at 2.4 -2.9125)
+    (size 0.6 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "B6" smd rect
+    (at 0.75 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "B5" smd rect
+    (at 1.75 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "B8" smd rect
+    (at -1.75 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (pad "B7" smd rect
+    (at -0.75 -2.9125)
+    (size 0.3 1.15)
+    (layers F.Cu F.Mask F.Paste)
+    (solder_mask_margin 0.102))
+  (fp_line
+    (start -6.4 -3.74)
+    (end 6.4 -3.74)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 6.4 -3.74)
+    (end 6.4 3.74)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start 6.4 3.74)
+    (end -6.4 3.74)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -6.4 3.74)
+    (end -6.4 -3.74)
+    (layer F.Fab)
+    (width 0.1))
+  (fp_line
+    (start -6.51 -3.85)
+    (end 6.51 -3.85)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 6.51 -3.85)
+    (end 6.51 3.85)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start 6.51 3.85)
+    (end -6.51 3.85)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -6.51 3.85)
+    (end -6.51 -3.85)
+    (layer F.SilkS)
+    (width 0.12))
+  (fp_line
+    (start -6.65 -3.99)
+    (end 6.65 -3.99)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 6.65 -3.99)
+    (end 6.65 3.99)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start 6.65 3.99)
+    (end -6.65 3.99)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_line
+    (start -6.65 3.99)
+    (end -6.65 -3.99)
+    (layer F.CrtYd)
+    (width 0.05))
+  (fp_circle
+    (center -6.4 -3.74)
+    (end -6.3 -3.74)
+    (layer F.SilkS)
+    (width 0.12))
+  (model "2340901-1.step"
+    (offset
+      (xyz 0 -4.5 0))
+    (scale
+      (xyz 1 1 1))
+    (rotate
+      (xyz -90 0 0))))

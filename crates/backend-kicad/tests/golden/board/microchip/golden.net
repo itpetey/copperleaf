@@ -1,0 +1,31 @@
+(export
+  (version "E")
+  (design
+    (source "copperleaf")
+    (date "")
+    (tool "copperleaf" version 0.1)
+    (sheet
+      (number "1")
+      (name "/")
+      (tstamps "/")))
+  (components
+    (comp
+      (ref "U1")
+      (value "U")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "STAT"))
+        (pin "2"
+          (type "power_in")
+          (name "VSS"))
+        (pin "3"
+          (type "power_out")
+          (name "VBAT"))
+        (pin "4"
+          (type "power_in")
+          (name "VDD"))
+        (pin "5"
+          (type "bidirectional")
+          (name "PROG")))))
+  (nets))

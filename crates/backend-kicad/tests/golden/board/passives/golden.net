@@ -1,0 +1,62 @@
+(export
+  (version "E")
+  (design
+    (source "copperleaf")
+    (date "")
+    (tool "copperleaf" version 0.1)
+    (sheet
+      (number "1")
+      (name "/")
+      (tstamps "/")))
+  (components
+    (comp
+      (ref "C1")
+      (value "C")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "1"))
+        (pin "2"
+          (type "bidirectional")
+          (name "2"))))
+    (comp
+      (ref "R1")
+      (value "R")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "1"))
+        (pin "2"
+          (type "bidirectional")
+          (name "2"))))
+    (comp
+      (ref "Y1")
+      (value "Y")
+      (pins
+        (pin "1"
+          (type "input")
+          (name "1"))
+        (pin "2"
+          (type "input")
+          (name "2"))))
+    (comp
+      (ref "L1")
+      (value "L")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "1"))
+        (pin "2"
+          (type "bidirectional")
+          (name "2"))))
+    (comp
+      (ref "L2")
+      (value "L")
+      (pins
+        (pin "1"
+          (type "bidirectional")
+          (name "1"))
+        (pin "2"
+          (type "bidirectional")
+          (name "2")))))
+  (nets))

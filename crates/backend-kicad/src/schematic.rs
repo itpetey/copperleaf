@@ -1,6 +1,6 @@
 //! KiCad schematic emitter.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Role};
 
@@ -36,7 +36,9 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
         children.push(symbol_instance_node(comp, &layouts[idx], positions[idx]));
     }
 
-    let mut net_conns: HashMap<&str, Vec<&Connection>> = HashMap::new();
+    // A `BTreeMap` keeps wire/label emission order deterministic across
+    // processes (std `HashMap` iteration order is randomised per process).
+    let mut net_conns: BTreeMap<&str, Vec<&Connection>> = BTreeMap::new();
     for conn in &board.connections {
         net_conns.entry(conn.net.0.as_str()).or_default().push(conn);
     }
