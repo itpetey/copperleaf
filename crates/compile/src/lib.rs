@@ -19,8 +19,8 @@ use copperleaf::{
     CompiledComponent, Farad,
     board::{Board, CompiledBoard, ComponentEntry, Connection, RawNetOverride},
     erc,
-    net::{Constraint, Net, NetClass, NetId, NetKind},
-    pin::{Pin, RawConnection, Role, SigSpec},
+    net::{Constraint, Net, NetClass, NetIdx, NetKind},
+    pin::{Pin, PinHandle, RawConnection, Role, SigSpec},
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
     util::UnionFind,
 };
@@ -74,8 +74,8 @@ pub struct CompileOptions {
 }
 
 impl NetGrouping {
-    /// Build the grouping from the given connections.
-    fn build(connections: &[RawConnection]) -> Self {
+    /// Build the grouping from the given connections and single-pin nets.
+    fn build(connections: &[RawConnection], single_pin_nets: &[PinHandle]) -> Self {
         let mut pin_to_node: HashMap<(usize, &'static str), usize> = HashMap::new();
         let mut nodes: Vec<(usize, &'static str)> = Vec::new();
 
@@ -90,12 +90,23 @@ impl NetGrouping {
             }
         }
 
+        // Add single-pin nets as single-node entries.
+        for pin in single_pin_nets {
+            if let std::collections::hash_map::Entry::Vacant(e) =
+                pin_to_node.entry((pin.component, pin.pin))
+            {
+                e.insert(nodes.len());
+                nodes.push((pin.component, pin.pin));
+            }
+        }
+
         let mut uf = UnionFind::new(nodes.len());
         for conn in connections {
             let a = pin_to_node[&(conn.from.component, conn.from.pin)];
             let b = pin_to_node[&(conn.to.component, conn.to.pin)];
             uf.union(a, b);
         }
+        // Single-pin nets are already isolated (no union needed).
 
         let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
         let mut roots = Vec::with_capacity(nodes.len());
@@ -149,23 +160,28 @@ impl Default for CompileOptions {
 pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, CompileError> {
     // --- Phase 1: Lowering ---
     let compiled = compile_components(&board.components);
-    let grouping = NetGrouping::build(&board.connections);
+    let grouping = NetGrouping::build(&board.connections, &board.single_pin_nets);
 
     let mut lowering_errors: Vec<Diagnostic> = Vec::new();
 
-    let (net_names, net_voltages) = resolve_net_overrides(
-        &grouping,
-        &board.connections,
-        &board.net_overrides,
-        &board.components,
-        &compiled,
-        &mut lowering_errors,
-    );
+    // Build override lookups for single-pin nets keyed by (component, pin).
+    let single_net_overrides: BTreeMap<(usize, &str), RawNetOverride> = board
+        .single_pin_nets
+        .iter()
+        .enumerate()
+        .map(|(i, pin)| {
+            let key = board.next_edge + i;
+            let ov = board.net_overrides.get(&key).cloned().unwrap_or_default();
+            ((pin.component, pin.pin), ov)
+        })
+        .collect();
 
     let (nets, connections) = build_nets_and_connections(
         &grouping,
-        &net_names,
-        &net_voltages,
+        &board.connections,
+        &board.net_overrides,
+        &single_net_overrides,
+        &board.components,
         &compiled,
         &mut lowering_errors,
     );
@@ -235,41 +251,51 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
 }
 
 /// Turn every group of connected pins into a [`Net`] and a set of
-/// [`Connection`]s.  Power nets without a voltage source are flagged as errors.
+/// [`Connection`]s.  Each net is resolved in one pass via [`resolve_net`].
 fn build_nets_and_connections(
     grouping: &NetGrouping,
-    net_names: &HashMap<usize, String>,
-    net_voltages: &HashMap<usize, Option<Qty<Volt>>>,
+    connections: &[RawConnection],
+    overrides: &BTreeMap<usize, RawNetOverride>,
+    single_net_overrides: &BTreeMap<(usize, &str), RawNetOverride>,
+    components: &[ComponentEntry],
     compiled: &[CompiledComponent],
     errors: &mut Vec<Diagnostic>,
 ) -> (Vec<Net>, Vec<Connection>) {
     let mut nets: Vec<Net> = Vec::new();
-    let mut connections: Vec<Connection> = Vec::new();
+    let mut out_connections: Vec<Connection> = Vec::new();
 
     for (&rep, members) in &grouping.groups {
-        let name = net_names[&rep].clone();
-        let voltage = net_voltages[&rep];
-
-        let kind = classify_net(&name, voltage, members, grouping, compiled, errors);
+        let (name, kind) = resolve_net(
+            rep,
+            members,
+            grouping,
+            connections,
+            overrides,
+            single_net_overrides,
+            components,
+            compiled,
+            errors,
+        );
 
         nets.push(Net {
-            name: name.clone(),
+            name,
             kind,
             class: NetClass::default(),
             constraints: vec![],
         });
+        let net_idx = NetIdx(nets.len() - 1);
 
         for &node_idx in members {
             let (comp_idx, pin_name) = grouping.nodes[node_idx];
-            connections.push(Connection {
+            out_connections.push(Connection {
                 component: comp_idx,
                 pin: pin_name.to_owned(),
-                net: NetId(name.clone()),
+                net: net_idx,
             });
         }
     }
 
-    (nets, connections)
+    (nets, out_connections)
 }
 
 /// Build the [`CompileSummary`] from the final board.
@@ -278,14 +304,11 @@ fn build_summary(board: &CompiledBoard) -> CompileSummary {
         nets: board
             .nets
             .iter()
-            .map(|n| NetInfo {
+            .enumerate()
+            .map(|(i, n)| NetInfo {
                 name: n.name.clone(),
                 kind: n.kind.clone(),
-                pin_count: board
-                    .connections
-                    .iter()
-                    .filter(|c| c.net.0 == n.name)
-                    .count(),
+                pin_count: board.connections.iter().filter(|c| c.net.0 == i).count(),
             })
             .collect(),
         pin_count: board.components.iter().map(|c| c.pins.len()).sum(),
@@ -293,184 +316,31 @@ fn build_summary(board: &CompiledBoard) -> CompileSummary {
     }
 }
 
-/// Determine whether a net is power or signal and assign its [`NetKind`].
-fn classify_net(
-    net_name: &str,
-    voltage: Option<Qty<Volt>>,
+/// Resolve one net's name and kind in a single pass.
+///
+/// Precedence, in order:
+///   1. explicit override (voltage/name from `NetHandle`)
+///   2. power-pin `v_nom` consensus (conflict → `NET:VOLTAGE_CONFLICT`)
+///   3. ground fallback (`Gnd`-role pins imply 0 V)
+///   4. power net with no voltage → `NET:NO_VOLTAGE_SOURCE` error
+#[allow(clippy::too_many_arguments)]
+fn resolve_net(
+    rep: usize,
     members: &[usize],
     grouping: &NetGrouping,
+    connections: &[RawConnection],
+    overrides: &BTreeMap<usize, RawNetOverride>,
+    single_net_overrides: &BTreeMap<(usize, &str), RawNetOverride>,
+    components: &[ComponentEntry],
     compiled: &[CompiledComponent],
     errors: &mut Vec<Diagnostic>,
-) -> NetKind {
-    let mut is_power = false;
-    let mut sig_spec: Option<SigSpec> = None;
-
-    for &node_idx in members {
-        let (comp_idx, pin_name) = grouping.nodes[node_idx];
-        let pin = compiled[comp_idx]
-            .pins
-            .iter()
-            .find(|p| p.name() == pin_name)
-            .unwrap();
-
-        match pin.role() {
-            Role::PowerIn | Role::PowerOut | Role::Gnd => is_power = true,
-            _ => {}
-        }
-        if sig_spec.is_none() && pin.sig_spec().is_some() {
-            sig_spec = pin.sig_spec();
-        }
-    }
-
-    if is_power {
-        match voltage {
-            Some(v_nom) => NetKind::Power {
-                v_nom,
-                ripple: None,
-            },
-            None => {
-                errors.push(Diagnostic {
-                    code: "NET:NO_VOLTAGE_SOURCE".into(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "power net '{}' has no voltage source; use Board::set_net_voltage()",
-                        net_name
-                    ),
-                    entities: vec![net_name.to_owned()],
-                    hint: Some("call Board::set_net_voltage()".into()),
-                });
-                NetKind::Power {
-                    v_nom: 0.0.volt(),
-                    ripple: None,
-                }
-            }
-        }
-    } else {
-        NetKind::Signal {
-            spec: sig_spec.unwrap_or_else(SigSpec::control),
-        }
-    }
-}
-
-/// Type-erase [`Component`] trait objects into [`CompiledComponent`]s with
-/// deterministic pin IDs.
-fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
-    entries
-        .iter()
-        .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
-        .collect()
-}
-
-fn ground_net_name_and_fallback(board: &CompiledBoard) -> (String, Option<Net>) {
-    if let Some(n) = board.nets.iter().find(|n| n.name == "GND") {
-        return (n.name.clone(), None);
-    }
-    if let Some(n) = board
-        .nets
-        .iter()
-        .find(|n| matches!(n.kind, NetKind::Power { v_nom, .. } if v_nom.as_base().abs() < 1e-9))
-    {
-        return (n.name.clone(), None);
-    }
-    let net = Net {
-        name: "GND".into(),
-        kind: NetKind::Power {
-            v_nom: 0.0.volt(),
-            ripple: None,
-        },
-        class: NetClass::default(),
-        constraints: vec![],
-    };
-    ("GND".into(), Some(net))
-}
-
-/// Collect `v_nom` from every power pin on the net.  Returns `None` if no pin
-/// provides a nominal voltage, or emits an error on conflict.
-///
-/// Ground pins are ignored as voltage sources unless the net contains no other
-/// `PowerIn`/`PowerOut` pins, so that decoupling capacitors and direct ground
-/// ties do not create false conflicts.
-fn infer_voltage_from_pins(
-    members: &[usize],
-    nodes: &[(usize, &'static str)],
-    compiled: &[CompiledComponent],
-    net_name: &str,
-    errors: &mut Vec<Diagnostic>,
-) -> Option<Qty<Volt>> {
-    let mut inferred: Option<Qty<Volt>> = None;
-    let mut ground: Option<Qty<Volt>> = None;
-
-    for &node_idx in members {
-        let (comp_idx, pin_name) = nodes[node_idx];
-        let comp = &compiled[comp_idx];
-        let pin = comp.pins.iter().find(|p| p.name() == pin_name).unwrap();
-
-        let v = pin.power_spec().v_nom;
-        if matches!(pin.role(), Role::Gnd) {
-            ground = v.or(Some(0.0.volt()));
-            continue;
-        }
-
-        let Some(v) = v else {
-            continue;
-        };
-
-        if let Some(existing) = inferred {
-            if (existing.as_base() - v.as_base()).abs() > 1e-9 {
-                errors.push(Diagnostic {
-                    code: "NET:VOLTAGE_CONFLICT".into(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "conflicting v_nom values on net '{}' ({:.2}V vs {:.2}V)",
-                        net_name,
-                        existing.as_base(),
-                        v.as_base()
-                    ),
-                    entities: vec![net_name.to_owned()],
-                    hint: Some("check connected power pins".into()),
-                });
-            }
-        } else {
-            inferred = Some(v);
-        }
-    }
-
-    inferred.or(ground)
-}
-
-fn is_ground_net(board: &CompiledBoard, net_name: &str) -> bool {
-    board
-        .nets
-        .iter()
-        .find(|n| n.name == net_name)
-        .map(|n| matches!(n.kind, NetKind::Power { v_nom, .. } if v_nom.as_base().abs() < 1e-9))
-        .unwrap_or(false)
-}
-
-/// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
-/// footprint from the passives library.
-fn make_capacitor_component(
-    refdes: &str,
-    value: Qty<Farad>,
-    package: Package,
-) -> CompiledComponent {
-    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
-    CompiledComponent::from_component(refdes, &cap)
-}
-
-/// Walk the edge overrides for a single net and merge them, detecting
-/// conflicting voltage or name values.
-fn merge_overrides(
-    edge_ids: &[usize],
-    overrides: &[RawNetOverride],
-    errors: &mut Vec<Diagnostic>,
-    rep: usize,
-) -> (Option<Qty<Volt>>, Option<String>) {
+) -> (String, NetKind) {
+    // --- Explicit overrides from the edges that belong to this net ---
+    let edge_ids = grouping.edges_for_net(rep, connections);
     let mut explicit_voltage: Option<Qty<Volt>> = None;
     let mut explicit_name: Option<String> = None;
-
-    for &eid in edge_ids {
-        if let Some(ov) = overrides.get(eid) {
+    for &eid in &edge_ids {
+        if let Some(ov) = overrides.get(&eid) {
             if let Some(v) = ov.voltage {
                 if let Some(existing) = explicit_voltage {
                     if (existing.as_base() - v.as_base()).abs() > 1e-9 {
@@ -492,7 +362,152 @@ fn merge_overrides(
         }
     }
 
-    (explicit_voltage, explicit_name)
+    // For single-pin nets (no edges), check the single-net override map.
+    if edge_ids.is_empty() && members.len() == 1 {
+        let node_idx = members[0];
+        let (comp_idx, pin_name) = grouping.nodes[node_idx];
+        if let Some(ov) = single_net_overrides.get(&(comp_idx, pin_name)) {
+            if let Some(v) = ov.voltage {
+                explicit_voltage = Some(v);
+            }
+            if let Some(name) = &ov.name {
+                explicit_name = Some(name.clone());
+            }
+        }
+    }
+
+    // --- Net name (override → auto-generated) ---
+    let name = explicit_name.unwrap_or_else(|| {
+        let (comp, pin) = grouping.nodes[rep];
+        let comp_name = &components[comp].name;
+        format!("NET_{}_{}", comp_name, pin)
+    });
+
+    // --- Infer voltage from connected pin v_nom values ---
+    let mut inferred: Option<Qty<Volt>> = None;
+    let mut ground: Option<Qty<Volt>> = None;
+    for &node_idx in members {
+        let (comp_idx, pin_name) = grouping.nodes[node_idx];
+        let comp = &compiled[comp_idx];
+        let pin = comp.pins.iter().find(|p| p.name() == pin_name).unwrap();
+        let v = pin.power_spec().v_nom;
+        if matches!(pin.role(), Role::Gnd) {
+            ground = v.or(Some(0.0.volt()));
+            continue;
+        }
+        let Some(v) = v else { continue };
+        if let Some(existing) = inferred {
+            if (existing.as_base() - v.as_base()).abs() > 1e-9 {
+                errors.push(Diagnostic {
+                    code: "NET:VOLTAGE_CONFLICT".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "conflicting v_nom values on net '{}' ({:.2}V vs {:.2}V)",
+                        name,
+                        existing.as_base(),
+                        v.as_base()
+                    ),
+                    entities: vec![name.clone()],
+                    hint: Some("check connected power pins".into()),
+                });
+            }
+        } else {
+            inferred = Some(v);
+        }
+    }
+    // Override takes precedence over inferred; ground is fallback.
+    let voltage = explicit_voltage.or(inferred).or(ground);
+
+    // --- Classify: power vs signal ---
+    let mut is_power = false;
+    let mut sig_spec: Option<SigSpec> = None;
+    for &node_idx in members {
+        let (comp_idx, pin_name) = grouping.nodes[node_idx];
+        let pin = compiled[comp_idx]
+            .pins
+            .iter()
+            .find(|p| p.name() == pin_name)
+            .unwrap();
+        match pin.role() {
+            Role::PowerIn | Role::PowerOut | Role::Gnd => is_power = true,
+            _ => {}
+        }
+        if sig_spec.is_none() && pin.sig_spec().is_some() {
+            sig_spec = pin.sig_spec();
+        }
+    }
+
+    let kind = if is_power {
+        match voltage {
+            Some(v_nom) => NetKind::Power {
+                v_nom,
+                ripple: None,
+            },
+            None => {
+                errors.push(Diagnostic {
+                    code: "NET:NO_VOLTAGE_SOURCE".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "power net '{}' has no voltage source; use Board::set_net_voltage()",
+                        name
+                    ),
+                    entities: vec![name.clone()],
+                    hint: Some("call Board::set_net_voltage()".into()),
+                });
+                NetKind::Power {
+                    v_nom: 0.0.volt(),
+                    ripple: None,
+                }
+            }
+        }
+    } else {
+        NetKind::Signal {
+            spec: sig_spec.unwrap_or_else(SigSpec::control),
+        }
+    };
+
+    (name, kind)
+}
+
+/// Type-erase [`Component`] trait objects into [`CompiledComponent`]s with
+/// deterministic pin IDs.
+fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
+    entries
+        .iter()
+        .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
+        .collect()
+}
+
+fn ground_net_idx_and_fallback(board: &CompiledBoard) -> (NetIdx, Option<Net>) {
+    if let Some(idx) = board.find_net("GND") {
+        return (idx, None);
+    }
+    if let Some(idx) = board.nets.iter().position(|n| n.is_ground()) {
+        return (NetIdx(idx), None);
+    }
+    // Fallback: fresh ground net will be appended at current length.
+    let idx = NetIdx(board.nets.len());
+    let net = Net {
+        name: "GND".into(),
+        kind: NetKind::Power {
+            v_nom: 0.0.volt(),
+            ripple: None,
+        },
+        class: NetClass::default(),
+        constraints: vec![],
+    };
+    (idx, Some(net))
+}
+
+/// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
+/// footprint from the passives library.
+fn make_capacitor_component(
+    refdes: &str,
+    value: Qty<Farad>,
+    package: Package,
+) -> CompiledComponent {
+    let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
+    CompiledComponent::from_component(refdes, &cap)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -503,19 +518,19 @@ fn place_decoupling_set(
     pin: &Pin,
     values: &[Qty<Farad>],
     package: Package,
-    gnd_net_name: &str,
+    gnd_net_idx: NetIdx,
     components: &mut Vec<CompiledComponent>,
     connections: &mut Vec<Connection>,
     diagnostics: &mut Vec<Diagnostic>,
     next_c: &mut u32,
 ) {
-    let net_name = board
+    let net_idx = board
         .connections
         .iter()
         .find(|c| c.component == comp_idx && c.pin == pin.name())
-        .map(|c| c.net.0.clone());
+        .map(|c| c.net);
 
-    let Some(net) = net_name else {
+    let Some(net_idx) = net_idx else {
         diagnostics.push(Diagnostic {
             code: "DECOUPLE:UNCONNECTED".into(),
             severity: Severity::Warning,
@@ -531,7 +546,7 @@ fn place_decoupling_set(
     };
 
     // Skip pins that are tied directly to ground (e.g. VDD_USB in SPI mode).
-    if is_ground_net(board, &net) {
+    if board.net(net_idx).is_ground() {
         return;
     }
 
@@ -544,58 +559,14 @@ fn place_decoupling_set(
         connections.push(Connection {
             component: comp_idx_in_final,
             pin: "1".into(),
-            net: NetId(net.clone()),
+            net: net_idx,
         });
         connections.push(Connection {
             component: comp_idx_in_final,
             pin: "2".into(),
-            net: NetId(gnd_net_name.into()),
+            net: gnd_net_idx,
         });
     }
-}
-
-/// Determine the name and voltage for every net by merging explicit overrides
-/// with values inferred from connected pins.
-///
-/// Returns `(net_names, net_voltages)` keyed by the group representative id.
-/// Diagnostics are appended to `errors`.
-#[allow(clippy::type_complexity)]
-fn resolve_net_overrides(
-    grouping: &NetGrouping,
-    connections: &[RawConnection],
-    overrides: &[RawNetOverride],
-    components: &[ComponentEntry],
-    compiled: &[CompiledComponent],
-    errors: &mut Vec<Diagnostic>,
-) -> (HashMap<usize, String>, HashMap<usize, Option<Qty<Volt>>>) {
-    let mut net_names: HashMap<usize, String> = HashMap::new();
-    let mut net_voltages: HashMap<usize, Option<Qty<Volt>>> = HashMap::new();
-
-    for (&rep, members) in &grouping.groups {
-        let edge_ids = grouping.edges_for_net(rep, connections);
-
-        // Merge explicit overrides.
-        let (explicit_voltage, explicit_name) = merge_overrides(&edge_ids, overrides, errors, rep);
-
-        // Determine net name (override -> auto-generated).
-        let name = explicit_name.unwrap_or_else(|| {
-            let (comp, pin) = grouping.nodes[rep];
-            let comp_name = &components[comp].name;
-            format!("NET_{}_{}", comp_name, pin)
-        });
-
-        // Infer voltage from connected pin v_nom values.
-        let inferred_voltage =
-            infer_voltage_from_pins(members, &grouping.nodes, compiled, &name, errors);
-
-        // Override takes precedence over inferred.
-        let final_voltage = explicit_voltage.or(inferred_voltage);
-
-        net_names.insert(rep, name);
-        net_voltages.insert(rep, final_voltage);
-    }
-
-    (net_names, net_voltages)
 }
 
 /// Synthesise decoupling capacitors from part-level [`Constraint::Decoupling`] rules.
@@ -626,7 +597,7 @@ fn synthesise_decoupling(
     let mut connections = Vec::new();
     let mut next_c = 1u32;
 
-    let (gnd_net_name, fallback_gnd_net) = ground_net_name_and_fallback(board);
+    let (gnd_net_idx, fallback_gnd_net) = ground_net_idx_and_fallback(board);
 
     for (comp_idx, comp) in board.components.iter().enumerate() {
         for constraint in &comp.constraints {
@@ -663,7 +634,7 @@ fn synthesise_decoupling(
                         pin,
                         values,
                         package,
-                        &gnd_net_name,
+                        gnd_net_idx,
                         &mut components,
                         &mut connections,
                         &mut diagnostics,
@@ -674,15 +645,15 @@ fn synthesise_decoupling(
                 // One set of decoupling capacitors per unique power net.
                 // A `BTreeMap` keeps iteration (and hence capacitor refdes
                 // assignment) deterministic across processes.
-                let mut pins_by_net: BTreeMap<String, Vec<&Pin>> = BTreeMap::new();
+                let mut pins_by_net: BTreeMap<NetIdx, Vec<&Pin>> = BTreeMap::new();
                 for pin in power_pins {
-                    let net_name = board
+                    let net_idx = board
                         .connections
                         .iter()
                         .find(|c| c.component == comp_idx && c.pin == pin.name())
-                        .map(|c| c.net.0.clone());
-                    if let Some(name) = net_name {
-                        pins_by_net.entry(name).or_default().push(pin);
+                        .map(|c| c.net);
+                    if let Some(idx) = net_idx {
+                        pins_by_net.entry(idx).or_default().push(pin);
                     } else {
                         diagnostics.push(Diagnostic {
                             code: "DECOUPLE:UNCONNECTED".into(),
@@ -707,7 +678,7 @@ fn synthesise_decoupling(
                             pin,
                             values,
                             package,
-                            &gnd_net_name,
+                            gnd_net_idx,
                             &mut components,
                             &mut connections,
                             &mut diagnostics,
@@ -770,7 +741,7 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "VIN".into(),
-                net: NetId("V3V3".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,
@@ -807,7 +778,7 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "VIN".into(),
-                net: NetId("V3V3".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,
@@ -866,12 +837,12 @@ mod tests {
                 Connection {
                     component: 0,
                     pin: "VDD".into(),
-                    net: NetId("V3V3".into()),
+                    net: NetIdx(0),
                 },
                 Connection {
                     component: 0,
                     pin: "VDD_USB".into(),
-                    net: NetId("GND".into()),
+                    net: NetIdx(1),
                 },
             ],
             constraints: vec![],
@@ -929,12 +900,12 @@ mod tests {
                 Connection {
                     component: 0,
                     pin: "AVDD".into(),
-                    net: NetId("AVDD".into()),
+                    net: NetIdx(0),
                 },
                 Connection {
                     component: 0,
                     pin: "VDD".into(),
-                    net: NetId("VDD".into()),
+                    net: NetIdx(1),
                 },
             ],
             constraints: vec![],

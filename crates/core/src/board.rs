@@ -5,7 +5,7 @@
 //! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    CompileError, Component, ComponentMeta, Constraint, Net, NetId, Pad, Pin,
+    CompileError, Component, ComponentMeta, Constraint, Net, NetIdx, Pad, Pin,
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
@@ -48,7 +48,7 @@ impl CompiledComponent {
 pub struct Connection {
     pub component: usize,
     pub pin: String,
-    pub net: NetId,
+    pub net: NetIdx,
 }
 
 /// An immutable structure representing a finished [`Board`](crate::Board) that is ready for export.
@@ -62,6 +62,52 @@ pub struct CompiledBoard {
     pub width: f64,
     /// Board height in millimetres.
     pub height: f64,
+}
+
+impl CompiledBoard {
+    /// Get a reference to the net at the given index.
+    pub fn net(&self, idx: NetIdx) -> &Net {
+        &self.nets[idx.0]
+    }
+
+    /// Find a net by name, returning its index if present.
+    pub fn find_net(&self, name: &str) -> Option<NetIdx> {
+        self.nets.iter().position(|n| n.name == name).map(NetIdx)
+    }
+}
+
+/// Precomputed connectivity index for a [`CompiledBoard`].
+///
+/// Maps component/pin pairs to their owning net and tracks which pins are
+/// connected.  Built once during compilation and consumed by ERC and emitters.
+#[derive(Clone, Debug)]
+pub struct BoardView<'a> {
+    /// Reference to the underlying board.
+    pub board: &'a CompiledBoard,
+    /// Map from (component_index, pin_index) to the owning net.
+    pub net_of: std::collections::HashMap<(usize, usize), NetIdx>,
+    /// Set of (component_index, pin_index) pairs that are connected to a net.
+    pub connected: std::collections::HashSet<(usize, usize)>,
+}
+
+impl<'a> BoardView<'a> {
+    /// Build a board view from a compiled board.
+    pub fn new(board: &'a CompiledBoard) -> Self {
+        let mut net_of = std::collections::HashMap::new();
+        let mut connected = std::collections::HashSet::new();
+        for conn in &board.connections {
+            let comp = &board.components[conn.component];
+            if let Some(pin_idx) = comp.pins.iter().position(|p| p.name() == conn.pin) {
+                net_of.insert((conn.component, pin_idx), conn.net);
+                connected.insert((conn.component, pin_idx));
+            }
+        }
+        Self {
+            board,
+            net_of,
+            connected,
+        }
+    }
 }
 
 /// Handle to a component instance on a [`Board`].
@@ -84,8 +130,9 @@ pub struct Board {
     name: String,
     pub components: Vec<ComponentEntry>,
     pub connections: Vec<RawConnection>,
-    pub net_overrides: Vec<RawNetOverride>,
-    pub(crate) next_edge: usize,
+    pub net_overrides: std::collections::BTreeMap<usize, RawNetOverride>,
+    pub next_edge: usize,
+    pub single_pin_nets: Vec<PinHandle>,
     /// Board width in millimetres (default 100.0).
     width: f64,
     /// Board height in millimetres (default 80.0).
@@ -109,7 +156,8 @@ impl Board {
             name: name.into(),
             components: Vec::new(),
             connections: Vec::new(),
-            net_overrides: Vec::new(),
+            net_overrides: std::collections::BTreeMap::new(),
+            single_pin_nets: Vec::new(),
             next_edge: 0,
             width: 100.0,
             height: 80.0,
@@ -155,24 +203,43 @@ impl Board {
         let edge = self.next_edge;
         self.next_edge += 1;
         self.connections.push(RawConnection { from, to });
-        self.net_overrides.push(RawNetOverride::default());
-        Ok(NetHandle { edge })
+        self.net_overrides.insert(edge, RawNetOverride::default());
+        Ok(NetHandle { id: edge })
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Set an explicit voltage override for a net returned by [`Board::connect`].
+    /// Register a single-pin net (e.g. a lone power pin needing a named net).
+    ///
+    /// Unlike [`Board::connect`], this does not create a self-connection edge;
+    /// the single-pin net is represented directly during compilation.
+    pub fn net(&mut self, pin: PinHandle) -> Result<NetHandle, CompileError> {
+        if let Some(diag) = self.validate_pin(&pin) {
+            return Err(CompileError::new(vec![diag]));
+        }
+        let idx = self.single_pin_nets.len();
+        self.single_pin_nets.push(pin);
+        self.net_overrides
+            .insert(self.next_edge + idx, RawNetOverride::default());
+        Ok(NetHandle {
+            id: self.next_edge + idx,
+        })
+    }
+
+    /// Set an explicit voltage override for a net returned by [`Board::connect`]
+    /// or [`Board::net`].
     pub fn set_net_voltage(&mut self, handle: NetHandle, v: Qty<Volt>) {
-        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+        if let Some(ov) = self.net_overrides.get_mut(&handle.id) {
             ov.voltage = Some(v);
         }
     }
 
-    /// Set an explicit name override for a net returned by [`Board::connect`].
+    /// Set an explicit name override for a net returned by [`Board::connect`]
+    /// or [`Board::net`].
     pub fn set_net_name(&mut self, handle: NetHandle, name: &str) {
-        if let Some(ov) = self.net_overrides.get_mut(handle.edge) {
+        if let Some(ov) = self.net_overrides.get_mut(&handle.id) {
             ov.name = Some(name.to_owned());
         }
     }

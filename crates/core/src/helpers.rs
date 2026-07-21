@@ -13,8 +13,3 @@ pub fn join(board: &mut Board, pins: &[PinHandle]) -> Result<NetHandle, CompileE
     }
     Ok(first)
 }
-
-/// Create a power net from a single power pin by self-connecting it.
-pub fn pwr_net(board: &mut Board, pin: PinHandle) -> Result<NetHandle, CompileError> {
-    board.connect(pin, pin)
-}

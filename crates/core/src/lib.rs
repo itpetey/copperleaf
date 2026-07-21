@@ -2,10 +2,10 @@ use std::path::Path;
 
 // Re-export all public types at crate root for backward compatibility.
 pub use board::{
-    Board, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle, Connection,
-    RawNetOverride,
+    Board, BoardView, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle,
+    Connection, RawNetOverride,
 };
-pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetKind};
+pub use net::{Constraint, Net, NetClass, NetHandle, NetId, NetIdx, NetKind};
 pub use pin::{
     DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, Pin, PinBuilder,
     PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SMD_LAYERS, SigKind, SigSpec, SymPin,

@@ -87,9 +87,9 @@ fn design_node() -> Sexpr {
 
 fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
     use std::collections::HashMap;
-    let mut by_net: HashMap<&str, Vec<&copperleaf::Connection>> = HashMap::new();
+    let mut by_net: HashMap<usize, Vec<&copperleaf::Connection>> = HashMap::new();
     for conn in &board.connections {
-        by_net.entry(conn.net.0.as_str()).or_default().push(conn);
+        by_net.entry(conn.net.0).or_default().push(conn);
     }
 
     let nets: Vec<_> = net_codes
@@ -100,7 +100,9 @@ fn nets_node(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Sexpr {
                 Sexpr::list([Sexpr::atom("code"), Sexpr::atom(code.to_string())]),
                 kv("name", name),
             ];
-            if let Some(conns) = by_net.get(name.as_str()) {
+            if let Some(net_idx) = board.find_net(name)
+                && let Some(conns) = by_net.get(&net_idx.0)
+            {
                 for conn in conns {
                     net_children.push(node_sexpr(board, conn));
                 }
@@ -135,7 +137,7 @@ fn node_sexpr(board: &CompiledBoard, conn: &copperleaf::Connection) -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{Connection, Net, NetClass, NetIdx, Pin, UnitExt};
 
     fn make_board() -> CompiledBoard {
         CompiledBoard {
@@ -185,17 +187,17 @@ mod tests {
                 Connection {
                     component: 0,
                     pin: "VIN".into(),
-                    net: NetId("VBUS".into()),
+                    net: NetIdx(0),
                 },
                 Connection {
                     component: 1,
                     pin: "VDD".into(),
-                    net: NetId("V3V3".into()),
+                    net: NetIdx(1),
                 },
                 Connection {
                     component: 1,
                     pin: "GPIO".into(),
-                    net: NetId("V3V3".into()),
+                    net: NetIdx(1),
                 },
             ],
             constraints: vec![],

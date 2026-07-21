@@ -43,15 +43,15 @@
 
 ## 4. Phase 4 — Connectivity simplification (golden: byte-identical)
 
-- [ ] 4.1 Introduce `NetIdx` and change `Connection.net` to an index into `CompiledBoard.nets`; add `CompiledBoard::net(idx)`/`find_net(name)` helpers
-- [ ] 4.2 Move net overrides off the edge-indexed parallel `Vec<RawNetOverride>` into a per-net override map built during grouping
-- [ ] 4.3 Implement one-pass `resolve_net()` encoding the documented precedence (override → v_nom consensus → ground fallback → NO_VOLTAGE_SOURCE); delete `resolve_net_overrides`/`merge_overrides`/`infer_voltage_from_pins`/`classify_net`
-- [ ] 4.4 Add `Net::is_ground()`; replace the three ground-detection rules (compile ×2, decoupling fallback) with it
-- [ ] 4.5 Add `Board::net(pin) -> Result<NetHandle, CompileError>` for single-pin nets; delete `helpers::pwr_net` and the self-connection edge
-- [ ] 4.6 Build the board view (pin→net index, connected set) once during compilation; expose it from `CompiledBoard`
-- [ ] 4.7 Migrate ERC rules to the board view; delete `connected_pins`, `component_index`, and the `usize::MAX` sentinel
-- [ ] 4.8 Migrate KiCad emitters (netlist, pcb, schematic) to the board view; delete per-emitter `by_net`/`pin_to_net`/`net_conns` maps and `build_net_codes`' defensive extras
-- [ ] 4.9 Verify `cargo test --workspace`, clippy, fmt with zero golden diffs
+- [x] 4.1 Introduce `NetIdx` and change `Connection.net` to an index into `CompiledBoard.nets`; add `CompiledBoard::net(idx)`/`find_net(name)` helpers
+- [x] 4.2 Move net overrides off the edge-indexed parallel `Vec<RawNetOverride>` into a per-net override map built during grouping
+- [x] 4.3 Implement one-pass `resolve_net()` encoding the documented precedence (override → v_nom consensus → ground fallback → NO_VOLTAGE_SOURCE); delete `resolve_net_overrides`/`merge_overrides`/`infer_voltage_from_pins`/`classify_net`
+- [x] 4.4 Add `Net::is_ground()`; replace the three ground-detection rules (compile ×2, decoupling fallback) with it
+- [x] 4.5 Add `Board::net(pin) -> Result<NetHandle, CompileError>` for single-pin nets; delete `helpers::pwr_net` and the self-connection edge
+- [x] 4.6 Build the board view (pin→net index, connected set) once during compilation; expose it from `CompiledBoard`
+- [x] 4.7 Migrate ERC rules to the board view; delete `connected_pins`, `component_index`, and the `usize::MAX` sentinel
+- [x] 4.8 Migrate KiCad emitters (netlist, pcb, schematic) to the board view; delete per-emitter `by_net`/`pin_to_net`/`net_conns` maps and `build_net_codes`' defensive extras
+- [x] 4.9 Verify `cargo test --workspace`, clippy, fmt with zero golden diffs
 
 ## 5. Phase 5 — CLI rationalisation (golden: byte-identical + TOML round-trip)
 

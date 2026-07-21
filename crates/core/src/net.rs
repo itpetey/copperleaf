@@ -4,9 +4,13 @@ use crate::{
     units::{Farad, Meter, Ohm, Qty, UnitExt, Volt},
 };
 
-/// Identifier for a net name.
+/// Identifier for a net name (legacy; prefer [`NetIdx`] for compiled boards).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NetId(pub String);
+
+/// Index into [`CompiledBoard::nets`](crate::board::CompiledBoard::nets).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NetIdx(pub usize);
 
 #[derive(Clone, Debug)]
 pub enum NetKind {
@@ -66,10 +70,11 @@ pub struct Net {
     pub constraints: Vec<Constraint>,
 }
 
-/// Handle to an emerging net, returned by [`Board::connect`](crate::Board::connect).
+/// Handle to an emerging net, returned by [`Board::connect`](crate::Board::connect)
+/// or [`Board::net`](crate::Board::net).
 #[derive(Clone, Copy, Debug)]
 pub struct NetHandle {
-    pub(crate) edge: usize,
+    pub(crate) id: usize,
 }
 
 impl Net {
@@ -100,5 +105,10 @@ impl Net {
             };
         }
         self
+    }
+
+    /// Returns true if this net is a ground net (nominal voltage ≈ 0 V).
+    pub fn is_ground(&self) -> bool {
+        matches!(self.kind, NetKind::Power { v_nom, .. } if v_nom.as_base().abs() < 1e-9)
     }
 }

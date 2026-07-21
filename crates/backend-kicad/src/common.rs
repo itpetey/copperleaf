@@ -8,25 +8,12 @@ pub const PROJECT_LIB: &str = "copperleaf";
 
 /// Build deterministic 1-based net codes from a compiled board.
 pub fn build_net_codes(board: &CompiledBoard) -> Vec<(String, usize)> {
-    let mut codes: Vec<(String, usize)> = board
+    board
         .nets
         .iter()
         .enumerate()
         .map(|(i, n)| (n.name.clone(), i + 1))
-        .collect();
-    let mut seen: std::collections::BTreeSet<String> =
-        board.nets.iter().map(|n| n.name.clone()).collect();
-    let mut extra = Vec::new();
-    for conn in &board.connections {
-        if seen.insert(conn.net.0.clone()) {
-            extra.push(conn.net.0.clone());
-        }
-    }
-    let start = codes.len();
-    for (i, name) in extra.into_iter().enumerate() {
-        codes.push((name, start + i + 1));
-    }
-    codes
+        .collect()
 }
 
 /// Convert metres to millimetres as a formatted string.

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Role};
+use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetIdx, NetKind, Role};
 
 use crate::{
     common::{footprint_ref, format_float, property_sym_node, refdes_prefix, symbol_lib_id},
@@ -38,12 +38,14 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
 
     // A `BTreeMap` keeps wire/label emission order deterministic across
     // processes (std `HashMap` iteration order is randomised per process).
-    let mut net_conns: BTreeMap<&str, Vec<&Connection>> = BTreeMap::new();
+    let mut net_conns: BTreeMap<NetIdx, Vec<&Connection>> = BTreeMap::new();
     for conn in &board.connections {
-        net_conns.entry(conn.net.0.as_str()).or_default().push(conn);
+        net_conns.entry(conn.net).or_default().push(conn);
     }
 
-    for (net_name, conns) in &net_conns {
+    for (net_idx, conns) in &net_conns {
+        let net = board.net(*net_idx);
+        let net_name = net.name.as_str();
         let tips: Vec<((f64, f64), f64)> = conns
             .iter()
             .filter_map(|conn| pin_tip_and_label(board, &layouts, &positions, conn))
@@ -52,7 +54,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
             continue;
         }
 
-        if is_power_net(board, net_name) {
+        if is_power_net(board, *net_idx) {
             let mut seen = std::collections::HashSet::new();
             for ((tip_x, tip_y), rotation) in &tips {
                 let end = stub_end((*tip_x, *tip_y), *rotation);
@@ -80,11 +82,8 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
     format!("{}\n", sch)
 }
 
-fn is_power_net(board: &CompiledBoard, net_name: &str) -> bool {
-    board
-        .nets
-        .iter()
-        .any(|n| n.name == net_name && matches!(n.kind, NetKind::Power { .. }))
+fn is_power_net(board: &CompiledBoard, net_idx: NetIdx) -> bool {
+    matches!(board.net(net_idx).kind, NetKind::Power { .. })
 }
 
 fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
@@ -363,7 +362,7 @@ fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{Connection, Net, NetClass, NetId, Pin, UnitExt};
+    use copperleaf::{Connection, Net, NetClass, NetIdx, Pin, UnitExt};
 
     fn test_board() -> CompiledBoard {
         CompiledBoard {
@@ -395,7 +394,7 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
-                net: NetId("V3V3".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,

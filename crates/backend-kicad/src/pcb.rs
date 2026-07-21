@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use copperleaf::{CompiledBoard, NetClass};
+use copperleaf::{CompiledBoard, NetClass, NetIdx};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
@@ -13,15 +13,16 @@ use crate::{
 /// Emit a KiCad S-expression PCB file for the given compiled board.
 pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
     let net_codes = build_net_codes(board);
-    let net_to_code: HashMap<&str, usize> = net_codes
+    let net_to_code: HashMap<usize, usize> = net_codes
         .iter()
-        .map(|(name, code)| (name.as_str(), *code))
+        .enumerate()
+        .map(|(idx, (_, code))| (idx, *code))
         .collect();
 
-    let pin_to_net: HashMap<(usize, &str), &str> = board
+    let pin_to_net: HashMap<(usize, &str), NetIdx> = board
         .connections
         .iter()
-        .map(|c| ((c.component, c.pin.as_str()), c.net.0.as_str()))
+        .map(|c| ((c.component, c.pin.as_str()), c.net))
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
@@ -56,6 +57,7 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
             placements[idx],
             &pin_to_net,
             &net_to_code,
+            board,
             project_name,
         ));
     }
@@ -146,8 +148,9 @@ fn footprint_node(
     idx: usize,
     comp: &copperleaf::CompiledComponent,
     at: (f64, f64),
-    pin_to_net: &HashMap<(usize, &str), &str>,
-    net_to_code: &HashMap<&str, usize>,
+    pin_to_net: &HashMap<(usize, &str), NetIdx>,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
     project_name: &str,
 ) -> Sexpr {
     let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
@@ -217,9 +220,11 @@ fn footprint_node(
         let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
         let net = pin_index.and_then(|i| {
             let pin = &comp.pins[i];
-            pin_to_net
-                .get(&(idx, pin.name()))
-                .and_then(|&net_name| net_to_code.get(net_name).map(|&code| (code, net_name)))
+            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
+                net_to_code
+                    .get(&net_idx.0)
+                    .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
+            })
         });
         children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
     }
@@ -411,7 +416,7 @@ fn setup_node() -> Sexpr {
 mod tests {
     use super::*;
     use copperleaf::{
-        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetId, NetKind, Pin, UnitExt,
+        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetIdx, NetKind, Pin, UnitExt,
     };
 
     fn test_board() -> CompiledBoard {
@@ -451,7 +456,7 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
-                net: NetId("V3V3".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,

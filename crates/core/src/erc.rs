@@ -9,24 +9,23 @@
 //! in isolation.
 
 use crate::{
-    board::CompiledBoard,
+    board::{BoardView, CompiledBoard},
     net::NetKind,
     pin::Role,
     units::{Diagnostic, Severity},
 };
 
 /// ERC rule: flag DigitalIO/AnalogIn pins with no signal spec and no net connection.
-pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
-    let connected = connected_pins(board);
+pub fn erc_floating_inputs(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
-    for comp in &board.components {
-        for pin in &comp.pins {
+    for (comp_idx, comp) in view.board.components.iter().enumerate() {
+        for (pin_idx, pin) in comp.pins.iter().enumerate() {
             if pin.name() == "NC" || pin.name().starts_with("NC_") {
                 continue;
             }
             if matches!(pin.role(), Role::DigitalIO | Role::AnalogIn)
                 && pin.sig_spec().is_none()
-                && !connected.contains(&(comp.refdes.as_str(), pin.name()))
+                && !view.connected.contains(&(comp_idx, pin_idx))
             {
                 diags.push(Diagnostic {
                     code: "ERC:FLOATING_INPUT".into(),
@@ -42,13 +41,11 @@ pub fn erc_floating_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
 }
 
 /// ERC rule: flag PowerIn pins with no net connection.
-pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
-    let connected = connected_pins(board);
+pub fn erc_floating_power_inputs(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
-    for comp in &board.components {
-        for pin in &comp.pins {
-            if matches!(pin.role(), Role::PowerIn)
-                && !connected.contains(&(comp.refdes.as_str(), pin.name()))
+    for (comp_idx, comp) in view.board.components.iter().enumerate() {
+        for (pin_idx, pin) in comp.pins.iter().enumerate() {
+            if matches!(pin.role(), Role::PowerIn) && !view.connected.contains(&(comp_idx, pin_idx))
             {
                 diags.push(Diagnostic {
                     code: "ERC:FLOATING_POWER_INPUT".into(),
@@ -68,13 +65,12 @@ pub fn erc_floating_power_inputs(board: &CompiledBoard) -> Vec<Diagnostic> {
 }
 
 /// ERC rule: flag NC pins that are connected to a net.
-pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
-    let connected = connected_pins(board);
+pub fn erc_nc_pin_connected(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
-    for comp in &board.components {
-        for pin in &comp.pins {
+    for (comp_idx, comp) in view.board.components.iter().enumerate() {
+        for (pin_idx, pin) in comp.pins.iter().enumerate() {
             if (pin.name() == "NC" || pin.name().starts_with("NC_"))
-                && connected.contains(&(comp.refdes.as_str(), pin.name()))
+                && view.connected.contains(&(comp_idx, pin_idx))
             {
                 diags.push(Diagnostic {
                     code: "ERC:NC_CONNECTED".into(),
@@ -94,35 +90,32 @@ pub fn erc_nc_pin_connected(board: &CompiledBoard) -> Vec<Diagnostic> {
 }
 
 /// ERC rule: flag PowerIn pins connected to a net with voltage exceeding v_max.
-pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
+pub fn erc_overvoltage(view: &BoardView) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
-    for comp in &board.components {
-        for pin in &comp.pins {
+    for (comp_idx, comp) in view.board.components.iter().enumerate() {
+        for (pin_idx, pin) in comp.pins.iter().enumerate() {
             if !matches!(pin.role(), Role::PowerIn) {
                 continue;
             }
-            for conn in &board.connections {
-                if conn.component == component_index(&comp.refdes, board)
-                    && conn.pin == pin.name()
-                    && let Some(net) = board.nets.iter().find(|n| n.name == conn.net.0)
-                    && let NetKind::Power { v_nom, .. } = net.kind
-                    && v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9
-                {
-                    diags.push(Diagnostic {
-                        code: "ERC:OVERVOLT".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "Pin {}.{} max {:.2}V, connected to {:.2}V net {}",
-                            comp.refdes,
-                            pin.name(),
-                            pin.power_spec().v_max.as_base(),
-                            v_nom.as_base(),
-                            net.name
-                        ),
-                        entities: vec![format!("{}.{}", comp.refdes, pin.name()), net.name.clone()],
-                        hint: Some("Use a level shifter or different pin".into()),
-                    });
-                }
+            if let Some(&net_idx) = view.net_of.get(&(comp_idx, pin_idx))
+                && let net = view.board.net(net_idx)
+                && let NetKind::Power { v_nom, .. } = net.kind
+                && v_nom.as_base() > pin.power_spec().v_max.as_base() + 1e-9
+            {
+                diags.push(Diagnostic {
+                    code: "ERC:OVERVOLT".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "Pin {}.{} max {:.2}V, connected to {:.2}V net {}",
+                        comp.refdes,
+                        pin.name(),
+                        pin.power_spec().v_max.as_base(),
+                        v_nom.as_base(),
+                        net.name
+                    ),
+                    entities: vec![format!("{}.{}", comp.refdes, pin.name()), net.name.clone()],
+                    hint: Some("Use a level shifter or different pin".into()),
+                });
             }
         }
     }
@@ -134,34 +127,16 @@ pub fn erc_overvoltage(board: &CompiledBoard) -> Vec<Diagnostic> {
 /// Returns `(warnings, errors)`.  Errors are fatal and short-circuit the
 /// pipeline; warnings are informational and always collected.
 pub fn run_erc(board: &CompiledBoard) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
+    let view = BoardView::new(board);
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
 
-    warnings.extend(erc_floating_inputs(board));
-    warnings.extend(erc_floating_power_inputs(board));
-    errors.extend(erc_overvoltage(board));
-    errors.extend(erc_nc_pin_connected(board));
+    warnings.extend(erc_floating_inputs(&view));
+    warnings.extend(erc_floating_power_inputs(&view));
+    errors.extend(erc_overvoltage(&view));
+    errors.extend(erc_nc_pin_connected(&view));
 
     (warnings, errors)
-}
-
-fn component_index(refdes: &str, board: &CompiledBoard) -> usize {
-    board
-        .components
-        .iter()
-        .position(|c| c.refdes == refdes)
-        .unwrap_or(usize::MAX)
-}
-
-fn connected_pins(board: &CompiledBoard) -> Vec<(&str, &str)> {
-    board
-        .connections
-        .iter()
-        .map(|c| {
-            let comp = &board.components[c.component];
-            (comp.refdes.as_str(), c.pin.as_str())
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -169,8 +144,8 @@ mod tests {
     use super::*;
     use crate::{
         ComponentMeta,
-        board::{CompiledComponent, Connection},
-        net::{Constraint, Net, NetClass, NetId},
+        board::{BoardView, CompiledComponent, Connection},
+        net::{Constraint, Net, NetClass, NetIdx},
         pin::Pin,
         units::UnitExt,
     };
@@ -205,13 +180,14 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
-                net: NetId("VBUS".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,
             height: 80.0,
         };
-        let diags = erc_overvoltage(&board);
+        let view = BoardView::new(&board);
+        let diags = erc_overvoltage(&view);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:OVERVOLT");
     }
@@ -232,13 +208,14 @@ mod tests {
             connections: vec![Connection {
                 component: 0,
                 pin: "NC".into(),
-                net: NetId("NET".into()),
+                net: NetIdx(0),
             }],
             constraints: vec![],
             width: 100.0,
             height: 80.0,
         };
-        let diags = erc_nc_pin_connected(&board);
+        let view = BoardView::new(&board);
+        let diags = erc_nc_pin_connected(&view);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:NC_CONNECTED");
     }
@@ -253,7 +230,8 @@ mod tests {
             width: 100.0,
             height: 80.0,
         };
-        let diags = erc_floating_inputs(&board);
+        let view = BoardView::new(&board);
+        let diags = erc_floating_inputs(&view);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, "ERC:FLOATING_INPUT");
     }
