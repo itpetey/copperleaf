@@ -264,8 +264,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             // If no model found in the footprint S-expression, look for a
             // .step file alongside the footprint file.
             if manifest.component.model_3d.is_none() {
-                manifest.component.model_3d =
-                    find_step_file_alongside(footprint_path);
+                manifest.component.model_3d = find_step_file_alongside(footprint_path);
             }
         }
     }
@@ -301,6 +300,29 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     Ok(())
 }
 
+/// Look for a `.step` file in the same directory as `footprint_path`.
+///
+/// If the footprint path is a directory (`.pretty` library), searches for any
+/// `.step` file inside it.  Returns the first match as a `Some(String)`, or
+/// `None` if nothing is found.
+pub(crate) fn find_step_file_alongside(footprint_path: &str) -> Option<String> {
+    let path = std::path::Path::new(footprint_path);
+    let dir = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()?.to_path_buf()
+    };
+
+    for entry in std::fs::read_dir(&dir).ok()? {
+        let entry = entry.ok()?;
+        let p = entry.path();
+        if p.extension().and_then(|s| s.to_str()) == Some("step") {
+            return p.to_str().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
 /// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
 /// bounding box (i.e. it is a thermal via, not an electrical pad).
 fn is_thermal_via(
@@ -325,27 +347,4 @@ fn is_thermal_via(
         }
     }
     false
-}
-
-/// Look for a `.step` file in the same directory as `footprint_path`.
-///
-/// If the footprint path is a directory (`.pretty` library), searches for any
-/// `.step` file inside it.  Returns the first match as a `Some(String)`, or
-/// `None` if nothing is found.
-pub(crate) fn find_step_file_alongside(footprint_path: &str) -> Option<String> {
-    let path = std::path::Path::new(footprint_path);
-    let dir = if path.is_dir() {
-        path.to_path_buf()
-    } else {
-        path.parent()?.to_path_buf()
-    };
-
-    for entry in std::fs::read_dir(&dir).ok()? {
-        let entry = entry.ok()?;
-        let p = entry.path();
-        if p.extension().and_then(|s| s.to_str()) == Some("step") {
-            return p.to_str().map(|s| s.to_string());
-        }
-    }
-    None
 }

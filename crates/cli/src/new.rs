@@ -84,14 +84,14 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
                 hint: None,
             }));
         };
-        let model = copperleaf_backend_kicad::parse_footprint_model_lib(
-            footprint_path,
-            &lib_id,
-        )?;
+        let model = copperleaf_backend_kicad::parse_footprint_model_lib(footprint_path, &lib_id)?;
         (pads, model)
     } else {
         let model = copperleaf_backend_kicad::parse_footprint_model(footprint_path)?;
-        (copperleaf_backend_kicad::parse_footprint(footprint_path)?, model)
+        (
+            copperleaf_backend_kicad::parse_footprint(footprint_path)?,
+            model,
+        )
     };
 
     let model_3d = args

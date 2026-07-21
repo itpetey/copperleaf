@@ -66,6 +66,13 @@ struct NetGrouping {
     roots: Vec<usize>,
 }
 
+/// Options controlling the compilation pipeline.
+pub struct CompileOptions {
+    /// Footprint code used for synthesised decoupling capacitors.
+    /// Defaults to [`DEFAULT_CAP_FOOTPRINT`] (0603 / 1608 metric).
+    pub decoupling_footprint: Package,
+}
+
 impl CompileError {
     pub fn new(errors: Vec<Diagnostic>) -> Self {
         Self { errors }
@@ -143,13 +150,6 @@ impl NetGrouping {
         }
         edge_ids
     }
-}
-
-/// Options controlling the compilation pipeline.
-pub struct CompileOptions {
-    /// Footprint code used for synthesised decoupling capacitors.
-    /// Defaults to [`DEFAULT_CAP_FOOTPRINT`] (0603 / 1608 metric).
-    pub decoupling_footprint: Package,
 }
 
 impl Default for CompileOptions {

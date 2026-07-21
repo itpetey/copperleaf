@@ -3,6 +3,7 @@
 //! Generates `.kicad_mod` files from Copperleaf [`Manifest`] data so the part
 //! TOML can serve as the single source of truth for a component's footprint.
 
+use base64::Engine as _;
 use copperleaf_part_codegen::{Manifest, MechanicalDef, PinDef};
 
 use crate::{
@@ -23,7 +24,6 @@ pub enum EmitError {
         source: std::io::Error,
     },
 }
-use base64::Engine as _;
 
 /// Generate a `.kicad_mod` S-expression string from a component manifest.
 ///
@@ -139,8 +139,14 @@ pub fn emit_footprint_to(
     }
 
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
-    let rot = manifest.component.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0));
-    let off = manifest.component.model_3d_offset.unwrap_or((0.0, 0.0, 0.0));
+    let rot = manifest
+        .component
+        .model_3d_rotation
+        .unwrap_or((0.0, 0.0, 0.0));
+    let off = manifest
+        .component
+        .model_3d_offset
+        .unwrap_or((0.0, 0.0, 0.0));
     children.push(fp_geom::model_sexpr(
         name,
         model_path_for_sexpr.as_deref(),
@@ -154,7 +160,9 @@ pub fn emit_footprint_to(
             .chain(children),
     )
     .to_string())
-}/// Collect all pads for a manifest: electrical pins (with thermal vias)
+}
+
+/// Collect all pads for a manifest: electrical pins (with thermal vias)
 /// followed by mechanical pads.
 pub fn pads_from_manifest(manifest: &Manifest) -> Vec<PadGeom> {
     let mut pads: Vec<PadGeom> = Vec::new();

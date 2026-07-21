@@ -10,7 +10,9 @@ use base64::Engine as _;
 use copperleaf::{Backend, BackendError, CompiledBoard};
 
 pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
-pub use fp_parser::{PadDef, parse_footprint, parse_footprint_lib, parse_footprint_model, parse_footprint_model_lib};
+pub use fp_parser::{
+    PadDef, parse_footprint, parse_footprint_lib, parse_footprint_model, parse_footprint_model_lib,
+};
 pub use lib_emitter::{emit_footprint_lib, emit_symbol_lib};
 pub use project::{emit_fp_lib_table, emit_sym_lib_table};
 pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
@@ -127,7 +129,8 @@ mod tests {
         let mut board = Board::new("test");
         let u1 = board.add("U1", TwoPinPart::new());
         let _ = board.connect(u1.pin(TwoPinPart::A), u1.pin(TwoPinPart::B));
-        let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
+        let report =
+            copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         let backend = KiCad::new().with_project_name("test");

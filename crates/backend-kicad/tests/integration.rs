@@ -93,7 +93,8 @@ fn decoupling_caps_have_footprints() {
         .connect(src.pin(PwrSource::VCC), part.pin(DecoupledPart::VDD))
         .unwrap();
 
-    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect("board should compile");
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default())
+        .expect("board should compile");
     // The synthesised capacitor should appear in the compiled board with a footprint.
     let caps: Vec<_> = report
         .board
@@ -113,7 +114,8 @@ fn decoupling_caps_have_footprints() {
 #[test]
 fn emitted_netlist_contains_components_and_nets() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
+    let report =
+        copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -132,7 +134,8 @@ fn emitted_netlist_contains_components_and_nets() {
 #[test]
 fn emitted_schematic_contains_lib_id_and_pin_positions() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
+    let report =
+        copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
     KiCad::new()
@@ -149,14 +152,16 @@ fn emitted_schematic_contains_lib_id_and_pin_positions() {
 #[test]
 fn overvoltage_produces_compile_error() {
     let (board, _, _) = build_two_component_board(5.0, 3.3);
-    let err = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect_err("overvoltage should fail compilation");
+    let err = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default())
+        .expect_err("overvoltage should fail compilation");
     assert!(err.errors.iter().any(|d| d.code == "ERC:OVERVOLT"));
 }
 
 #[test]
 fn valid_board_compiles_and_emits() {
     let (board, _, _) = build_two_component_board(3.3, 3.6);
-    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default()).expect("valid board should compile");
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default())
+        .expect("valid board should compile");
 
     let dir = tempfile::tempdir().unwrap();
     let backend = KiCad::new().with_project_name("test");

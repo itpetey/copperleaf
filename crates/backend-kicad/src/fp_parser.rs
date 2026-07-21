@@ -42,16 +42,6 @@ pub fn parse_footprint(path: impl AsRef<Path>) -> Result<Vec<PadDef>, ParseError
     Ok(extract_pads(&sexpr))
 }
 
-/// Extract the 3D model path from a `.kicad_mod` file's `(model ...)` node.
-///
-/// Returns the path string (e.g. `"${KICAD10_3DMODEL_DIR}/footprints.3dshapes/QFN-60.step"`)
-/// if a model node is found, or `None` otherwise.
-pub fn parse_footprint_model(path: impl AsRef<Path>) -> Result<Option<String>, ParseError> {
-    let source = std::fs::read_to_string(path.as_ref())?;
-    let sexpr = parse(&source)?;
-    Ok(extract_model_path(&sexpr))
-}
-
 /// Parse a `.pretty` footprint library directory, returning one entry per
 /// `.kicad_mod` file found inside.
 pub fn parse_footprint_lib(
@@ -75,6 +65,16 @@ pub fn parse_footprint_lib(
     }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(entries)
+}
+
+/// Extract the 3D model path from a `.kicad_mod` file's `(model ...)` node.
+///
+/// Returns the path string (e.g. `"${KICAD10_3DMODEL_DIR}/footprints.3dshapes/QFN-60.step"`)
+/// if a model node is found, or `None` otherwise.
+pub fn parse_footprint_model(path: impl AsRef<Path>) -> Result<Option<String>, ParseError> {
+    let source = std::fs::read_to_string(path.as_ref())?;
+    let sexpr = parse(&source)?;
+    Ok(extract_model_path(&sexpr))
 }
 
 /// Extract the 3D model path for a named footprint within a `.pretty` library
@@ -114,12 +114,6 @@ fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     }
 }
 
-fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
-    let mut pads = Vec::new();
-    collect_pads(sexpr, &mut pads);
-    pads
-}
-
 /// Walk the S-expression tree looking for a `(model <path> ...)` node and
 /// return the model path string if found.
 fn extract_model_path(node: &Sexpr) -> Option<String> {
@@ -139,6 +133,12 @@ fn extract_model_path(node: &Sexpr) -> Option<String> {
         }
     }
     None
+}
+
+fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
+    let mut pads = Vec::new();
+    collect_pads(sexpr, &mut pads);
+    pads
 }
 
 fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {

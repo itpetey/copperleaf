@@ -5,6 +5,7 @@
 //! automatically.  This script emits `cargo:rerun-if-changed` directives for
 //! every TOML file in the crate root so editing a part manifest triggers a
 //! recompile.
+
 use std::{env, fs, path::Path};
 
 fn main() {
