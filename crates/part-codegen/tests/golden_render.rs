@@ -66,7 +66,8 @@ fn compare_or_bless(path: &Path, actual: &str) {
         )
     });
     assert_eq!(
-        expected, actual,
+        expected,
+        actual,
         "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
         path.display()
     );
@@ -101,7 +102,11 @@ fn elide_long_literals(rendered: &str) -> String {
             }
         }
         if body.len() > THRESHOLD {
-            out.push_str(&format!("\"<elided:{}:{:016x}>\"", body.len(), fnv1a(&body)));
+            out.push_str(&format!(
+                "\"<elided:{}:{:016x}>\"",
+                body.len(),
+                fnv1a(&body)
+            ));
         } else {
             out.push('"');
             out.push_str(&body);
@@ -140,7 +145,10 @@ mod tests {
 
     #[test]
     fn elide_leaves_short_literals_alone() {
-        assert_eq!(elide_long_literals("fn x() { \"abc\" }"), "fn x() { \"abc\" }");
+        assert_eq!(
+            elide_long_literals("fn x() { \"abc\" }"),
+            "fn x() { \"abc\" }"
+        );
     }
 
     #[test]

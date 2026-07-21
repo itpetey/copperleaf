@@ -17,7 +17,7 @@
 /// Standard SMD footprint code.
 ///
 /// Variants are named by their metric code (e.g. `M1608` for the 0603/1608
-/// package).  Use [`from_str`](Package::from_str) to look up by imperial or
+/// package).  Use [`from_code`](Package::from_code) to look up by imperial or
 /// metric string.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Package {
@@ -64,7 +64,7 @@ impl Package {
     /// Look up a footprint code by its imperial or metric name.
     ///
     /// Accepts e.g. `"0603"`, `"1608"`, `"0402"`, `"1005"`.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_code(s: &str) -> Option<Self> {
         Some(match s {
             "0201" | "0603" => Self::M0603,
             "0402" | "1005" => Self::M1005,
@@ -203,14 +203,14 @@ mod tests {
 
     #[test]
     fn lookup_by_imperial_and_metric() {
-        assert_eq!(Package::from_str("0603"), Some(Package::M0603));
-        assert_eq!(Package::from_str("1608"), Some(Package::M1608));
+        assert_eq!(Package::from_code("0603"), Some(Package::M0603));
+        assert_eq!(Package::from_code("1608"), Some(Package::M1608));
     }
 
     #[test]
     fn unknown_code_returns_none() {
-        assert_eq!(Package::from_str("9999"), None);
-        assert_eq!(Package::from_str(""), None);
+        assert_eq!(Package::from_code("9999"), None);
+        assert_eq!(Package::from_code(""), None);
     }
 
     #[test]

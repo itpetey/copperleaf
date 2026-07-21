@@ -81,21 +81,7 @@ pub fn emit_footprint_to(
     let pads = pads_from_manifest(manifest);
     let extent = fp_geom::pads_extent(&pads);
 
-    let mut children = Vec::new();
-
     // Footprint header.
-    children.push(Sexpr::str(name));
-    children.push(Sexpr::list([
-        Sexpr::atom("version"),
-        Sexpr::atom("20231218"),
-    ]));
-    children.push(Sexpr::list([
-        Sexpr::atom("generator"),
-        Sexpr::str("copperleaf"),
-    ]));
-    children.push(Sexpr::list([Sexpr::atom("layer"), Sexpr::atom("F.Cu")]));
-    children.push(Sexpr::list([Sexpr::atom("tedit"), Sexpr::atom("00000000")]));
-    // KLC F9.1: the description should carry the datasheet URL when known.
     let descr = match (
         &manifest.component.description,
         &manifest.component.datasheet,
@@ -105,12 +91,19 @@ pub fn emit_footprint_to(
         (None, Some(url)) => url.clone(),
         (None, None) => String::new(),
     };
-    children.push(Sexpr::list([Sexpr::atom("descr"), Sexpr::str(&descr)]));
-    children.push(Sexpr::list([Sexpr::atom("tags"), Sexpr::str("copperleaf")]));
-    children.push(Sexpr::list([
-        Sexpr::atom("attr"),
-        Sexpr::atom(fp_geom::footprint_attr(&pads)),
-    ]));
+    let mut children = vec![
+        Sexpr::str(name),
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20231218")]),
+        Sexpr::list([Sexpr::atom("generator"), Sexpr::str("copperleaf")]),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::atom("F.Cu")]),
+        Sexpr::list([Sexpr::atom("tedit"), Sexpr::atom("00000000")]),
+        Sexpr::list([Sexpr::atom("descr"), Sexpr::str(&descr)]),
+        Sexpr::list([Sexpr::atom("tags"), Sexpr::str("copperleaf")]),
+        Sexpr::list([
+            Sexpr::atom("attr"),
+            Sexpr::atom(fp_geom::footprint_attr(&pads)),
+        ]),
+    ];
 
     // Text items: reference on silk, value + second reference on fab.
     let (cx, ref_y, val_y) = match extent {
@@ -154,12 +147,7 @@ pub fn emit_footprint_to(
         rot,
     ));
 
-    Ok(Sexpr::list(
-        [Sexpr::atom("footprint").into()]
-            .into_iter()
-            .chain(children),
-    )
-    .to_string())
+    Ok(Sexpr::list([Sexpr::atom("footprint")].into_iter().chain(children)).to_string())
 }
 
 /// Collect all pads for a manifest: electrical pins (with thermal vias)
@@ -222,9 +210,7 @@ fn pad_from_pin_def(pin: &PinDef, index: usize) -> PadGeom {
         pin.number.clone()
     };
     let pad_type = pin.pad_type.clone().unwrap_or_else(|| "smd".to_string());
-    let default_shape = if pin.pos.is_some() || pad_type != "thru_hole" {
-        "rect"
-    } else if index == 0 {
+    let default_shape = if pin.pos.is_some() || pad_type != "thru_hole" || index == 0 {
         "rect"
     } else {
         "circle"

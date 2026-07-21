@@ -71,7 +71,8 @@ fn compare_or_bless(path: &Path, actual: &str) {
         )
     });
     assert_eq!(
-        expected, actual,
+        expected,
+        actual,
         "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
         path.display()
     );

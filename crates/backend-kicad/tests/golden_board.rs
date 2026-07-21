@@ -44,7 +44,8 @@ fn compare_or_bless(path: &Path, actual: &str) {
         )
     });
     assert_eq!(
-        expected, actual,
+        expected,
+        actual,
         "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
         path.display()
     );
@@ -106,7 +107,9 @@ fn check_board(name: &str, board: Board) {
 
 #[test]
 fn golden_board_connectors() {
-    use copperleaf_parts_connectors::{Arjm11d7502AbEw2, Conmhf4SmdGT, S2bPhSm4TbLfSn, UsbC23409011};
+    use copperleaf_parts_connectors::{
+        Arjm11d7502AbEw2, Conmhf4SmdGT, S2bPhSm4TbLfSn, UsbC23409011,
+    };
     let mut board = Board::new(PROJECT);
     let j1 = board.add("J1", Arjm11d7502AbEw2::new());
     auto_wire(&mut board, j1);
@@ -138,8 +141,7 @@ fn golden_board_morsemicro() {
 #[test]
 fn golden_board_passives() {
     use copperleaf_parts_passives::{
-        B82472p6152m000, B82472p6222m000, Capacitor, Crystal, Resistor,
-        footprint::Package,
+        B82472p6152m000, B82472p6222m000, Capacitor, Crystal, Resistor, footprint::Package,
     };
     let mut board = Board::new(PROJECT);
     let c1 = board.add("C1", Capacitor::new(100.0.nf(), Package::M1608));
@@ -166,7 +168,10 @@ fn golden_board_raspberrypi() {
 #[test]
 fn golden_board_texas_instruments() {
     let mut board = Board::new(PROJECT);
-    let u1 = board.add("U1", copperleaf_parts_texas_instruments::Tps63031dskr::new());
+    let u1 = board.add(
+        "U1",
+        copperleaf_parts_texas_instruments::Tps63031dskr::new(),
+    );
     auto_wire(&mut board, u1);
     check_board("texas-instruments", board);
 }

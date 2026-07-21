@@ -12,9 +12,9 @@
 use copperleaf::{CompiledComponent, Role};
 
 use crate::{
-    common::{footprint_ref, format_float, refdes_prefix, symbol_name},
-    fp_geom,
-    sexpr::{Sexpr, deterministic_uuid},
+    common::{footprint_ref, property_sym_node, refdes_prefix, symbol_name},
+    deterministic_id, fp_geom,
+    sexpr::Sexpr,
     sym_layout::{self, LayoutPin},
 };
 
@@ -69,19 +69,12 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
         })
         .collect();
 
-    // Add pins for thermal vias and mechanical pads that appear in the PCB
-    // footprint but are not electrical pins.
-    let pads = fp_geom::pads_from_component(comp);
-    let mut extra_idx = 0;
-    for pad in &pads {
-        if pad.pin_index.is_none() {
-            extra_idx += 1;
-            layout_pins.push(LayoutPin {
-                name: format!("MECH{}", extra_idx),
-                number: pad.number.clone(),
-                role: Role::Passive,
-            });
-        }
+    for (number, name) in fp_geom::mech_pad_names(comp) {
+        layout_pins.push(LayoutPin {
+            name,
+            number,
+            role: Role::Passive,
+        });
     }
 
     let layout = sym_layout::layout_symbol(&layout_pins);
@@ -96,28 +89,37 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
         Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
         Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
         // Reference above the body, Value below it (KLC S6.2).
-        lib_property_at(
+        property_sym_node(
             "Reference",
             &refdes_prefix(&comp.refdes),
             (layout.x1, layout.y1 + 1.27),
             false,
+            true,
         ),
-        lib_property_at("Value", symbol_name, (layout.x1, layout.y2 - 1.27), false),
-        lib_property_at("Footprint", &fp_ref, (0.0, 0.0), true),
-        lib_property_at(
+        property_sym_node(
+            "Value",
+            symbol_name,
+            (layout.x1, layout.y2 - 1.27),
+            false,
+            true,
+        ),
+        property_sym_node("Footprint", &fp_ref, (0.0, 0.0), true, false),
+        property_sym_node(
             "Datasheet",
             comp.datasheet.as_deref().unwrap_or("~"),
             (0.0, 0.0),
             true,
+            false,
         ),
-        lib_property_at(
+        property_sym_node(
             "Description",
             comp.description.as_deref().unwrap_or(""),
             (0.0, 0.0),
             true,
+            false,
         ),
-        lib_property_at("ki_keywords", "copperleaf", (0.0, 0.0), true),
-        lib_property_at("ki_fp_filters", &fp_filter, (0.0, 0.0), true),
+        property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
+        property_sym_node("ki_fp_filters", &fp_filter, (0.0, 0.0), true, false),
     ];
 
     // Unit sub-symbol with body and pins.
@@ -177,7 +179,7 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
 
     // Pads.
     for pad in &pads {
-        let uuid = deterministic_uuid(&format!("{}:pad:{}", seed, pad.number));
+        let uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
         children.push(fp_geom::pad_sexpr(pad, Some(&uuid), None));
     }
 
@@ -214,40 +216,6 @@ fn footprint_filter(comp: &CompiledComponent) -> String {
         .map(|c| if c == '-' || c == '_' { '?' } else { c })
         .collect();
     format!("{}*", escaped)
-}
-
-/// Build a `(property ...)` node at a given position.
-fn lib_property_at(key: &str, value: &str, pos: (f64, f64), hide: bool) -> Sexpr {
-    let mut effects = vec![Sexpr::list([
-        Sexpr::atom("font"),
-        Sexpr::list([
-            Sexpr::atom("size"),
-            Sexpr::atom("1.27"),
-            Sexpr::atom("1.27"),
-        ]),
-    ])];
-    if pos != (0.0, 0.0) {
-        effects.push(Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]));
-    }
-
-    let mut children = vec![
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(pos.0, 2)),
-            Sexpr::atom(format_float(pos.1, 2)),
-            Sexpr::atom("0"),
-        ]),
-    ];
-    if hide {
-        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    children.push(Sexpr::list(
-        std::iter::once(Sexpr::atom("effects")).chain(effects),
-    ));
-    Sexpr::list(children)
 }
 
 #[cfg(test)]

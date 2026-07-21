@@ -232,7 +232,7 @@ fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
         return None;
     }
 
-    let pin_type = string_value(children.get(1)?);
+    let pin_type = children.get(1)?.as_string();
     let mut pos = (0.0, 0.0);
     let mut rotation = 0.0;
     let mut length = 2.54;
@@ -251,21 +251,21 @@ fn parse_pin_node(node: &Sexpr) -> Option<PinDef> {
         };
         match key.as_str() {
             "at" => {
-                let xs = string_value(parts.get(1)?);
-                let ys = string_value(parts.get(2)?);
-                let rs = string_value(parts.get(3)?);
+                let xs = parts.get(1)?.as_string();
+                let ys = parts.get(2)?.as_string();
+                let rs = parts.get(3)?.as_string();
                 pos.0 = xs.parse().ok()?;
                 pos.1 = ys.parse().ok()?;
                 rotation = rs.parse().ok()?;
             }
             "length" => {
-                length = string_value(parts.get(1)?).parse().ok()?;
+                length = parts.get(1)?.as_string().parse().ok()?;
             }
             "name" => {
-                name = string_value(parts.get(1)?);
+                name = parts.get(1)?.as_string();
             }
             "number" => {
-                number = string_value(parts.get(1)?);
+                number = parts.get(1)?.as_string();
             }
             _ => {}
         }
@@ -294,11 +294,11 @@ fn parse_property_value(node: &Sexpr, key: &str) -> Option<String> {
     if head != "property" {
         return None;
     }
-    let prop_key = string_value(children.get(1)?);
+    let prop_key = children.get(1)?.as_string();
     if prop_key != key {
         return None;
     }
-    let val = string_value(children.get(2)?);
+    let val = children.get(2)?.as_string();
     if val.is_empty() {
         return None;
     }
@@ -319,7 +319,7 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
         return None;
     }
 
-    let lib_id = string_value(children.get(1)?);
+    let lib_id = children.get(1)?.as_string();
     let mut extends = None;
     for child in &children[2..] {
         if let Sexpr::List(parts) = child
@@ -327,7 +327,7 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
             && let Sexpr::Atom(key) = &parts[0]
             && key == "extends"
         {
-            extends = Some(string_value(&parts[1]));
+            extends = Some(parts[1].as_string());
         }
     }
 
@@ -409,21 +409,6 @@ fn resolve_extends(symbols: &mut [SymbolDef]) {
     for i in 0..symbols.len() {
         let mut visited = std::collections::HashSet::new();
         resolve_one(i, symbols, &by_name, &mut resolved, &mut visited);
-    }
-}
-
-fn string_value(expr: &Sexpr) -> String {
-    match expr {
-        Sexpr::Atom(s) => {
-            if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
-                s[1..s.len() - 1]
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\")
-            } else {
-                s.clone()
-            }
-        }
-        _ => String::new(),
     }
 }
 

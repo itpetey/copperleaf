@@ -103,12 +103,11 @@ fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<St
         if !line.starts_with('{') {
             continue;
         }
-        if let Ok(event) = serde_json::from_str::<OpencodeEvent>(line) {
-            if event.ty == "text" {
-                if let Some(part) = event.part {
-                    text.push_str(&part.text);
-                }
-            }
+        if let Ok(event) = serde_json::from_str::<OpencodeEvent>(line)
+            && event.ty == "text"
+            && let Some(part) = event.part
+        {
+            text.push_str(&part.text);
         }
     }
 
@@ -120,7 +119,7 @@ fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<St
                 output.status, stderr
             )
         } else {
-            format!("`opencode` succeeded but returned no text output")
+            "`opencode` succeeded but returned no text output".to_string()
         };
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:LLM_EMPTY".into(),

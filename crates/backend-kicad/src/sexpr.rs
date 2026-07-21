@@ -69,6 +69,23 @@ impl Sexpr {
         Self::Raw(s.into())
     }
 
+    /// Return the unquoted string value of a quoted atom, or the raw atom
+    /// text for unquoted atoms. Returns an empty string for lists.
+    pub fn as_string(&self) -> String {
+        match self {
+            Self::Atom(s) => {
+                if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
+                    s[1..s.len() - 1]
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                } else {
+                    s.clone()
+                }
+            }
+            _ => String::new(),
+        }
+    }
+
     /// True if this node is an atom or raw text (i.e. has no children).
     fn is_leaf(&self) -> bool {
         matches!(self, Self::Atom(_) | Self::Raw(_))
@@ -164,33 +181,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// Deterministic UUID-formatted string (8-4-4-4-12 hex) derived from `seed`.
-pub fn deterministic_uuid(seed: &str) -> String {
-    let h1 = fnv1a_64(seed, 0);
-    let h2 = fnv1a_64(seed, 0x6c14_4f3a_7af5_c5d2);
-    let b1 = h1.to_be_bytes();
-    let b2 = h2.to_be_bytes();
-    format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        b1[0],
-        b1[1],
-        b1[2],
-        b1[3],
-        b1[4],
-        b1[5],
-        b1[6],
-        b1[7],
-        b2[0],
-        b2[1],
-        b2[2],
-        b2[3],
-        b2[4],
-        b2[5],
-        b2[6],
-        b2[7]
-    )
-}
-
 /// Convenience: `(key "val")`.
 pub fn kv(key: impl AsRef<str>, val: impl AsRef<str>) -> Sexpr {
     Sexpr::list([Sexpr::atom(key.as_ref().to_string()), Sexpr::str(val)])
@@ -216,17 +206,6 @@ fn escape_str(s: &str) -> String {
         .replace('\n', "\\n")
         .replace('\t', "\\t")
         .replace('\r', "\\r")
-}
-
-fn fnv1a_64(seed: &str, salt: u64) -> u64 {
-    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-    let mut hash = FNV_OFFSET ^ salt;
-    for b in seed.bytes() {
-        hash ^= b as u64;
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    hash
 }
 
 /// Tokenize a KiCad S-expression string.
@@ -287,14 +266,6 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn deterministic_uuid_stable() {
-        let a = deterministic_uuid("sch:U1");
-        let b = deterministic_uuid("sch:U1");
-        assert_eq!(a, b);
-        assert_eq!(a.len(), 36);
-    }
 
     #[test]
     fn parse_simple_list() {

@@ -92,7 +92,7 @@ pub fn fp_circle(
     if let Some(seed) = uuid_seed {
         children.push(Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(crate::sexpr::deterministic_uuid(&format!(
+            Sexpr::str(crate::deterministic_id(&format!(
                 "{}:circle:{}:{}:{}",
                 seed, center.0, center.1, layer
             ))),
@@ -127,7 +127,7 @@ pub fn fp_line(
     if let Some(seed) = uuid_seed {
         children.push(Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(crate::sexpr::deterministic_uuid(&format!(
+            Sexpr::str(crate::deterministic_id(&format!(
                 "{}:{}:{}:{}:{}:{}",
                 seed, start.0, start.1, end.0, end.1, layer
             ))),
@@ -187,9 +187,9 @@ pub fn model_sexpr(
             Sexpr::atom("offset"),
             Sexpr::list([
                 Sexpr::atom("xyz"),
-                Sexpr::atom(&format!("{ox}")),
-                Sexpr::atom(&format!("{oy}")),
-                Sexpr::atom(&format!("{oz}")),
+                Sexpr::atom(format!("{ox}")),
+                Sexpr::atom(format!("{oy}")),
+                Sexpr::atom(format!("{oz}")),
             ]),
         ]),
         Sexpr::list([
@@ -205,9 +205,9 @@ pub fn model_sexpr(
             Sexpr::atom("rotate"),
             Sexpr::list([
                 Sexpr::atom("xyz"),
-                Sexpr::atom(&format!("{rx}")),
-                Sexpr::atom(&format!("{ry}")),
-                Sexpr::atom(&format!("{rz}")),
+                Sexpr::atom(format!("{rx}")),
+                Sexpr::atom(format!("{ry}")),
+                Sexpr::atom(format!("{rz}")),
             ]),
         ]),
     ])
@@ -221,7 +221,7 @@ pub fn model_sexpr(
 ///   (KLC F7.2).  Auto-generated rows already start at the origin.
 /// - Fully automatic footprints (no explicit positions at all) are left
 ///   untouched.
-pub fn normalise_anchor(pads: &mut Vec<PadGeom>) {
+pub fn normalise_anchor(pads: &mut [PadGeom]) {
     if pads.is_empty() {
         return;
     }
@@ -446,6 +446,18 @@ pub fn pads_from_component(comp: &CompiledComponent) -> Vec<PadGeom> {
     pads
 }
 
+/// Return `(number, MECH_name)` pairs for pads that do not correspond to an
+/// electrical pin (thermal vias and mechanical pads).  Schematic and netlist
+/// emitters add these as extra symbol pins so pin counts match.
+pub fn mech_pad_names(comp: &CompiledComponent) -> Vec<(String, String)> {
+    pads_from_component(comp)
+        .iter()
+        .filter(|p| p.pin_index.is_none())
+        .enumerate()
+        .map(|(i, p)| (p.number.clone(), format!("MECH{}", i + 1)))
+        .collect()
+}
+
 /// Position of pad `"1"` (the first electrical pad), used for the pin-1
 /// marker.
 pub fn pin1_pos(pads: &[PadGeom]) -> Option<(f64, f64)> {
@@ -557,9 +569,7 @@ fn pad_from_pin(pin: &Pin, index: usize) -> PadGeom {
 
     // KLC F7.3: for auto-generated through-hole rows, pad 1 is rectangular
     // and the rest circular.  Explicit vendor geometry is preserved as-is.
-    let default_shape = if pin.pos().is_some() || !is_through_hole(&pad_type) {
-        "rect"
-    } else if index == 0 {
+    let default_shape = if pin.pos().is_some() || !is_through_hole(&pad_type) || index == 0 {
         "rect"
     } else {
         "circle"

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use copperleaf::{Diagnostic, Severity};
-use copperleaf_backend_kicad::{find_symbol, flatten_extends, parse_symbol_lib};
+use copperleaf_backend_kicad::{find_symbol, parse_symbol_lib};
 use copperleaf_part_codegen::{ComponentMeta, Manifest};
 
 use crate::{CliError, NewArgs, kindmap::KindMap, manifest, update, vendor};
@@ -54,24 +54,14 @@ fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
 }
 
 fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Result<(), CliError> {
-    // Guard against accidentally passing a symbol file as a footprint.
-    if let Some(ext) = PathBuf::from(footprint_path)
-        .extension()
-        .and_then(|s| s.to_str())
-    {
-        if ext.eq_ignore_ascii_case("kicad_sym") {
-            return Err(CliError::Diagnostic(Diagnostic {
-                code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
-                severity: Severity::Error,
-                message: format!(
-                    "'{}' is a symbol file, not a footprint — use --symbol instead",
-                    footprint_path
-                ),
-                entities: vec![],
-                hint: None,
-            }));
-        }
-    }
+    manifest::check_extension(
+        footprint_path,
+        "kicad_sym",
+        "CLI:SYMBOL_AS_FOOTPRINT",
+        "a symbol file",
+        "a footprint",
+        "--symbol",
+    )?;
     let lib_id = args.lib_id.clone().unwrap_or_default();
     let (pads, extracted_model) = if std::fs::metadata(footprint_path)?.is_dir() {
         let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
@@ -117,14 +107,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
         &args.default_kind,
     );
 
-    // Embed the 3D model file content as base64.
-    if let Some(ref model_path) = manifest.component.model_3d.clone() {
-        if let Ok(bytes) = std::fs::read(model_path) {
-            use base64::Engine;
-            manifest.component.model_3d_data =
-                Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
-        }
-    }
+    manifest::embed_model_data(&mut manifest);
 
     let output = manifest::serialise(&manifest);
     let diags = vec![Diagnostic {
@@ -139,86 +122,35 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
 }
 
 fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError> {
-    // Guard against accidentally passing a footprint file as a symbol.
-    if let Some(ext) = PathBuf::from(symbol_path)
-        .extension()
-        .and_then(|s| s.to_str())
-    {
-        if ext.eq_ignore_ascii_case("kicad_mod") {
-            return Err(CliError::Diagnostic(Diagnostic {
-                code: "CLI:FOOTPRINT_AS_SYMBOL".into(),
-                severity: Severity::Error,
-                message: format!(
-                    "'{}' is a footprint file, not a symbol — use --footprint instead",
-                    symbol_path
-                ),
-                entities: vec![],
-                hint: None,
-            }));
-        }
-    }
+    manifest::check_extension(
+        symbol_path,
+        "kicad_mod",
+        "CLI:FOOTPRINT_AS_SYMBOL",
+        "a footprint file",
+        "a symbol",
+        "--footprint",
+    )?;
     let source = std::fs::read_to_string(symbol_path)?;
     let symbols = parse_symbol_lib(&source)?;
 
-    // Resolve lib-id: use the provided value, or auto-detect from the file.
-    let owned_lib_id;
-    let lib_id = match args.lib_id.as_deref() {
-        Some(id) => id,
-        None => {
-            if symbols.len() == 1 {
-                owned_lib_id = symbols[0].lib_id.clone();
-                &owned_lib_id
-            } else if symbols.is_empty() {
-                return Err(CliError::Diagnostic(Diagnostic {
-                    code: "CLI:NO_SYMBOLS".into(),
-                    severity: Severity::Error,
-                    message: format!("No symbols found in '{}'", symbol_path),
-                    entities: vec![],
-                    hint: None,
-                }));
-            } else {
-                let names: Vec<&str> = symbols.iter().map(|s| s.lib_id.as_str()).collect();
-                return Err(CliError::Diagnostic(Diagnostic {
-                    code: "CLI:MISSING_LIB_ID".into(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "Multiple symbols found in '{}', --lib-id is required",
-                        symbol_path
-                    ),
-                    entities: names.into_iter().map(String::from).collect(),
-                    hint: Some(format!(
-                        "Available symbols: {}",
-                        symbols
-                            .iter()
-                            .map(|s| s.lib_id.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )),
-                }));
-            }
-        }
-    };
+    let lib_id =
+        manifest::resolve_symbol_lib_id(args.lib_id.as_deref(), None, &symbols, symbol_path)?;
 
-    let Some(symbol) = find_symbol(&symbols, lib_id) else {
+    let Some(symbol) = find_symbol(&symbols, &lib_id) else {
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:SYMBOL_NOT_FOUND".into(),
             severity: Severity::Error,
             message: format!("Symbol '{}' not found in '{}'", lib_id, symbol_path),
-            entities: vec![lib_id.to_string()],
+            entities: vec![lib_id.clone()],
             hint: None,
         }));
     };
-
-    // Resolve inherited pins; the returned S-expression is available for
-    // inspection, and the symbol's `pins` field is already populated by
-    // `parse_symbol_lib`.
-    let _flattened = flatten_extends(symbol, &symbols);
 
     let title = args.title.clone().unwrap_or_else(|| lib_id.to_string());
     let description = args.description.clone();
     let mut manifest = Manifest {
         component: ComponentMeta {
-            name: struct_name(lib_id),
+            name: struct_name(&lib_id),
             title,
             description,
             datasheet: symbol.datasheet.clone(),
@@ -237,7 +169,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
     let diags = manifest::merge_symbol(&mut manifest, &symbol.pins, kindmap, &args.default_kind);
 
     let output = manifest::serialise(&manifest);
-    write_output(args, lib_id, &output, &diags)?;
+    write_output(args, &lib_id, &output, &diags)?;
     Ok(())
 }
 

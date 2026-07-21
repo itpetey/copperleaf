@@ -9,13 +9,14 @@ use std::{fs, path::Path};
 use base64::Engine as _;
 use copperleaf::{Backend, BackendError, CompiledBoard};
 
+pub use copperleaf::deterministic_id;
 pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
 pub use fp_parser::{
     PadDef, parse_footprint, parse_footprint_lib, parse_footprint_model, parse_footprint_model_lib,
 };
 pub use lib_emitter::{emit_footprint_lib, emit_symbol_lib};
 pub use project::{emit_fp_lib_table, emit_sym_lib_table};
-pub use sexpr::{ParseError, Sexpr, deterministic_uuid, kv, parse};
+pub use sexpr::{ParseError, Sexpr, kv, parse};
 pub use sym_emitter::emit_symbol;
 pub use sym_parser::{
     PinDef, SymbolDef, find_symbol, flatten_extends, parse_single_symbol, parse_symbol_lib,
@@ -63,7 +64,7 @@ impl Backend for KiCad {
         let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
 
-        let pro = project::emit_project(&self.project_name, &[], None);
+        let pro = project::emit_project(&self.project_name);
         fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
 
         let sch = schematic::emit_schematic(board);

@@ -36,71 +36,26 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     let mut diags = Vec::new();
 
     if let Some(ref symbol_path) = args.symbol {
-        // Guard against accidentally passing a footprint file as a symbol.
-        if let Some(ext) = std::path::Path::new(symbol_path)
-            .extension()
-            .and_then(|s| s.to_str())
-        {
-            if ext.eq_ignore_ascii_case("kicad_mod") {
-                return Err(CliError::Diagnostic(Diagnostic {
-                    code: "CLI:FOOTPRINT_AS_SYMBOL".into(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "'{}' is a footprint file, not a symbol — use --footprint instead",
-                        symbol_path
-                    ),
-                    entities: vec![],
-                    hint: None,
-                }));
-            }
-        }
+        manifest::check_extension(
+            symbol_path,
+            "kicad_mod",
+            "CLI:FOOTPRINT_AS_SYMBOL",
+            "a footprint file",
+            "a symbol",
+            "--footprint",
+        )?;
         let sym_source = std::fs::read_to_string(symbol_path)?;
         let symbols = parse_symbol_lib(&sym_source)?;
 
-        // Resolve lib-id: CLI arg -> existing TOML -> auto-detect from single-symbol file.
-        let owned_lib_id;
-        let lib_id = match args
-            .lib_id
-            .as_deref()
-            .or(manifest.component.lib_id.as_deref())
-        {
-            Some(id) => id,
-            None => {
-                if symbols.len() == 1 {
-                    owned_lib_id = symbols[0].lib_id.clone();
-                    &owned_lib_id
-                } else if symbols.is_empty() {
-                    return Err(CliError::Diagnostic(Diagnostic {
-                        code: "CLI:NO_SYMBOLS".into(),
-                        severity: Severity::Error,
-                        message: format!("No symbols found in '{}'", symbol_path),
-                        entities: vec![],
-                        hint: None,
-                    }));
-                } else {
-                    return Err(CliError::Diagnostic(Diagnostic {
-                        code: "CLI:MISSING_LIB_ID".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "Multiple symbols found in '{}', --lib-id is required",
-                            symbol_path
-                        ),
-                        entities: symbols.iter().map(|s| s.lib_id.clone()).collect(),
-                        hint: Some(format!(
-                            "Available symbols: {}",
-                            symbols
-                                .iter()
-                                .map(|s| s.lib_id.as_str())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )),
-                    }));
-                }
-            }
-        };
+        let lib_id = manifest::resolve_symbol_lib_id(
+            args.lib_id.as_deref(),
+            manifest.component.lib_id.as_deref(),
+            &symbols,
+            symbol_path,
+        )?;
         // Idiot check: verify the source matches this part.
         if let Some(ref existing) = manifest.component.lib_id
-            && existing != lib_id
+            && *existing != lib_id
         {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:LIB_ID_MISMATCH".into(),
@@ -113,7 +68,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                 hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
             }));
         }
-        let Some(symbol) = find_symbol(&symbols, lib_id) else {
+        let Some(symbol) = find_symbol(&symbols, &lib_id) else {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:SYMBOL_NOT_FOUND".into(),
                 severity: Severity::Error,
@@ -193,24 +148,14 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
             };
             pads
         } else {
-            // Guard against accidentally passing a symbol file as a footprint.
-            if let Some(ext) = std::path::Path::new(footprint_path)
-                .extension()
-                .and_then(|s| s.to_str())
-            {
-                if ext.eq_ignore_ascii_case("kicad_sym") {
-                    return Err(CliError::Diagnostic(Diagnostic {
-                        code: "CLI:SYMBOL_AS_FOOTPRINT".into(),
-                        severity: Severity::Error,
-                        message: format!(
-                            "'{}' is a symbol file, not a footprint — use --symbol instead",
-                            footprint_path
-                        ),
-                        entities: vec![],
-                        hint: None,
-                    }));
-                }
-            }
+            manifest::check_extension(
+                footprint_path,
+                "kicad_sym",
+                "CLI:SYMBOL_AS_FOOTPRINT",
+                "a symbol file",
+                "a footprint",
+                "--symbol",
+            )?;
             copperleaf_backend_kicad::parse_footprint(footprint_path)?
         };
         // Idiot check: warn if pad count doesn't match pin count.
@@ -274,16 +219,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         manifest.component.model_3d = Some(model_3d.clone());
     }
 
-    // If we have a model path but no embedded data, read and embed the file.
-    if let Some(ref model_path) = manifest.component.model_3d.clone() {
-        if manifest.component.model_3d_data.is_none() {
-            if let Ok(bytes) = std::fs::read(model_path) {
-                use base64::Engine;
-                manifest.component.model_3d_data =
-                    Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
-            }
-        }
-    }
+    manifest::embed_model_data(&mut manifest);
 
     let output = manifest::serialise(&manifest);
     let out_path = args
@@ -329,22 +265,6 @@ fn is_thermal_via(
     pad: &copperleaf_backend_kicad::PadDef,
     pins: &[copperleaf_part_codegen::PinDef],
 ) -> bool {
-    for pin in pins {
-        // Skip pins that correspond to the same pad number — a pad is not a
-        // thermal via of itself.
-        if pin.number == pad.number {
-            continue;
-        }
-        let Some((px, py)) = pin.pos else { continue };
-        let half_w = pin.width.unwrap_or(0.0) / 2.0;
-        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
-        if pad.pos.0 >= px - half_w
-            && pad.pos.0 <= px + half_w
-            && pad.pos.1 >= py - half_h
-            && pad.pos.1 <= py + half_h
-        {
-            return true;
-        }
-    }
-    false
+    pins.iter()
+        .any(|pin| pin.number != pad.number && manifest::pin_contains_point(pin, pad.pos))
 }

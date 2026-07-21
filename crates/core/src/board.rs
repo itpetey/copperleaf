@@ -7,8 +7,9 @@
 use crate::{
     CompileError, Component, Constraint, Net, NetId, Pin,
     net::NetHandle,
-    pin::{PinHandle, PinRef, RawConnection},
+    pin::{PinHandle, PinId, PinRef, RawConnection},
     units::{Diagnostic, Qty, Severity, Volt},
+    util::deterministic_id,
 };
 
 /// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
@@ -57,6 +58,35 @@ pub struct CompiledComponent {
     pub model_3d_rotation: (f64, f64, f64),
     /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
     pub model_3d_offset: (f64, f64, f64),
+}
+
+impl CompiledComponent {
+    /// Build a compiled component from a refdes and any [`Component`] impl,
+    /// assigning deterministic pin IDs.
+    pub fn from_component(refdes: &str, component: &dyn Component) -> Self {
+        let pins: Vec<Pin> = component
+            .pins()
+            .iter()
+            .map(|p| {
+                let seed = format!("{}:{}", refdes, p.name());
+                p.clone().with_id(PinId(deterministic_id(&seed)))
+            })
+            .collect();
+        Self {
+            refdes: refdes.to_owned(),
+            pins,
+            constraints: component.constraints(),
+            symbol: component.symbol().map(|s| s.to_owned()),
+            footprint: component.footprint().map(|s| s.to_owned()),
+            mechanical: component.mechanical().to_vec(),
+            datasheet: component.datasheet().map(|s| s.to_owned()),
+            description: component.description().map(|s| s.to_owned()),
+            model_3d: component.model_3d().map(|s| s.to_owned()),
+            model_3d_data: component.model_3d_data().map(|s| s.to_owned()),
+            model_3d_rotation: component.model_3d_rotation(),
+            model_3d_offset: component.model_3d_offset(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -120,12 +120,11 @@ fn extract_model_path(node: &Sexpr) -> Option<String> {
     let Sexpr::List(children) = node else {
         return None;
     };
-    if let Some(Sexpr::Atom(head)) = children.first() {
-        if head == "model" {
-            if let Some(path_node) = children.get(1) {
-                return Some(string_value(path_node));
-            }
-        }
+    if let Some(Sexpr::Atom(head)) = children.first()
+        && head == "model"
+        && let Some(path_node) = children.get(1)
+    {
+        return Some(path_node.as_string());
     }
     for child in children {
         if let Some(path) = extract_model_path(child) {
@@ -155,9 +154,9 @@ fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {
         return None;
     }
 
-    let number = string_value(children.get(1)?);
-    let pad_type = string_value(children.get(2)?);
-    let shape = string_value(children.get(3)?);
+    let number = children.get(1)?.as_string();
+    let pad_type = children.get(2)?.as_string();
+    let shape = children.get(3)?.as_string();
 
     let mut pos = (0.0, 0.0);
     let mut rotation = 0.0;
@@ -180,37 +179,37 @@ fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {
         };
         match key.as_str() {
             "at" => {
-                let xs = string_value(parts.get(1)?);
-                let ys = string_value(parts.get(2)?);
+                let xs = parts.get(1)?.as_string();
+                let ys = parts.get(2)?.as_string();
                 pos.0 = xs.parse().ok()?;
                 pos.1 = ys.parse().ok()?;
                 if let Some(rs) = parts.get(3) {
-                    rotation = string_value(rs).parse().ok()?;
+                    rotation = rs.as_string().parse().ok()?;
                 }
             }
             "size" => {
-                let ws = string_value(parts.get(1)?);
-                let hs = string_value(parts.get(2)?);
+                let ws = parts.get(1)?.as_string();
+                let hs = parts.get(2)?.as_string();
                 width = ws.parse().ok()?;
                 height = hs.parse().ok()?;
             }
             "roundrect_rratio" => {
                 if let Some(rs) = parts.get(1) {
-                    roundrect_rratio = string_value(rs).parse().ok();
+                    roundrect_rratio = rs.as_string().parse().ok();
                 }
             }
             "solder_mask_margin" => {
                 if let Some(ms) = parts.get(1) {
-                    solder_mask_margin = string_value(ms).parse().ok();
+                    solder_mask_margin = ms.as_string().parse().ok();
                 }
             }
             "layers" => {
-                let layer_strs: Vec<String> = parts[1..].iter().map(string_value).collect();
+                let layer_strs: Vec<String> = parts[1..].iter().map(|s| s.as_string()).collect();
                 layers = layer_strs.join(" ");
             }
             "drill" => {
                 if let Some(ds) = parts.get(1) {
-                    drill = string_value(ds).parse().ok();
+                    drill = ds.as_string().parse().ok();
                 }
             }
             _ => {}
@@ -230,21 +229,6 @@ fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {
         layers,
         drill,
     })
-}
-
-fn string_value(expr: &Sexpr) -> String {
-    match expr {
-        Sexpr::Atom(s) => {
-            if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
-                s[1..s.len() - 1]
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\")
-            } else {
-                s.clone()
-            }
-        }
-        _ => String::new(),
-    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 //! Shared helpers for the KiCad backend emitters.
 
+use crate::sexpr::Sexpr;
 use copperleaf::{CompiledBoard, CompiledComponent, Role};
 
 /// Nickname of the project-local library written into `symbols/`/`footprints/`.
@@ -95,9 +96,48 @@ pub fn role_to_pin_type(role: Role) -> &'static str {
     }
 }
 
-/// Map a Copperleaf pin role to a KiCad netlist pintype string.
-pub fn role_to_pintype(role: Role) -> &'static str {
-    role_to_pin_type(role)
+/// Build a `(property …)` node for schematic and symbol-library contexts.
+///
+/// Emitted properties always use 1.27 mm font size.  Pass `justify_left: true`
+/// when the property appears at a non-zero position so KiCad left-aligns the
+/// text; pass `false` for properties at the origin (hidden metadata).
+pub fn property_sym_node(
+    key: &str,
+    value: &str,
+    pos: (f64, f64),
+    hide: bool,
+    justify_left: bool,
+) -> Sexpr {
+    let mut effects = vec![Sexpr::list([
+        Sexpr::atom("font"),
+        Sexpr::list([
+            Sexpr::atom("size"),
+            Sexpr::atom("1.27"),
+            Sexpr::atom("1.27"),
+        ]),
+    ])];
+    if justify_left {
+        effects.push(Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]));
+    }
+
+    let mut children = vec![
+        Sexpr::atom("property"),
+        Sexpr::str(key),
+        Sexpr::str(value),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_float(pos.0, 2)),
+            Sexpr::atom(format_float(pos.1, 2)),
+            Sexpr::atom("0"),
+        ]),
+    ];
+    if hide {
+        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
+    }
+    children.push(Sexpr::list(
+        std::iter::once(Sexpr::atom("effects")).chain(effects),
+    ));
+    Sexpr::list(children)
 }
 
 /// Full `lib:symbol` identifier used by schematic instances.

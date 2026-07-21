@@ -5,10 +5,10 @@ use std::collections::BTreeMap;
 use copperleaf::{CompiledBoard, CompiledComponent, Connection, NetKind, Role};
 
 use crate::{
-    common::{footprint_ref, format_float, refdes_prefix, symbol_lib_id},
-    fp_geom,
+    common::{footprint_ref, format_float, property_sym_node, refdes_prefix, symbol_lib_id},
+    deterministic_id, fp_geom,
     lib_emitter::symbol_def_sexpr,
-    sexpr::{Sexpr, deterministic_uuid, kv},
+    sexpr::{Sexpr, kv},
     sym_layout::{self, LayoutPin, SymbolLayout},
 };
 
@@ -25,7 +25,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
         kv("generator_version", "10.0"),
         Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid("sch:root")),
+            Sexpr::str(deterministic_id("sch:root")),
         ]),
         kv("paper", "A4"),
         title_block_node(),
@@ -110,7 +110,7 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
         ]),
         Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!(
+            Sexpr::str(deterministic_id(&format!(
                 "sch:label:{}:{:.2}:{:.2}",
                 name, x, y
             ))),
@@ -134,19 +134,12 @@ fn layout_for_comp(comp: &CompiledComponent) -> SymbolLayout {
         })
         .collect();
 
-    // Add pins for thermal vias and mechanical pads that appear in the PCB
-    // footprint but are not electrical pins.
-    let pads = fp_geom::pads_from_component(comp);
-    let mut extra_idx = 0;
-    for pad in &pads {
-        if pad.pin_index.is_none() {
-            extra_idx += 1;
-            pins.push(LayoutPin {
-                name: format!("MECH{}", extra_idx),
-                number: pad.number.clone(),
-                role: Role::Passive,
-            });
-        }
+    for (number, name) in fp_geom::mech_pad_names(comp) {
+        pins.push(LayoutPin {
+            name,
+            number,
+            role: Role::Passive,
+        });
     }
 
     sym_layout::layout_symbol(&pins)
@@ -198,35 +191,6 @@ fn pin_tip_and_label(
     Some(((sym_x + pin.x, sym_y - pin.y), pin.rotation))
 }
 
-fn property_node(key: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
-    let mut children = vec![
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
-            Sexpr::atom("0"),
-        ]),
-    ];
-    if hide {
-        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    children.push(Sexpr::list([
-        Sexpr::atom("effects"),
-        Sexpr::list([
-            Sexpr::atom("font"),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.27"),
-                Sexpr::atom("1.27"),
-            ]),
-        ]),
-    ]));
-    Sexpr::list(children)
-}
-
 fn sheet_instances_node() -> Sexpr {
     Sexpr::list([
         Sexpr::atom("sheet_instances"),
@@ -254,15 +218,21 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
     let fp_value = footprint_ref(comp);
 
     let properties = vec![
-        property_node("Reference", &comp.refdes, x, y - layout.y1 - 1.27, false),
-        property_node(
-            "Value",
-            &refdes_prefix(&comp.refdes),
-            x,
-            y - layout.y2 + 1.27,
+        property_sym_node(
+            "Reference",
+            &comp.refdes,
+            (x, y - layout.y1 - 1.27),
+            false,
             false,
         ),
-        property_node("Footprint", &fp_value, x, y, true),
+        property_sym_node(
+            "Value",
+            &refdes_prefix(&comp.refdes),
+            (x, y - layout.y2 + 1.27),
+            false,
+            false,
+        ),
+        property_sym_node("Footprint", &fp_value, (x, y), true, false),
     ];
 
     Sexpr::list(
@@ -295,7 +265,7 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
             ])))
             .chain(std::iter::once(Sexpr::list([
                 Sexpr::atom("uuid"),
-                Sexpr::str(deterministic_uuid(&format!("sch:{}", comp.refdes))),
+                Sexpr::str(deterministic_id(&format!("sch:{}", comp.refdes))),
             ])))
             .chain(properties)
             .chain(std::iter::once(Sexpr::list([
@@ -305,7 +275,7 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
                     Sexpr::str(""),
                     Sexpr::list([
                         Sexpr::atom("path"),
-                        Sexpr::str(format!("/ {}", deterministic_uuid("sch:root"))),
+                        Sexpr::str(format!("/ {}", deterministic_id("sch:root"))),
                         Sexpr::list([Sexpr::atom("reference"), Sexpr::str(&comp.refdes)]),
                         Sexpr::list([Sexpr::atom("unit"), Sexpr::atom("1")]),
                     ]),
@@ -382,7 +352,7 @@ fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
         ]),
         Sexpr::list([
             Sexpr::atom("uuid"),
-            Sexpr::str(deterministic_uuid(&format!(
+            Sexpr::str(deterministic_id(&format!(
                 "sch:wire:{}:{:.2}:{:.2}:{:.2}:{:.2}",
                 net_name, from.0, from.1, to.0, to.1
             ))),

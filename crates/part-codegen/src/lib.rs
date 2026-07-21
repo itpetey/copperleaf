@@ -398,6 +398,16 @@ pub fn generate_component_to_string(toml_path: impl AsRef<Path>) -> Result<Strin
     render_component_file(toml_path.as_ref(), &mut renderer)
 }
 
+/// Returns the field names that must be populated for a pin of the given kind.
+pub fn required_fields(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "clk" | "spi" => &["bw_mhz"],
+        "pwr" => &["v_min", "v_max", "i_max"],
+        "pwr_fixed" | "pwr_out" => &["v", "i"],
+        _ => &[],
+    }
+}
+
 /// Validates a manifest and returns diagnostics for any problems found.
 pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
     use copperleaf::{Diagnostic, Severity};
@@ -417,30 +427,22 @@ pub fn validate(manifest: &Manifest) -> Vec<copperleaf::Diagnostic> {
         }
 
         // Required fields per kind.
-        let missing = match pin.kind.as_str() {
-            "clk" | "spi" => pin.bw_mhz.is_none().then_some("bw_mhz"),
-            "pwr" => {
-                if pin.v_min.is_none() {
-                    Some("v_min")
-                } else if pin.v_max.is_none() {
-                    Some("v_max")
-                } else if pin.i_max.is_none() {
-                    Some("i_max")
-                } else {
-                    None
-                }
+        let mut missing = None;
+        for &field in required_fields(&pin.kind) {
+            let ok = match field {
+                "bw_mhz" => pin.bw_mhz.is_some(),
+                "v_min" => pin.v_min.is_some(),
+                "v_max" => pin.v_max.is_some(),
+                "i_max" => pin.i_max.is_some(),
+                "v" => pin.v.is_some(),
+                "i" => pin.i.is_some(),
+                _ => true,
+            };
+            if !ok {
+                missing = Some(field);
+                break;
             }
-            "pwr_fixed" | "pwr_out" => {
-                if pin.v.is_none() {
-                    Some("v")
-                } else if pin.i.is_none() {
-                    Some("i")
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
+        }
         if let Some(field) = missing {
             diags.push(Diagnostic {
                 code: "VALIDATE:MISSING_FIELD".into(),
@@ -649,7 +651,7 @@ fn default_mech_shape() -> String {
     "circle".into()
 }
 
-fn fmt_f64(v: f64) -> String {
+pub fn fmt_f64(v: f64) -> String {
     format!("{:?}", v)
 }
 

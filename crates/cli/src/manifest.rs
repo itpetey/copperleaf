@@ -1,12 +1,102 @@
 //! Helpers for reading, writing, and merging Copperleaf part manifests.
 
 use copperleaf::{Diagnostic, Severity};
-use copperleaf_backend_kicad::{PadDef, sym_parser::PinDef as SymPinDef};
+use copperleaf_backend_kicad::{PadDef, sym_parser::PinDef as SymPinDef, sym_parser::SymbolDef};
 use copperleaf_part_codegen::{
-    CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef,
+    CodegenError, ComponentMeta, Manifest, MechanicalDef, PinDef, ThermalViaDef, fmt_f64,
+    required_fields,
 };
 
 use crate::kindmap::{KindEntry, KindMap};
+
+/// Guard against passing a file of the wrong type. If `path` has extension
+/// `bad_ext`, return a diagnostic error suggesting `--flag` instead.
+pub(crate) fn check_extension(
+    path: &str,
+    bad_ext: &str,
+    code: &str,
+    wrong_kind: &str,
+    right_kind: &str,
+    flag: &str,
+) -> Result<(), crate::CliError> {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|s| s.to_str())
+        && ext.eq_ignore_ascii_case(bad_ext)
+    {
+        return Err(crate::CliError::Diagnostic(Diagnostic {
+            code: code.into(),
+            severity: Severity::Error,
+            message: format!(
+                "'{}' is {}, not a {} — use {} instead",
+                path, wrong_kind, right_kind, flag
+            ),
+            entities: vec![],
+            hint: None,
+        }));
+    }
+    Ok(())
+}
+
+/// Read and base64-encode a 3D model file, storing it in the manifest, if a
+/// model path is set and data hasn't already been embedded.
+pub(crate) fn embed_model_data(manifest: &mut Manifest) {
+    if let Some(ref model_path) = manifest.component.model_3d.clone()
+        && manifest.component.model_3d_data.is_none()
+        && let Ok(bytes) = std::fs::read(model_path)
+    {
+        use base64::Engine;
+        manifest.component.model_3d_data =
+            Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+    }
+}
+
+/// Resolve the lib-id for a symbol source.
+///
+/// Priority: `args_lib_id` → `manifest_lib_id` (for update mode, pass
+/// `None` for new) → auto-detect from a single-symbol file → error.
+pub(crate) fn resolve_symbol_lib_id(
+    args_lib_id: Option<&str>,
+    manifest_lib_id: Option<&str>,
+    symbols: &[SymbolDef],
+    symbol_path: &str,
+) -> Result<String, crate::CliError> {
+    // Explicit via CLI arg or existing manifest.
+    if let Some(id) = args_lib_id.or(manifest_lib_id) {
+        return Ok(id.to_owned());
+    }
+    // Auto-detect from a single-symbol file.
+    if symbols.len() == 1 {
+        return Ok(symbols[0].lib_id.clone());
+    }
+    if symbols.is_empty() {
+        return Err(crate::CliError::Diagnostic(Diagnostic {
+            code: "CLI:NO_SYMBOLS".into(),
+            severity: Severity::Error,
+            message: format!("No symbols found in '{}'", symbol_path),
+            entities: vec![],
+            hint: None,
+        }));
+    }
+    let names: Vec<String> = symbols.iter().map(|s| s.lib_id.clone()).collect();
+    Err(crate::CliError::Diagnostic(Diagnostic {
+        code: "CLI:MISSING_LIB_ID".into(),
+        severity: Severity::Error,
+        message: format!(
+            "Multiple symbols found in '{}', --lib-id is required",
+            symbol_path
+        ),
+        entities: names,
+        hint: Some(format!(
+            "Available symbols: {}",
+            symbols
+                .iter()
+                .map(|s| s.lib_id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }))
+}
 
 /// Deserialise a TOML string into a manifest.
 pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
@@ -573,25 +663,23 @@ fn escape_toml_string(s: &str) -> String {
 }
 
 /// Return a mutable reference to the first pin whose bounding box contains
-/// `pad`'s centre point, or `None` if no pin contains it.
-fn find_containing_pad<'a>(manifest: &'a mut Manifest, pad: &PadDef) -> Option<&'a mut PinDef> {
-    for pin in &mut manifest.pins {
-        let Some((px, py)) = pin.pos else { continue };
-        let half_w = pin.width.unwrap_or(0.0) / 2.0;
-        let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
-        if pad.pos.0 >= px - half_w
-            && pad.pos.0 <= px + half_w
-            && pad.pos.1 >= py - half_h
-            && pad.pos.1 <= py + half_h
-        {
-            return Some(pin);
-        }
-    }
-    None
+/// Return `true` if `pos` falls inside the bounding box of a pin.
+pub(crate) fn pin_contains_point(pin: &PinDef, pos: (f64, f64)) -> bool {
+    let Some((px, py)) = pin.pos else {
+        return false;
+    };
+    let half_w = pin.width.unwrap_or(0.0) / 2.0;
+    let half_h = pin.height.or(pin.length).unwrap_or(0.0) / 2.0;
+    pos.0 >= px - half_w && pos.0 <= px + half_w && pos.1 >= py - half_h && pos.1 <= py + half_h
 }
 
-fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
+/// Find the first pin in the manifest whose bounding box contains `pad`'s
+/// centre point, or `None` if no pin contains it.
+fn find_containing_pad<'a>(manifest: &'a mut Manifest, pad: &PadDef) -> Option<&'a mut PinDef> {
+    manifest
+        .pins
+        .iter_mut()
+        .find(|pin| pin_contains_point(pin, pad.pos))
 }
 
 fn is_placeholder_name(name: &str) -> bool {
@@ -599,32 +687,19 @@ fn is_placeholder_name(name: &str) -> bool {
 }
 
 fn missing_power_fields(pin: &PinDef) -> Vec<&'static str> {
-    match pin.kind.as_str() {
-        "pwr" => {
-            let mut missing = Vec::new();
-            if pin.v_min.is_none() {
-                missing.push("v_min");
-            }
-            if pin.v_max.is_none() {
-                missing.push("v_max");
-            }
-            if pin.i_max.is_none() {
-                missing.push("i_max");
-            }
-            missing
-        }
-        "pwr_fixed" | "pwr_out" => {
-            let mut missing = Vec::new();
-            if pin.v.is_none() {
-                missing.push("v");
-            }
-            if pin.i.is_none() {
-                missing.push("i");
-            }
-            missing
-        }
-        _ => vec![],
-    }
+    required_fields(&pin.kind)
+        .iter()
+        .filter(|&&field| match field {
+            "bw_mhz" => pin.bw_mhz.is_none(),
+            "v_min" => pin.v_min.is_none(),
+            "v_max" => pin.v_max.is_none(),
+            "i_max" => pin.i_max.is_none(),
+            "v" => pin.v.is_none(),
+            "i" => pin.i.is_none(),
+            _ => false,
+        })
+        .copied()
+        .collect()
 }
 
 fn purpose_for_kind(kind: &str) -> &'static str {

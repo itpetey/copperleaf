@@ -12,7 +12,7 @@ use copperleaf::Role;
 use copperleaf_part_codegen::Manifest;
 
 use crate::{
-    common::format_float,
+    common::property_sym_node,
     sexpr::Sexpr,
     sym_layout::{self, LayoutPin},
 };
@@ -33,7 +33,7 @@ pub fn emit_symbol(manifest: &Manifest) -> String {
     lib_children.push(symbol_node(manifest, lib_id));
 
     Sexpr::list(
-        [Sexpr::atom("kicad_symbol_lib").into()]
+        [Sexpr::atom("kicad_symbol_lib")]
             .into_iter()
             .chain(lib_children),
     )
@@ -49,62 +49,6 @@ fn kind_to_role(kind: &str) -> Role {
         "analog_in" | "analog_rf" => Role::AnalogIn,
         _ => Role::DigitalIO,
     }
-}
-
-fn property_at(key: &str, value: &str, pos: (f64, f64), hide: bool) -> Sexpr {
-    let mut children = vec![
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_float(pos.0, 2)),
-            Sexpr::atom(format_float(pos.1, 2)),
-            Sexpr::atom("0"),
-        ]),
-    ];
-    if hide {
-        children.push(Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]));
-    }
-    children.push(Sexpr::list([
-        Sexpr::atom("effects"),
-        Sexpr::list([
-            Sexpr::atom("font"),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom("1.27"),
-                Sexpr::atom("1.27"),
-            ]),
-        ]),
-        Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("left")]),
-    ]));
-    Sexpr::list(children)
-}
-
-fn property_hidden(key: &str, value: &str) -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("property"),
-        Sexpr::str(key),
-        Sexpr::str(value),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-            Sexpr::atom("0"),
-        ]),
-        Sexpr::list([Sexpr::atom("hide"), Sexpr::atom("yes")]),
-        Sexpr::list([
-            Sexpr::atom("effects"),
-            Sexpr::list([
-                Sexpr::atom("font"),
-                Sexpr::list([
-                    Sexpr::atom("size"),
-                    Sexpr::atom("1.27"),
-                    Sexpr::atom("1.27"),
-                ]),
-            ]),
-        ]),
-    ])
 }
 
 fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
@@ -130,18 +74,24 @@ fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
         Sexpr::list([Sexpr::atom("exclude_from_sim"), Sexpr::atom("no")]),
         Sexpr::list([Sexpr::atom("in_bom"), Sexpr::atom("yes")]),
         Sexpr::list([Sexpr::atom("on_board"), Sexpr::atom("yes")]),
-        property_at("Reference", "U", (layout.x1, layout.y1 + 1.27), false),
-        property_at("Value", lib_id, (layout.x1, layout.y2 - 1.27), false),
-        property_hidden("Footprint", ""),
-        property_hidden(
+        property_sym_node("Reference", "U", (layout.x1, layout.y1 + 1.27), false, true),
+        property_sym_node("Value", lib_id, (layout.x1, layout.y2 - 1.27), false, true),
+        property_sym_node("Footprint", "", (0.0, 0.0), true, false),
+        property_sym_node(
             "Datasheet",
             manifest.component.datasheet.as_deref().unwrap_or("~"),
+            (0.0, 0.0),
+            true,
+            false,
         ),
-        property_hidden(
+        property_sym_node(
             "Description",
             manifest.component.description.as_deref().unwrap_or(""),
+            (0.0, 0.0),
+            true,
+            false,
         ),
-        property_hidden("ki_keywords", "copperleaf"),
+        property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
     ];
 
     // ── unit sub-symbol ──

@@ -16,17 +16,12 @@ pub fn emit_fp_lib_table(lib_nick: &str) -> String {
         Sexpr::list([Sexpr::atom("options"), Sexpr::str("")]),
         Sexpr::list([Sexpr::atom("descr"), Sexpr::str("")]),
     ]);
-    let table = Sexpr::list([Sexpr::atom("fp_lib_table"), entry].into_iter());
+    let table = Sexpr::list([Sexpr::atom("fp_lib_table"), entry]);
     format!("{}\n", table)
 }
 
 /// Build a minimal `.kicad_pro` JSON document for a project named `name`.
-///
-/// `symbol_libs` is a list of symbol library nicknames registered as
-/// project-specific pinned libraries pointing into `symbols/`.
-/// `footprint_lib` is the nickname of the single directory-based footprint
-/// library rooted at `footprints/`, when the project has local footprints.
-pub fn emit_project(name: &str, symbol_libs: &[String], footprint_lib: Option<&str>) -> String {
+pub fn emit_project(name: &str) -> String {
     let root: Value = json!({
         "board": {
             "3dviewports": [],
@@ -93,25 +88,8 @@ pub fn emit_project(name: &str, symbol_libs: &[String], footprint_lib: Option<&s
             }
         },
         "libraries": {
-            "pinned_footprint_libs": footprint_lib
-                .map(|nick| {
-                    vec![json!({
-                        "name": nick,
-                        "uri": "${KIPRJMOD}/footprints",
-                        "options": { "visible": true }
-                    })]
-                })
-                .unwrap_or_default(),
-            "pinned_symbol_libs": symbol_libs
-                .iter()
-                .map(|nick| {
-                    json!({
-                        "name": nick,
-                        "uri": format!("${{KIPRJMOD}}/symbols/{}.kicad_sym", nick),
-                        "options": { "visible": true }
-                    })
-                })
-                .collect::<Vec<_>>()
+            "pinned_footprint_libs": [],
+            "pinned_symbol_libs": []
         },
         "meta": { "filename": name, "version": 3 },
         "net_settings": {
@@ -190,7 +168,7 @@ pub fn emit_sym_lib_table(lib_nicks: &[String]) -> String {
             Sexpr::list([Sexpr::atom("type"), Sexpr::str("KiCad")]),
             Sexpr::list([
                 Sexpr::atom("uri"),
-                Sexpr::str(&format!("${{KIPRJMOD}}/symbols/{}.kicad_sym", nick)),
+                Sexpr::str(format!("${{KIPRJMOD}}/symbols/{}.kicad_sym", nick)),
             ]),
             Sexpr::list([Sexpr::atom("options"), Sexpr::str("")]),
             Sexpr::list([Sexpr::atom("descr"), Sexpr::str("")]),
@@ -206,7 +184,7 @@ mod tests {
 
     #[test]
     fn project_is_valid_json() {
-        let s = emit_project("example", &[], None);
+        let s = emit_project("example");
         let v: Value = serde_json::from_str(&s).expect("must be valid JSON");
         assert_eq!(v["meta"]["filename"], "example");
         assert_eq!(v["meta"]["version"], 3);
@@ -220,25 +198,15 @@ mod tests {
     }
 
     #[test]
-    fn project_includes_pinned_libraries() {
-        let s = emit_project("example", &["copperleaf".into()], Some("copperleaf"));
+    fn project_libraries_are_empty_by_default() {
+        let s = emit_project("example");
         let v: Value = serde_json::from_str(&s).expect("must be valid JSON");
-
-        let sym_libs = v["libraries"]["pinned_symbol_libs"].as_array().unwrap();
-        assert_eq!(sym_libs.len(), 1);
-        assert_eq!(sym_libs[0]["name"], "copperleaf");
         assert!(
-            sym_libs[0]["uri"]
-                .as_str()
+            v["libraries"]["pinned_symbol_libs"]
+                .as_array()
                 .unwrap()
-                .contains("symbols/copperleaf.kicad_sym")
+                .is_empty()
         );
-
-        // A single directory-based footprint library.
-        let fp_libs = v["libraries"]["pinned_footprint_libs"].as_array().unwrap();
-        assert_eq!(fp_libs.len(), 1);
-        assert_eq!(fp_libs[0]["name"], "copperleaf");
-        assert_eq!(fp_libs[0]["uri"], "${KIPRJMOD}/footprints");
     }
 
     #[test]

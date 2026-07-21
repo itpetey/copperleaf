@@ -3,7 +3,7 @@
 use copperleaf::{CompiledBoard, Role};
 
 use crate::{
-    common::{build_net_codes, refdes_prefix, role_to_pintype},
+    common::{build_net_codes, refdes_prefix, role_to_pin_type},
     fp_geom,
     sexpr::{Sexpr, kv},
 };
@@ -40,24 +40,18 @@ fn components_node(board: &CompiledBoard) -> Sexpr {
                 pin_nodes.push(Sexpr::list([
                     Sexpr::atom("pin"),
                     Sexpr::str(fp_geom::pin_number(pin, i)),
-                    kv("type", role_to_pintype(pin.role())),
+                    kv("type", role_to_pin_type(pin.role())),
                     kv("name", pin.name()),
                 ]));
             }
-            // Add MECH pins for thermal vias and mechanical pads (same logic
-            // as schematic.rs::layout_for_comp).
-            let pads = fp_geom::pads_from_component(c);
-            let mut extra_idx = 0;
-            for pad in &pads {
-                if pad.pin_index.is_none() {
-                    extra_idx += 1;
-                    pin_nodes.push(Sexpr::list([
-                        Sexpr::atom("pin"),
-                        Sexpr::str(pad.number.clone()),
-                        kv("type", role_to_pintype(Role::Passive)),
-                        kv("name", &format!("MECH{}", extra_idx)),
-                    ]));
-                }
+            // Add MECH pins for thermal vias and mechanical pads.
+            for (number, name) in fp_geom::mech_pad_names(c) {
+                pin_nodes.push(Sexpr::list([
+                    Sexpr::atom("pin"),
+                    Sexpr::str(number),
+                    kv("type", role_to_pin_type(Role::Passive)),
+                    kv("name", &name),
+                ]));
             }
             if !pin_nodes.is_empty() {
                 children.push(Sexpr::list(
@@ -131,7 +125,7 @@ fn node_sexpr(board: &CompiledBoard, conn: &copperleaf::Connection) -> Sexpr {
     if let Some((i, pin)) = pin {
         children.push(kv("pin", crate::fp_geom::pin_number(pin, i)));
         children.push(kv("pinfunction", pin.name()));
-        children.push(kv("pintype", role_to_pintype(pin.role())));
+        children.push(kv("pintype", role_to_pin_type(pin.role())));
     } else {
         children.push(kv("pin", &conn.pin));
     }

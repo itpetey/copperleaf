@@ -6,8 +6,8 @@ use copperleaf::{CompiledBoard, NetClass};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
-    fp_geom,
-    sexpr::{Sexpr, deterministic_uuid, kv},
+    deterministic_id, fp_geom,
+    sexpr::{Sexpr, kv},
 };
 
 /// Emit a KiCad S-expression PCB file for the given compiled board.
@@ -135,7 +135,7 @@ fn board_outline(width: f64, height: f64) -> Vec<Sexpr> {
                 Sexpr::list([Sexpr::atom("layer"), Sexpr::str("Edge.Cuts")]),
                 Sexpr::list([
                     Sexpr::atom("uuid"),
-                    Sexpr::str(deterministic_uuid(&format!("pcb:outline:{}", side))),
+                    Sexpr::str(deterministic_id(&format!("pcb:outline:{}", side))),
                 ]),
             ])
         })
@@ -153,7 +153,7 @@ fn footprint_node(
     let pads = fp_geom::pads_from_component(comp);
     let extent = fp_geom::pads_extent(&pads);
 
-    let fp_uuid = deterministic_uuid(&format!("pcb:{}", comp.refdes));
+    let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
     let fp_name = footprint_ref(comp);
     let seed = format!("pcb:{}", comp.refdes);
 
@@ -193,11 +193,11 @@ fn footprint_node(
         // Visible value text on F.Fab using a KiCad variable.
         fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
         // Path linkage to schematic symbol.
-        Sexpr::list([Sexpr::atom("path"), Sexpr::str(&format!("/{}", fp_uuid))]),
+        Sexpr::list([Sexpr::atom("path"), Sexpr::str(format!("/{}", fp_uuid))]),
         Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
         Sexpr::list([
             Sexpr::atom("sheetfile"),
-            Sexpr::str(&format!("{}.kicad_sch", project_name)),
+            Sexpr::str(format!("{}.kicad_sch", project_name)),
         ]),
         Sexpr::list([
             Sexpr::atom("attr"),
@@ -214,7 +214,7 @@ fn footprint_node(
 
     // Pads with net associations.
     for pad in &pads {
-        let pad_uuid = deterministic_uuid(&format!("{}:pad:{}", seed, pad.number));
+        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
         let net = pad.pin_index.and_then(|i| {
             let pin = &comp.pins[i];
             pin_to_net
@@ -236,7 +236,7 @@ fn footprint_node(
     };
     children.push(fp_geom::model_sexpr(
         &fp_name,
-        model_path_for_pcb.as_ref().map(|s| &**s),
+        model_path_for_pcb.as_deref(),
         comp.model_3d_offset,
         comp.model_3d_rotation,
     ));
@@ -246,7 +246,7 @@ fn footprint_node(
 
 /// Hidden footprint property node for KiCad 9+ metadata (Reference, Value, etc.).
 fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
-    let prop_uuid = deterministic_uuid(&format!("pcb:prop:{}:{}", name, value));
+    let prop_uuid = deterministic_id(&format!("pcb:prop:{}:{}", name, value));
     let mut prop = vec![
         Sexpr::atom("property"),
         Sexpr::str(name),

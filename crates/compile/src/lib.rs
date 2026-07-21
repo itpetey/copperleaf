@@ -13,22 +13,18 @@
 //! The returned `CompiledBoard` is constructed exactly once and never rebuilt
 //! or mutated afterwards.
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use copperleaf::{
-    CompiledComponent, Component, Farad,
+    CompiledComponent, Farad,
     board::{Board, CompiledBoard, ComponentEntry, Connection, RawNetOverride},
     erc,
     net::{Constraint, Net, NetClass, NetId, NetKind},
-    pin::{Pin, PinId, RawConnection, Role, SigSpec},
+    pin::{Pin, RawConnection, Role, SigSpec},
     units::{Diagnostic, Qty, Severity, UnitExt, Volt},
-    util::{UnionFind, deterministic_id},
+    util::UnionFind,
 };
 use copperleaf_parts_passives::footprint::Package;
-use thiserror::Error;
 
 /// Default footprint package for synthesised decoupling capacitors.
 const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
@@ -54,10 +50,8 @@ pub struct CompileReport {
     pub summary: CompileSummary,
 }
 
-#[derive(Clone, Debug, Error)]
-pub struct CompileError {
-    pub errors: Vec<Diagnostic>,
-}
+/// Re-exported from `copperleaf` so callers have a single `CompileError` type.
+pub use copperleaf::CompileError;
 
 /// Intermediate data structure produced by a union-find pass over the raw
 /// connections.  Maps connected pins into equivalence classes (nets).
@@ -77,24 +71,6 @@ pub struct CompileOptions {
     /// Footprint code used for synthesised decoupling capacitors.
     /// Defaults to [`DEFAULT_CAP_FOOTPRINT`] (0603 / 1608 metric).
     pub decoupling_footprint: Package,
-}
-
-impl CompileError {
-    pub fn new(errors: Vec<Diagnostic>) -> Self {
-        Self { errors }
-    }
-}
-
-impl fmt::Display for CompileError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for e in &self.errors {
-            writeln!(f, "[{:?}] {} — {}", e.severity, e.code, e.message)?;
-            if let Some(hint) = &e.hint {
-                writeln!(f, "         hint: {}", hint)?;
-            }
-        }
-        Ok(())
-    }
 }
 
 impl NetGrouping {
@@ -381,31 +357,7 @@ fn classify_net(
 fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
     entries
         .iter()
-        .map(|entry| {
-            let pins: Vec<Pin> = entry
-                .component
-                .pins()
-                .iter()
-                .map(|p| {
-                    let seed = format!("{}:{}", entry.name, p.name());
-                    p.clone().with_id(PinId(deterministic_id(&seed)))
-                })
-                .collect();
-            CompiledComponent {
-                refdes: entry.name.clone(),
-                pins,
-                constraints: entry.component.constraints(),
-                symbol: entry.component.symbol().map(|s| s.to_owned()),
-                footprint: entry.component.footprint().map(|s| s.to_owned()),
-                mechanical: entry.component.mechanical().to_vec(),
-                datasheet: entry.component.datasheet().map(|s| s.to_owned()),
-                description: entry.component.description().map(|s| s.to_owned()),
-                model_3d: entry.component.model_3d().map(|s| s.to_owned()),
-                model_3d_data: entry.component.model_3d_data().map(|s| s.to_owned()),
-                model_3d_rotation: entry.component.model_3d_rotation(),
-                model_3d_offset: entry.component.model_3d_offset(),
-            }
-        })
+        .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
         .collect()
 }
 
@@ -503,28 +455,7 @@ fn make_capacitor_component(
     package: Package,
 ) -> CompiledComponent {
     let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
-    let pins: Vec<Pin> = cap
-        .pins()
-        .iter()
-        .map(|p| {
-            let seed = format!("{}:{}", refdes, p.name());
-            p.clone().with_id(PinId(deterministic_id(&seed)))
-        })
-        .collect();
-    CompiledComponent {
-        refdes: refdes.to_owned(),
-        pins,
-        constraints: cap.constraints(),
-        symbol: cap.symbol().map(|s| s.to_owned()),
-        footprint: cap.footprint().map(|s| s.to_owned()),
-        mechanical: cap.mechanical().to_vec(),
-        datasheet: cap.datasheet().map(|s| s.to_owned()),
-        description: cap.description().map(|s| s.to_owned()),
-        model_3d: cap.model_3d().map(|s| s.to_owned()),
-        model_3d_data: cap.model_3d_data().map(|s| s.to_owned()),
-        model_3d_rotation: cap.model_3d_rotation(),
-        model_3d_offset: cap.model_3d_offset(),
-    }
+    CompiledComponent::from_component(refdes, &cap)
 }
 
 /// Walk the edge overrides for a single net and merge them, detecting

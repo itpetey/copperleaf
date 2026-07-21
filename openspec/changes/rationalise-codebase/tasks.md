@@ -1,19 +1,19 @@
 ## 1. Phase 1 — Mechanical dedup (golden: byte-identical)
 
-- [ ] 1.1 Remove `deterministic_uuid` from `backend-kicad/src/sexpr.rs`; re-export core's `deterministic_id` and update all call sites
-- [ ] 1.2 Move `string_value` onto `Sexpr` (e.g. `Sexpr::as_string()`); delete the copies in `sym_parser.rs` and `fp_parser.rs`
-- [ ] 1.3 Consolidate `fmt_f64` into one shared location; delete the copies in `part-codegen` and `cli/manifest.rs`
-- [ ] 1.4 Delete the `role_to_pintype` alias; use `role_to_pin_type` everywhere
-- [ ] 1.5 Merge `cli/update.rs::is_thermal_via` and `cli/manifest.rs::find_containing_pad` into one pad-containment helper
-- [ ] 1.6 Replace the four `(property …)` builders (`schematic.rs`, `sym_emitter.rs` ×2, `lib_emitter.rs`) with one parameterised helper in `common.rs`
-- [ ] 1.7 Extract the MECH-pin synthesis loop (currently in `schematic.rs::layout_for_comp`, `lib_emitter.rs::symbol_def_sexpr`, `netlist.rs::components_node`) into one shared helper
-- [ ] 1.8 Add `CompiledComponent::from_component(refdes, &dyn Component)`; use it in `compile_components` and `make_capacitor_component`
-- [ ] 1.9 CLI: extract shared `resolve_lib_id()`, `check_extension()`, and `embed_model()` helpers; remove the 4×/2×/3× copies in `new.rs`/`update.rs`
-- [ ] 1.10 Delete the dead `let _flattened = flatten_extends(...)` call in `new.rs`; reconcile `new`/`update` to the same extends-resolution path
-- [ ] 1.11 Add one `required_fields(kind) -> &[&str]` table; consume it from `codegen::validate`, `builder_expr` error paths, and `cli/manifest.rs::missing_power_fields`
-- [ ] 1.12 Delete `copperleaf_compile::CompileError`; re-export the core `CompileError` in its place
-- [ ] 1.13 Delete `Copperleaf` dead code in `project.rs` (unused `emit_project` library params) or wire them up — per design D10, delete unless a consumer exists
-- [ ] 1.14 Verify `cargo test --workspace`, clippy (`-D warnings`), and fmt all pass with zero golden diffs
+- [x] 1.1 Remove `deterministic_uuid` from `backend-kicad/src/sexpr.rs`; re-export core's `deterministic_id` and update all call sites
+- [x] 1.2 Move `string_value` onto `Sexpr` (e.g. `Sexpr::as_string()`); delete the copies in `sym_parser.rs` and `fp_parser.rs`
+- [x] 1.3 Consolidate `fmt_f64` into one shared location; delete the copies in `part-codegen` and `cli/manifest.rs`
+- [x] 1.4 Delete the `role_to_pintype` alias; use `role_to_pin_type` everywhere
+- [x] 1.5 Merge `cli/update.rs::is_thermal_via` and `cli/manifest.rs::find_containing_pad` into one pad-containment helper
+- [x] 1.6 Replace the four `(property …)` builders (`schematic.rs`, `sym_emitter.rs` ×2, `lib_emitter.rs`) with one parameterised helper in `common.rs`
+- [x] 1.7 Extract the MECH-pin synthesis loop (currently in `schematic.rs::layout_for_comp`, `lib_emitter.rs::symbol_def_sexpr`, `netlist.rs::components_node`) into one shared helper
+- [x] 1.8 Add `CompiledComponent::from_component(refdes, &dyn Component)`; use it in `compile_components` and `make_capacitor_component`
+- [x] 1.9 CLI: extract shared `resolve_lib_id()`, `check_extension()`, and `embed_model()` helpers; remove the 4×/2×/3× copies in `new.rs`/`update.rs`
+- [x] 1.10 Delete the dead `let _flattened = flatten_extends(...)` call in `new.rs`; reconcile `new`/`update` to the same extends-resolution path
+- [x] 1.11 Add one `required_fields(kind) -> &[&str]` table; consume it from `codegen::validate`, `builder_expr` error paths, and `cli/manifest.rs::missing_power_fields`
+- [x] 1.12 Delete `copperleaf_compile::CompileError`; re-export the core `CompileError` in its place
+- [x] 1.13 Delete `Copperleaf` dead code in `project.rs` (unused `emit_project` library params) or wire them up — per design D10, delete unless a consumer exists
+- [x] 1.14 Verify `cargo test --workspace`, clippy (`-D warnings`), and fmt all pass with zero golden diffs
 
 ## 2. Phase 2 — One pad model (golden: reviewed diffs only)
 
