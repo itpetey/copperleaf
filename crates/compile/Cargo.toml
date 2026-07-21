@@ -8,4 +8,3 @@ license.workspace = true
 [dependencies]
 copperleaf.workspace = true
 copperleaf-parts-passives = { path = "../../parts/passives" }
-thiserror.workspace = true

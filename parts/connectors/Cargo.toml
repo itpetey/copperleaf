@@ -5,11 +5,12 @@ edition.workspace = true
 description = "Connector components"
 license.workspace = true
 
+[package.metadata.cargo-shear]
+ignored = ["copperleaf"]
+
 [lib]
 path = "lib.rs"
 
 [dependencies]
 copperleaf.workspace = true
 copperleaf-part-macro.workspace = true
-serde = { workspace = true, features = ["derive", "alloc"] }
-toml = { workspace = true, features = ["parse", "serde"] }

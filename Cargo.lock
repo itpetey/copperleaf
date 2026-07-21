@@ -154,7 +154,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -216,7 +216,6 @@ version = "0.1.0"
 dependencies = [
  "copperleaf",
  "copperleaf-parts-passives",
- "thiserror",
 ]
 
 [[package]]
@@ -236,7 +235,7 @@ version = "0.1.0"
 dependencies = [
  "copperleaf-part-codegen",
  "proc-macro2",
- "syn",
+ "syn 3.0.2",
 ]
 
 [[package]]
@@ -245,8 +244,6 @@ version = "0.1.0"
 dependencies = [
  "copperleaf",
  "copperleaf-part-macro",
- "serde",
- "toml",
 ]
 
 [[package]]
@@ -701,7 +698,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -772,6 +769,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a207d6d6a2b7fc470b80443726053f18a2481b7e1eee970597051596567987a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -800,7 +808,7 @@ checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -952,7 +960,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
  "wasm-bindgen-shared",
 ]
 

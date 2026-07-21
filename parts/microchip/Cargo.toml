@@ -5,6 +5,9 @@ edition.workspace = true
 description = "microchip vendor components"
 license.workspace = true
 
+[package.metadata.cargo-shear]
+ignored = ["copperleaf"]
+
 [lib]
 path = "lib.rs"
 

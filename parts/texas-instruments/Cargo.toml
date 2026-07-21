@@ -5,6 +5,9 @@ edition.workspace = true
 description = "texas-instruments vendor components"
 license.workspace = true
 
+[package.metadata.cargo-shear]
+ignored = ["copperleaf"]
+
 [lib]
 path = "lib.rs"
 
