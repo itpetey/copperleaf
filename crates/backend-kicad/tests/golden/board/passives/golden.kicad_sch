@@ -10,7 +10,7 @@
     (rev "")
     (date ""))
   (lib_symbols
-    (symbol "copperleaf:C1"
+    (symbol "copperleaf:Capacitor"
       (exclude_from_sim no)
       (in_bom yes)
       (on_board yes)
@@ -20,7 +20,7 @@
           (font
             (size 1.27 1.27))
           (justify left)))
-      (property "Value" "copperleaf:C1"
+      (property "Value" "copperleaf:Capacitor"
         (at -5.08 -3.81 0)
         (effects
           (font
@@ -56,7 +56,7 @@
         (effects
           (font
             (size 1.27 1.27))))
-      (symbol "C1_0_1"
+      (symbol "Capacitor_0_1"
         (rectangle
           (start -5.08 2.54)
           (end 5.08 -2.54)
@@ -396,7 +396,7 @@
               (font
                 (size 1.27 1.27))))))))
   (symbol
-    (lib_id "copperleaf:C1")
+    (lib_id "copperleaf:Capacitor")
     (at 35.56 33.02 0)
     (unit 1)
     (in_bom yes)
@@ -408,7 +408,7 @@
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "C"
+    (property "Value" "100nF"
       (at 35.56 36.83 0)
       (effects
         (font

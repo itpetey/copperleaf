@@ -15,7 +15,7 @@
       (pins
         (pin "1"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_1"))
         (pin "2"
           (type "bidirectional")
           (name "GPIO0"))
@@ -30,7 +30,7 @@
           (name "GPIO3"))
         (pin "6"
           (type "power_in")
-          (name "DVDD"))
+          (name "DVDD_1"))
         (pin "7"
           (type "bidirectional")
           (name "GPIO4"))
@@ -45,7 +45,7 @@
           (name "GPIO7"))
         (pin "11"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_2"))
         (pin "12"
           (type "bidirectional")
           (name "GPIO8"))
@@ -72,7 +72,7 @@
           (name "GPIO15"))
         (pin "20"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_3"))
         (pin "21"
           (type "bidirectional")
           (name "XIN"))
@@ -81,7 +81,7 @@
           (name "XOUT"))
         (pin "23"
           (type "power_in")
-          (name "DVDD"))
+          (name "DVDD_2"))
         (pin "24"
           (type "bidirectional")
           (name "SWCLK"))
@@ -102,7 +102,7 @@
           (name "GPIO18"))
         (pin "30"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_4"))
         (pin "31"
           (type "bidirectional")
           (name "GPIO19"))
@@ -126,10 +126,10 @@
           (name "GPIO25"))
         (pin "38"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_5"))
         (pin "39"
           (type "power_in")
-          (name "DVDD"))
+          (name "DVDD_3"))
         (pin "40"
           (type "bidirectional")
           (name "GPIO26_ADC0"))
@@ -147,7 +147,7 @@
           (name "ADC_AVDD"))
         (pin "45"
           (type "power_in")
-          (name "IOVDD"))
+          (name "IOVDD_6"))
         (pin "46"
           (type "power_in")
           (name "VREG_AVDD"))
@@ -155,13 +155,13 @@
           (type "power_in")
           (name "VREG_PGND"))
         (pin "48"
-          (type "power_in")
+          (type "bidirectional")
           (name "VREG_LX"))
         (pin "49"
           (type "power_in")
           (name "VREG_VIN"))
         (pin "50"
-          (type "power_in")
+          (type "bidirectional")
           (name "VREG_FB"))
         (pin "51"
           (type "bidirectional")
@@ -222,7 +222,27 @@
           (name "MECH8"))
         (pin "70"
           (type "passive")
-          (name "MECH9")))))
+          (name "MECH9"))))
+    (comp
+      (ref "C1")
+      (value "100nF")
+      (pins
+        (pin "1"
+          (type "power_in")
+          (name "1"))
+        (pin "2"
+          (type "power_in")
+          (name "2"))))
+    (comp
+      (ref "C2")
+      (value "100nF")
+      (pins
+        (pin "1"
+          (type "power_in")
+          (name "1"))
+        (pin "2"
+          (type "power_in")
+          (name "2")))))
   (nets
     (net
       (code 1)
@@ -236,6 +256,16 @@
         (ref "U1")
         (pin "53")
         (pinfunction "USB_OTP_VDD")
+        (pintype "power_in"))
+      (node
+        (ref "C1")
+        (pin "1")
+        (pinfunction "1")
+        (pintype "power_in"))
+      (node
+        (ref "C2")
+        (pin "1")
+        (pinfunction "1")
         (pintype "power_in")))
     (net
       (code 2)
@@ -249,4 +279,14 @@
         (ref "U1")
         (pin "61")
         (pinfunction "GND")
+        (pintype "power_in"))
+      (node
+        (ref "C1")
+        (pin "2")
+        (pinfunction "2")
+        (pintype "power_in"))
+      (node
+        (ref "C2")
+        (pin "2")
+        (pinfunction "2")
         (pintype "power_in")))))

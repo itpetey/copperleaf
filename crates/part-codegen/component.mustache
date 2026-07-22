@@ -85,6 +85,8 @@ impl copperleaf::Component for {{{struct_name}}} {
             {{^model3d_rotation_lit}}model_3d_rotation: (0.0, 0.0, 0.0),{{/model3d_rotation_lit}}
             {{#model3d_offset_lit}}model_3d_offset: {{{model3d_offset_lit}}},{{/model3d_offset_lit}}
             {{^model3d_offset_lit}}model_3d_offset: (0.0, 0.0, 0.0),{{/model3d_offset_lit}}
+            capacitance: None,
+            is_bypass: false,
         })
     }
     {{/has_meta}}

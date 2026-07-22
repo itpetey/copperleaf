@@ -26,10 +26,17 @@ fn components_node(board: &CompiledBoard) -> Sexpr {
         .components
         .iter()
         .map(|c| {
+            let owned_value = refdes_prefix(&c.refdes);
             let mut children = vec![
                 Sexpr::atom("comp"),
                 kv("ref", &c.refdes),
-                kv("value", refdes_prefix(&c.refdes)),
+                kv(
+                    "value",
+                    c.meta
+                        .capacitance
+                        .as_deref()
+                        .unwrap_or(&owned_value),
+                ),
             ];
 
             // Emit a (pins ...) section listing every pin on the component,

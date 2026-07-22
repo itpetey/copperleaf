@@ -14,7 +14,7 @@
       (value "U")
       (pins
         (pin "1"
-          (type "bidirectional")
+          (type "power_in")
           (name "VOUT"))
         (pin "2"
           (type "bidirectional")
@@ -26,7 +26,7 @@
           (type "bidirectional")
           (name "L1"))
         (pin "5"
-          (type "bidirectional")
+          (type "power_in")
           (name "VIN"))
         (pin "6"
           (type "bidirectional")
@@ -35,7 +35,7 @@
           (type "bidirectional")
           (name "PS/SYNC"))
         (pin "8"
-          (type "bidirectional")
+          (type "power_in")
           (name "VINA"))
         (pin "9"
           (type "power_in")

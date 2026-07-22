@@ -460,7 +460,7 @@
       (scale
         (xyz 1 1 1))
       (rotate
-        (xyz 90 0 0))))
+        (xyz -90 0 0))))
   (footprint "S2B-PH-SM4-TB_LF__SN_"
     (layer "F.Cu")
     (locked no)
@@ -604,7 +604,7 @@
       (scale
         (xyz 1 1 1))
       (rotate
-        (xyz 90 0 0))))
+        (xyz -90 0 0))))
   (footprint "2340901-1"
     (layer "F.Cu")
     (locked no)

@@ -75,6 +75,7 @@ fn symbol_node(manifest: &Manifest, lib_id: &str) -> Sexpr {
             datasheet: manifest.component.datasheet.as_deref().unwrap_or("~"),
             description: manifest.component.description.as_deref().unwrap_or(""),
             fp_filter: None,
+            bypass: false,
         },
         &layout,
     )

@@ -389,6 +389,8 @@ impl ComponentMeta {
             model_3d_data: self.model_3d_data.clone(),
             model_3d_rotation: self.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0)),
             model_3d_offset: self.model_3d_offset.unwrap_or((0.0, 0.0, 0.0)),
+            capacitance: None,
+            is_bypass: false,
         }
     }
 }

@@ -90,6 +90,7 @@ pub(crate) fn symbol_def_sexpr(comp: &CompiledComponent, symbol_name: &str) -> S
             datasheet: comp.meta.datasheet.as_deref().unwrap_or("~"),
             description: comp.meta.description.as_deref().unwrap_or(""),
             fp_filter: Some(&fp_filter),
+            bypass: comp.meta.is_bypass,
         },
         &layout,
     )

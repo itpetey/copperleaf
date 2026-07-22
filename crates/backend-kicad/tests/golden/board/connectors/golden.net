@@ -92,13 +92,13 @@
           (name "1"))
         (pin "S1"
           (type "bidirectional")
-          (name "SHIELD"))
+          (name "SHIELD_1"))
         (pin "2"
           (type "bidirectional")
           (name "2"))
         (pin "S2"
           (type "bidirectional")
-          (name "SHIELD"))))
+          (name "SHIELD_2"))))
     (comp
       (ref "J4")
       (value "J")
@@ -123,16 +123,16 @@
           (name "DN1"))
         (pin "SH1"
           (type "bidirectional")
-          (name "SHIELD"))
+          (name "SHIELD_1"))
         (pin "SH2"
           (type "bidirectional")
-          (name "SHIELD"))
+          (name "SHIELD_2"))
         (pin "SH3"
           (type "bidirectional")
-          (name "SHIELD"))
+          (name "SHIELD_3"))
         (pin "SH4"
           (type "bidirectional")
-          (name "SHIELD"))
+          (name "SHIELD_4"))
         (pin "B1/A12"
           (type "power_in")
           (name "GND_B"))

@@ -23,6 +23,8 @@ pub struct SymbolProps<'a> {
     pub description: &'a str,
     /// Optional `ki_fp_filters` value.
     pub fp_filter: Option<&'a str>,
+    /// When `true`, a `Bypass` property is added to the symbol definition.
+    pub bypass: bool,
 }
 
 /// Build deterministic 1-based net codes from a compiled board.
@@ -68,6 +70,15 @@ pub fn build_symbol_sexpr(props: &SymbolProps, layout: &crate::sym_layout::Symbo
         property_sym_node("Description", props.description, (0.0, 0.0), true, false),
         property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
     ];
+    if props.bypass {
+        children.push(property_sym_node(
+            "Bypass",
+            "yes",
+            (0.0, 0.0),
+            true,
+            false,
+        ));
+    }
     if let Some(filter) = props.fp_filter {
         children.push(property_sym_node(
             "ki_fp_filters",

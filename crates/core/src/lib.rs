@@ -83,6 +83,13 @@ pub struct ComponentMeta {
     pub model_3d_rotation: (f64, f64, f64),
     /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
     pub model_3d_offset: (f64, f64, f64),
+    /// Capacitance value string (e.g. `"100nF"`, `"10uF"`).  Used for the
+    /// schematic/Netlist `Value` property so bypass-capacitor tools can
+    /// detect the part.
+    pub capacitance: Option<String>,
+    /// `true` when this component is a decoupling / bypass capacitor.
+    /// Emitted as a `Bypass` property in the schematic and netlist.
+    pub is_bypass: bool,
 }
 
 /// Common backend errors.
@@ -111,6 +118,8 @@ impl ComponentMeta {
         model_3d_data: None,
         model_3d_rotation: (0.0, 0.0, 0.0),
         model_3d_offset: (0.0, 0.0, 0.0),
+        capacitance: None,
+        is_bypass: false,
     };
 }
 

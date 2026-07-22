@@ -4,6 +4,22 @@ use copperleaf::{
     Board, CompileError, Component, ComponentMeta, Farad, Hertz, Ohm, Pin, PinHandle, PinRef,
     PowerSpec, Qty, Role, UnitExt,
 };
+
+/// Format a capacitance in farads as a human-readable string (e.g. `"100nF"`, `"10uF"`).
+fn format_capacitance(farads: Qty<Farad>) -> String {
+    let v = farads.as_base();
+    if v < 1.0e-9 {
+        format!("{:.0}pF", v * 1.0e12)
+    } else if v < 1.0e-6 {
+        format!("{:.0}nF", v * 1.0e9)
+    } else if v < 1.0e-3 {
+        format!("{:.1}uF", v * 1.0e6)
+    } else if v < 1.0 {
+        format!("{:.1}mF", v * 1.0e3)
+    } else {
+        format!("{:.0}F", v)
+    }
+}
 use copperleaf_part_macro::build_component;
 
 use crate::footprint::Package;
@@ -108,6 +124,8 @@ impl Capacitor {
             ],
             meta: ComponentMeta {
                 footprint: Some(package.capacitor_footprint_name().to_string()),
+                symbol: Some("copperleaf:Capacitor".to_string()),
+                capacitance: Some(format_capacitance(value)),
                 ..ComponentMeta::default()
             },
         }
@@ -157,6 +175,9 @@ impl Capacitor {
             pins: Self::decoupling_pins(package),
             meta: ComponentMeta {
                 footprint: Some(package.capacitor_footprint_name().to_string()),
+                symbol: Some("copperleaf:Capacitor".to_string()),
+                capacitance: Some(format_capacitance(value)),
+                is_bypass: true,
                 ..ComponentMeta::default()
             },
         }

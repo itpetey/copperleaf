@@ -11,7 +11,7 @@
   (components
     (comp
       (ref "C1")
-      (value "C")
+      (value "100nF")
       (pins
         (pin "1"
           (type "bidirectional")

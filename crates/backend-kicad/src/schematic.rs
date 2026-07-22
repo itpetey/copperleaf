@@ -215,8 +215,14 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
     let (x, y) = pos;
     let lib_id = symbol_lib_id(comp);
     let fp_value = footprint_ref(comp);
+    let owned_value = refdes_prefix(&comp.refdes);
+    let value_str = comp
+        .meta
+        .capacitance
+        .as_deref()
+        .unwrap_or(&owned_value);
 
-    let properties = vec![
+    let mut properties = vec![
         property_sym_node(
             "Reference",
             &comp.refdes,
@@ -226,13 +232,22 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
         ),
         property_sym_node(
             "Value",
-            &refdes_prefix(&comp.refdes),
+            value_str,
             (x, y - layout.y2 + 1.27),
             false,
             false,
         ),
         property_sym_node("Footprint", &fp_value, (x, y), true, false),
     ];
+    if comp.meta.is_bypass {
+        properties.push(property_sym_node(
+            "Bypass",
+            "yes",
+            (x, y),
+            true,
+            false,
+        ));
+    }
 
     Sexpr::list(
         std::iter::once(Sexpr::atom("symbol"))
