@@ -109,6 +109,10 @@ impl copperleaf::Component for Arjm11d7502AbEw2 {
             model_3d_rotation: (0.0, 0.0, 0.0),
             
             model_3d_offset: (0.0, 0.0, 0.0),
+            
+            fab_extent: None,
+            capacitance: None,
+            is_bypass: false,
         })
     }
 }

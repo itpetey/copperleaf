@@ -580,6 +580,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![CodegenPinDef {
                 num: 1,
@@ -807,6 +808,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![],
             constraints: vec![],

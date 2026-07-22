@@ -123,6 +123,11 @@ pub struct ComponentMeta {
     /// relative to the footprint origin, e.g. `[0.0, 0.0, -2.0]`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_3d_offset: Option<(f64, f64, f64)>,
+    /// Explicit fabrication (body) outline extent as `(x1, y1, x2, y2)` in
+    /// millimetres.  When set, this replaces the pad-derived extent for
+    /// generating the F.Fab, F.SilkS, and F.CrtYd outlines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fab_extent: Option<(f64, f64, f64, f64)>,
 }
 
 /// Shared electrical fields used by both `PinDef` and the kind-map system.
@@ -348,6 +353,8 @@ struct TemplateData {
     model3d_offset_lit: Option<String>,
     /// Description as a Rust string literal.
     description_lit: Option<String>,
+    /// Fab extent as a Rust tuple expression, e.g. `(-3.65, -3.65, 3.65, 3.65)`.
+    fab_extent_lit: Option<String>,
 }
 
 impl SourceProvider for TemplateProvider {
@@ -389,6 +396,7 @@ impl ComponentMeta {
             model_3d_data: self.model_3d_data.clone(),
             model_3d_rotation: self.model_3d_rotation.unwrap_or((0.0, 0.0, 0.0)),
             model_3d_offset: self.model_3d_offset.unwrap_or((0.0, 0.0, 0.0)),
+            fab_extent: self.fab_extent,
             capacitance: None,
             is_bypass: false,
         }
@@ -901,7 +909,8 @@ fn render_component(
         || manifest.component.model_3d.is_some()
         || manifest.component.model_3d_data.is_some()
         || manifest.component.model_3d_rotation.is_some()
-        || manifest.component.model_3d_offset.is_some();
+        || manifest.component.model_3d_offset.is_some()
+        || manifest.component.fab_extent.is_some();
 
     let data = TemplateData {
         title: title.clone(),
@@ -934,6 +943,10 @@ fn render_component(
             .model_3d_offset
             .map(|(x, y, z)| format!("({x:?}, {y:?}, {z:?})")),
         description_lit: manifest.component.description.clone(),
+        fab_extent_lit: manifest
+            .component
+            .fab_extent
+            .map(|(x1, y1, x2, y2)| format!("({x1:?}, {y1:?}, {x2:?}, {y2:?})")),
     };
 
     let mut out = String::new();
@@ -1016,6 +1029,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![PinDef {
                 num: 1,
@@ -1060,6 +1074,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![PinDef {
                 num: 1,

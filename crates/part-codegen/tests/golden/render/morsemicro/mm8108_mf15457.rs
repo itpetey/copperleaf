@@ -182,6 +182,10 @@ impl copperleaf::Component for Mm8108Mf15457 {
             
             model_3d_offset: (-5.0, 4.5, 0.0),
             
+            
+            fab_extent: None,
+            capacitance: None,
+            is_bypass: false,
         })
     }
 }

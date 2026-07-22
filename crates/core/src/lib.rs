@@ -83,6 +83,10 @@ pub struct ComponentMeta {
     pub model_3d_rotation: (f64, f64, f64),
     /// 3D model offset in millimetres (x, y, z) relative to the footprint origin.
     pub model_3d_offset: (f64, f64, f64),
+    /// Explicit fabrication (body) outline extent as `(x1, y1, x2, y2)` in
+    /// millimetres.  When set, this replaces the pad-derived extent for
+    /// generating the F.Fab, F.SilkS, and F.CrtYd outlines.
+    pub fab_extent: Option<(f64, f64, f64, f64)>,
     /// Capacitance value string (e.g. `"100nF"`, `"10uF"`).  Used for the
     /// schematic/Netlist `Value` property so bypass-capacitor tools can
     /// detect the part.
@@ -118,6 +122,7 @@ impl ComponentMeta {
         model_3d_data: None,
         model_3d_rotation: (0.0, 0.0, 0.0),
         model_3d_offset: (0.0, 0.0, 0.0),
+        fab_extent: None,
         capacitance: None,
         is_bypass: false,
     };

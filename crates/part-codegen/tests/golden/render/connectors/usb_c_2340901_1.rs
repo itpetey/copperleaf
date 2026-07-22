@@ -12,10 +12,10 @@
 /// | 4   | CC1      | I/O         |                       |
 /// | 5   | SBU1     | I/O         |                       |
 /// | 6   | DN1      | I/O         |                       |
-/// | 7   | SHIELD   | I/O         |                       |
-/// | 8   | SHIELD   | I/O         |                       |
-/// | 9   | SHIELD   | I/O         |                       |
-/// | 10  | SHIELD   | I/O         |                       |
+/// | 7   | SHIELD_1 | I/O         |                       |
+/// | 8   | SHIELD_2 | I/O         |                       |
+/// | 9   | SHIELD_3 | I/O         |                       |
+/// | 10  | SHIELD_4 | I/O         |                       |
 /// | 11  | GND_B    | Ground      |                       |
 /// | 12  | VBUS_B   | Supply      |                       |
 /// | 13  | DP2      | I/O         |                       |
@@ -34,7 +34,10 @@ impl UsbC23409011 {
     pub const CC1: copperleaf::PinRef = copperleaf::PinRef("CC1");
     pub const SBU1: copperleaf::PinRef = copperleaf::PinRef("SBU1");
     pub const DN1: copperleaf::PinRef = copperleaf::PinRef("DN1");
-    pub const SHIELD: copperleaf::PinRef = copperleaf::PinRef("SHIELD");
+    pub const SHIELD_1: copperleaf::PinRef = copperleaf::PinRef("SHIELD_1");
+    pub const SHIELD_2: copperleaf::PinRef = copperleaf::PinRef("SHIELD_2");
+    pub const SHIELD_3: copperleaf::PinRef = copperleaf::PinRef("SHIELD_3");
+    pub const SHIELD_4: copperleaf::PinRef = copperleaf::PinRef("SHIELD_4");
     pub const GND_B: copperleaf::PinRef = copperleaf::PinRef("GND_B");
     pub const VBUS_B: copperleaf::PinRef = copperleaf::PinRef("VBUS_B");
     pub const DP2: copperleaf::PinRef = copperleaf::PinRef("DP2");
@@ -53,10 +56,10 @@ impl UsbC23409011 {
                 Pin::build("CC1").number("A5").pos(-1.25, -5.275).rotation(0.0).length(1.15).width(0.3).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").dio(),
                 Pin::build("SBU1").number("A8").pos(1.25, -5.275).rotation(0.0).length(1.15).width(0.3).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").dio(),
                 Pin::build("DN1").number("A7").pos(0.25, -5.275).rotation(0.0).length(1.15).width(0.3).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").dio(),
-                Pin::build("SHIELD").number("SH1").pos(-5.62, -4.0).rotation(0.0).length(1.85).width(1.05).height(1.85).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
-                Pin::build("SHIELD").number("SH2").pos(5.62, -4.0).rotation(0.0).length(1.85).width(1.05).height(1.85).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
-                Pin::build("SHIELD").number("SH3").pos(-5.62, 0.0).rotation(0.0).length(2.25).width(1.05).height(2.25).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
-                Pin::build("SHIELD").number("SH4").pos(5.62, 0.0).rotation(0.0).length(2.25).width(1.05).height(2.25).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
+                Pin::build("SHIELD_1").number("SH1").pos(-5.62, -4.0).rotation(0.0).length(1.85).width(1.05).height(1.85).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
+                Pin::build("SHIELD_2").number("SH2").pos(5.62, -4.0).rotation(0.0).length(1.85).width(1.05).height(1.85).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
+                Pin::build("SHIELD_3").number("SH3").pos(-5.62, 0.0).rotation(0.0).length(2.25).width(1.05).height(2.25).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
+                Pin::build("SHIELD_4").number("SH4").pos(5.62, 0.0).rotation(0.0).length(2.25).width(1.05).height(2.25).pad_type("thru_hole").pad_shape("oval").solder_mask_margin(0.102).layers("*.Cu *.Mask").dio(),
                 Pin::build("GND_B").number("B1/A12").pos(3.2, -5.275).rotation(0.0).length(1.15).width(0.6).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").gnd(),
                 Pin::build("VBUS_B").number("B4/AP").pos(2.4, -5.275).rotation(0.0).length(1.15).width(0.6).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").pwr(4.75.volt(), 5.25.volt(), 3.0.amp()).pin(),
                 Pin::build("DP2").number("B6").pos(0.75, -5.275).rotation(0.0).length(1.15).width(0.3).height(1.15).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").dio(),
@@ -108,6 +111,10 @@ impl copperleaf::Component for UsbC23409011 {
             
             model_3d_offset: (0.0, -4.5, 0.0),
             
+            
+            fab_extent: None,
+            capacitance: None,
+            is_bypass: false,
         })
     }
 }

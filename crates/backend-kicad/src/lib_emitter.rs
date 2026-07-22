@@ -145,7 +145,7 @@ fn footprint_def(comp: &CompiledComponent, fp_name: &str) -> String {
 
     // Outlines (fab, silk, courtyard, pin-1 marker).
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed)) {
+        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed), comp.meta.fab_extent) {
             children.push(node);
         }
     }

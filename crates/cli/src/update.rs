@@ -189,6 +189,22 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         }
         diags.extend(manifest::merge_footprint(&mut manifest, &pads));
 
+        // Extract fabricaton body outline from the footprint source.
+        {
+            let fab_path: std::path::PathBuf =
+                if std::fs::metadata(footprint_path)?.is_dir() {
+                    std::path::Path::new(footprint_path)
+                        .join(format!("{}.kicad_mod", resolved_lib_id))
+                } else {
+                    footprint_path.clone().into()
+                };
+            if let Ok(Some(extent)) =
+                copperleaf_backend_kicad::parse_footprint_fab_extent(&fab_path)
+            {
+                manifest.component.fab_extent = Some(extent);
+            }
+        }
+
         // Extract 3D model path from the footprint source, unless overridden
         // by --model-3d.
         if manifest.component.model_3d.is_none() && args.model_3d.is_none() {

@@ -71,10 +71,14 @@ impl copperleaf::Component for Conmhf4SmdGT {
             model_3d: None,
             model_3d_data: Some("<elided:361652:8b1b54454b3624c8>".into()),
             
-            model_3d_rotation: (90.0, 0.0, 0.0),
+            model_3d_rotation: (-90.0, 0.0, 0.0),
             
             
             model_3d_offset: (0.0, 0.0, 0.0),
+            
+            fab_extent: None,
+            capacitance: None,
+            is_bypass: false,
         })
     }
 }

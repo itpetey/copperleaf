@@ -1,7 +1,7 @@
 (kicad_symbol_lib
   (version 20251024)
   (generator "copperleaf")
-  (symbol "TPS63031DSKR"
+  (symbol "CON-SMA-EDGE-S"
     (exclude_from_sim no)
     (in_bom yes)
     (on_board yes)
@@ -11,7 +11,7 @@
         (font
           (size 1.27 1.27))
         (justify left)))
-    (property "Value" "TPS63031DSKR"
+    (property "Value" "CON-SMA-EDGE-S"
       (at -5.08 -6.35 0)
       (effects
         (font
@@ -23,7 +23,7 @@
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Datasheet" "https://www.ti.com/lit/gpn/TPS63031"
+    (property "Datasheet" "~"
       (at 0 0 0)
       (hide yes)
       (effects
@@ -41,7 +41,7 @@
       (effects
         (font
           (size 1.27 1.27))))
-    (symbol "TPS63031DSKR_0_1"
+    (symbol "CON-SMA-EDGE-S_0_1"
       (rectangle
         (start -5.08 5.08)
         (end 5.08 -5.08)
@@ -53,62 +53,7 @@
       (pin bidirectional line
         (at -7.62 2.54 0)
         (length 2.54)
-        (name "L2"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "2"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin bidirectional line
-        (at -7.62 0 0)
-        (length 2.54)
-        (name "L1"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "4"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin bidirectional line
-        (at -7.62 -2.54 0)
-        (length 2.54)
-        (name "EN"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "6"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin bidirectional line
-        (at 7.62 2.54 180)
-        (length 2.54)
-        (name "PS/SYNC"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "7"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin bidirectional line
-        (at 7.62 0 180)
-        (length 2.54)
-        (name "FB"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "10"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin power_in line
-        (at -2.54 7.62 270)
-        (length 2.54)
-        (name "VOUT"
+        (name "Signal"
           (effects
             (font
               (size 1.27 1.27))))
@@ -116,58 +61,47 @@
           (effects
             (font
               (size 1.27 1.27)))))
-      (pin power_in line
-        (at 0 7.62 270)
+      (pin bidirectional line
+        (at -7.62 0 0)
         (length 2.54)
-        (name "VIN"
+        (name "GND1"
           (effects
             (font
               (size 1.27 1.27))))
-        (number "5"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin power_in line
-        (at 2.54 7.62 270)
-        (length 2.54)
-        (name "VINA"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "8"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin power_in line
-        (at -2.54 -7.62 90)
-        (length 2.54)
-        (name "PGND"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "3"
-          (effects
-            (font
-              (size 1.27 1.27)))))
-      (pin power_in line
-        (at 0 -7.62 90)
-        (length 2.54)
-        (name "GND"
-          (effects
-            (font
-              (size 1.27 1.27))))
-        (number "9"
+        (number "G1"
           (effects
             (font
               (size 1.27 1.27)))))
       (pin bidirectional line
-        (at 2.54 -7.62 90)
+        (at -7.62 -2.54 0)
         (length 2.54)
-        (name "EXP"
+        (name "GND2"
           (effects
             (font
               (size 1.27 1.27))))
-        (number "11"
+        (number "G2"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 2.54 180)
+        (length 2.54)
+        (name "GND3"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "G3"
+          (effects
+            (font
+              (size 1.27 1.27)))))
+      (pin bidirectional line
+        (at 7.62 0 180)
+        (length 2.54)
+        (name "GND4"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "G4"
           (effects
             (font
               (size 1.27 1.27))))))))

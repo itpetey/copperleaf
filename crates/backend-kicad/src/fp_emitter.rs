@@ -130,7 +130,7 @@ pub fn emit_footprint_to(
 
     // Outlines (fab, silk, courtyard, pin-1 marker).
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), None) {
+        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), None, manifest.component.fab_extent) {
             children.push(node);
         }
     }
@@ -321,6 +321,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![
                 pin_def(1, "VDD", (-2.54, 0.0)),
@@ -377,6 +378,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![],
             constraints: vec![],
@@ -478,6 +480,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![
                 PinDef {
@@ -517,6 +520,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![
                 PinDef {
@@ -612,6 +616,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![
                 PinDef {
@@ -693,6 +698,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![pin],
             constraints: vec![],

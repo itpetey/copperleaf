@@ -124,6 +124,7 @@ mod tests {
                 model_3d_data: None,
                 model_3d_rotation: None,
                 model_3d_offset: None,
+                fab_extent: None,
             },
             pins: vec![
                 pin_def(1, "VDD", "pwr"),

@@ -200,18 +200,29 @@ pub fn model_sexpr(
 /// Build the fab/silk/courtyard outlines plus the pin-1 marker for a pad
 /// bounding box `(x1, y1, x2, y2)`.  All coordinates are rounded to the
 /// 0.01 mm grid and use KLC-legal line widths.
+///
+/// When `fab_extent` is `Some`, it is used directly as the fab outline
+/// (without the usual body margin added to the pad extent); silk and
+/// courtyard are derived from the fab extent with the standard offsets.
 pub fn outline_sexprs(
     extent: (f64, f64, f64, f64),
     pin1: Option<(f64, f64)>,
     uuid_seed: Option<&str>,
+    fab_extent: Option<(f64, f64, f64, f64)>,
 ) -> Vec<Sexpr> {
-    let (x1, y1, x2, y2) = extent;
-
-    // Fab outline: pad bounding box plus body margin.
-    let fx1 = x1 - BODY_MARGIN;
-    let fy1 = y1 - BODY_MARGIN;
-    let fx2 = x2 + BODY_MARGIN;
-    let fy2 = y2 + BODY_MARGIN;
+    // When an explicit fab extent is provided, use it directly.
+    // Otherwise derive the fab outline from the pad bounding box + margin.
+    let (fx1, fy1, fx2, fy2) = if let Some(fab) = fab_extent {
+        fab
+    } else {
+        let (x1, y1, x2, y2) = extent;
+        (
+            x1 - BODY_MARGIN,
+            y1 - BODY_MARGIN,
+            x2 + BODY_MARGIN,
+            y2 + BODY_MARGIN,
+        )
+    };
 
     let mut out = Vec::new();
     for &(start, end) in &outline_segments(fx1, fy1, fx2, fy2) {
@@ -575,7 +586,7 @@ mod tests {
     fn outlines_are_on_grid_and_klc_widths() {
         let pads = pads_from_component(&qfn_comp());
         let extent = pads_extent(&pads).unwrap();
-        let out = outline_sexprs(extent, pin1_pos(&pads), None);
+        let out = outline_sexprs(extent, pin1_pos(&pads), None, None);
         let text: String = out
             .iter()
             .map(|s| s.to_string())

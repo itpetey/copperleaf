@@ -77,6 +77,19 @@ pub fn parse_footprint_model(path: impl AsRef<Path>) -> Result<Option<String>, P
     Ok(extract_model_path(&sexpr))
 }
 
+/// Extract the fabrication (body) outline extent from a `.kicad_mod` file's
+/// `(fp_line ... (layer F.Fab) ...)` nodes.
+///
+/// Returns `(x1, y1, x2, y2)` in millimetres, or `None` if there are no
+/// F.Fab lines.
+pub fn parse_footprint_fab_extent(
+    path: impl AsRef<Path>,
+) -> Result<Option<(f64, f64, f64, f64)>, ParseError> {
+    let source = std::fs::read_to_string(path.as_ref())?;
+    let sexpr = parse(&source)?;
+    Ok(extract_fab_extent(&sexpr))
+}
+
 /// Extract the 3D model path for a named footprint within a `.pretty` library
 /// directory.
 pub fn parse_footprint_model_lib(
@@ -132,6 +145,98 @@ fn extract_model_path(node: &Sexpr) -> Option<String> {
         }
     }
     None
+}
+
+/// Walk the S-expression tree and compute the bounding box of all
+/// `(fp_line ... (layer F.Fab) ...)` nodes.
+fn extract_fab_extent(node: &Sexpr) -> Option<(f64, f64, f64, f64)> {
+    let mut lines: Vec<((f64, f64), (f64, f64))> = Vec::new();
+    collect_fab_lines(node, &mut lines);
+    if lines.is_empty() {
+        return None;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for (start, end) in &lines {
+        min_x = min_x.min(start.0).min(end.0);
+        min_y = min_y.min(start.1).min(end.1);
+        max_x = max_x.max(start.0).max(end.0);
+        max_y = max_y.max(start.1).max(end.1);
+    }
+    Some((min_x, min_y, max_x, max_y))
+}
+
+fn collect_fab_lines(node: &Sexpr, lines: &mut Vec<((f64, f64), (f64, f64))>) {
+    let Sexpr::List(children) = node else {
+        return;
+    };
+    if let Some(line) = parse_fab_line(node) {
+        lines.push(line);
+    }
+    for child in children {
+        collect_fab_lines(child, lines);
+    }
+}
+
+/// If `node` is an `(fp_line ... (layer F.Fab) ...)`, return its
+/// `(start, end)` coordinates.
+fn parse_fab_line(node: &Sexpr) -> Option<((f64, f64), (f64, f64))> {
+    let Sexpr::List(children) = node else {
+        return None;
+    };
+    if children.is_empty() {
+        return None;
+    }
+    let Sexpr::Atom(head) = &children[0] else {
+        return None;
+    };
+    if head != "fp_line" {
+        return None;
+    }
+
+    let mut start: Option<(f64, f64)> = None;
+    let mut end: Option<(f64, f64)> = None;
+    let mut is_fab = false;
+
+    for child in &children[1..] {
+        let Sexpr::List(parts) = child else {
+            continue;
+        };
+        if parts.is_empty() {
+            continue;
+        }
+        let Sexpr::Atom(key) = &parts[0] else {
+            continue;
+        };
+        match key.as_str() {
+            "start" => {
+                let xs = parts.get(1)?.as_string();
+                let ys = parts.get(2)?.as_string();
+                start = Some((xs.parse().ok()?, ys.parse().ok()?));
+            }
+            "end" => {
+                let xs = parts.get(1)?.as_string();
+                let ys = parts.get(2)?.as_string();
+                end = Some((xs.parse().ok()?, ys.parse().ok()?));
+            }
+            "layer" => {
+                if let Some(layer) = parts.get(1) {
+                    if layer.as_string() == "F.Fab" {
+                        is_fab = true;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if is_fab {
+        Some((start?, end?))
+    } else {
+        None
+    }
 }
 
 fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {

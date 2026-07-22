@@ -102,6 +102,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
             model_3d_data: None,
             model_3d_rotation: None,
             model_3d_offset: None,
+            fab_extent: None,
         },
         &args.default_kind,
     );
@@ -158,6 +159,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
             model_3d_data: None,
             model_3d_rotation: None,
             model_3d_offset: None,
+            fab_extent: None,
         },
         pins: vec![],
         constraints: vec![],

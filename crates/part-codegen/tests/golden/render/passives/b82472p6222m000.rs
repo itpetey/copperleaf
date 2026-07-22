@@ -69,6 +69,10 @@ impl copperleaf::Component for B82472p6222m000 {
             
             
             model_3d_offset: (0.0, 0.0, 0.0),
+            
+            fab_extent: None,
+            capacitance: None,
+            is_bypass: false,
         })
     }
 }

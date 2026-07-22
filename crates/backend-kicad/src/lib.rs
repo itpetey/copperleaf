@@ -12,7 +12,8 @@ use copperleaf::{Backend, BackendError, CompiledBoard};
 pub use copperleaf::deterministic_id;
 pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
 pub use fp_parser::{
-    PadDef, parse_footprint, parse_footprint_lib, parse_footprint_model, parse_footprint_model_lib,
+    PadDef, parse_footprint, parse_footprint_fab_extent, parse_footprint_lib,
+    parse_footprint_model, parse_footprint_model_lib,
 };
 pub use lib_emitter::{emit_footprint_lib, emit_symbol_lib};
 pub use project::{emit_fp_lib_table, emit_sym_lib_table};
