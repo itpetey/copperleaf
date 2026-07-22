@@ -42,6 +42,21 @@ pub struct Crystal {
     pins: Vec<Pin>,
 }
 
+/// A rectangular grid of plated through-hole pads.
+///
+/// Useful for pin headers, test-point arrays, or any row/column
+/// arrangement of solderable holes.
+///
+/// Pad numbering is **column-major**: pin 1 is (row 1, col 1),
+/// pin 2 is (row 2, col 1), pin 3 is (row 1, col 2), and so on.
+/// This matches the physical layout of right-angle box headers where
+/// adjacent pins on the same column pair are consecutive numbers.
+pub struct ThruHoleHeader {
+    pins: Vec<Pin>,
+    rows: usize,
+    cols: usize,
+}
+
 impl Capacitor {
     pub const PIN1: PinRef = PinRef("1");
     pub const PIN2: PinRef = PinRef("2");
@@ -282,21 +297,6 @@ impl Component for Crystal {
     fn pins(&self) -> &[Pin] {
         &self.pins
     }
-}
-
-/// A rectangular grid of plated through-hole pads.
-///
-/// Useful for pin headers, test-point arrays, or any row/column
-/// arrangement of solderable holes.
-///
-/// Pad numbering is **column-major**: pin 1 is (row 1, col 1),
-/// pin 2 is (row 2, col 1), pin 3 is (row 1, col 2), and so on.
-/// This matches the physical layout of right-angle box headers where
-/// adjacent pins on the same column pair are consecutive numbers.
-pub struct ThruHoleHeader {
-    pins: Vec<Pin>,
-    rows: usize,
-    cols: usize,
 }
 
 impl ThruHoleHeader {
@@ -561,10 +561,7 @@ mod tests {
     fn thru_hole_header_pin_names_are_row_col() {
         let hdr = ThruHoleHeader::new(2, 3, 1.0, 1.7, 2.54);
         let names: Vec<_> = hdr.pins().iter().map(|p| p.name()).collect();
-        assert_eq!(
-            names,
-            vec!["1_1", "2_1", "1_2", "2_2", "1_3", "2_3",]
-        );
+        assert_eq!(names, vec!["1_1", "2_1", "1_2", "2_2", "1_3", "2_3",]);
     }
 
     #[test]
