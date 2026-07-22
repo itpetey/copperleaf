@@ -811,12 +811,9 @@ layers = "F.Cu F.Mask F.Paste"
 num = 48
 number = "48"
 name = "VREG_LX"
-purpose = "Supply"
+purpose = "I/O"
 notes = "Voltage regulator switch node"
-kind = "pwr"
-v_min = 0.0
-v_max = 5.5
-i_max = 0.2
+kind = "dio"
 pos = [2.0, -3.45]
 rotation = 0.0
 length = 0.8
@@ -851,12 +848,9 @@ layers = "F.Cu F.Mask F.Paste"
 num = 50
 number = "50"
 name = "VREG_FB"
-purpose = "Supply"
+purpose = "I/O"
 notes = "Voltage regulator feedback"
-kind = "pwr"
-v_min = 1.1
-v_max = 1.1
-i_max = 0.0
+kind = "dio"
 pos = [1.2, -3.45]
 rotation = 0.0
 length = 0.8
@@ -1049,6 +1043,11 @@ height = 3.4
 pad_type = "smd"
 pad_shape = "rect"
 layers = "F.Cu F.Mask"
+
+[[constraint]]
+type = "Decoupling"
+values = ["100.0.nf()"]
+per_pin = true
 
 [[constraint]]
 type = "LengthMatch"

@@ -11,8 +11,11 @@ SVNPLTEwMzAzLTIxOw0KSEVBREVSOw0KRklMRV9ERVNDUklQVElPTiAoKCAnU1RFUCBBUDIxNCcgKSwN
 num = 1
 number = "1"
 name = "VOUT"
-purpose = "I/O"
-kind = "dio"
+purpose = "Supply"
+kind = "pwr"
+v_min = 3.3
+v_max = 3.3
+i_max = 0.45
 pos = [-1.195, -1.0]
 rotation = 0.0
 length = 0.84
@@ -79,8 +82,11 @@ layers = "F.Cu F.Mask F.Paste"
 num = 5
 number = "5"
 name = "VIN"
-purpose = "I/O"
-kind = "dio"
+purpose = "Supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 5.5
+i_max = 0.5
 pos = [-1.195, 1.0]
 rotation = 0.0
 length = 0.84
@@ -130,8 +136,11 @@ layers = "F.Cu F.Mask F.Paste"
 num = 8
 number = "8"
 name = "VINA"
-purpose = "I/O"
-kind = "dio"
+purpose = "Supply"
+kind = "pwr"
+v_min = 1.8
+v_max = 5.5
+i_max = 0.01
 pos = [1.195, 0.0]
 rotation = 0.0
 length = 0.84
@@ -198,3 +207,8 @@ thermal_vias = [
   { pos = [0.0, -0.75], drill = 0.2, size = 0.3 },
   { pos = [0.0, 0.75], drill = 0.2, size = 0.3 },
 ]
+
+[[constraint]]
+type = "Decoupling"
+values = ["100.0.nf()", "10.0.uf()"]
+per_pin = true
