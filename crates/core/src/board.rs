@@ -8,6 +8,7 @@ use crate::{
     CompileError, Component, ComponentMeta, Constraint, Net, NetIdx, Pad, Pin,
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
+    stackup::Stackup,
     units::{Diagnostic, Qty, Severity, Volt},
     util::deterministic_id,
 };
@@ -40,6 +41,8 @@ pub struct CompiledBoard {
     pub width: f64,
     /// Board height in millimetres.
     pub height: f64,
+    /// PCB layer stackup defining the physical layer structure.
+    pub stackup: Stackup,
 }
 
 /// Precomputed connectivity index for a [`CompiledBoard`].
@@ -85,6 +88,8 @@ pub struct Board {
     width: f64,
     /// Board height in millimetres (default 80.0).
     height: f64,
+    /// PCB layer stackup (default: standard 2‑layer FR‑4).
+    stackup: Stackup,
 }
 
 impl CompiledComponent {
@@ -186,6 +191,7 @@ impl Board {
             next_edge: 0,
             width: 100.0,
             height: 80.0,
+            stackup: Stackup::two_layer(),
         }
     }
 
@@ -203,6 +209,16 @@ impl Board {
     /// Board height in millimetres.
     pub fn height(&self) -> f64 {
         self.height
+    }
+
+    /// Set the PCB layer stackup.
+    pub fn set_stackup(&mut self, stackup: Stackup) {
+        self.stackup = stackup;
+    }
+
+    /// Reference to the current PCB layer stackup.
+    pub fn stackup(&self) -> &Stackup {
+        &self.stackup
     }
 
     /// Add a [`Component`] to this board.

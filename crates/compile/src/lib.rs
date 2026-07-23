@@ -201,6 +201,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         constraints,
         width: board.width(),
         height: board.height(),
+        stackup: board.stackup().clone(),
     };
 
     // --- Phase 2: Validation (ERC) ---
@@ -237,6 +238,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         constraints: board_struct.constraints,
         width: board_struct.width,
         height: board_struct.height,
+        stackup: board_struct.stackup,
     };
 
     let summary = build_summary(&final_board);
@@ -734,6 +736,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         };
         let (comps, diags, conns, fallback) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);
@@ -771,6 +774,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
@@ -836,6 +840,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
@@ -899,6 +904,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);

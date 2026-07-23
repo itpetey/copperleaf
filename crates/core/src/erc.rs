@@ -180,6 +180,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: crate::stackup::Stackup::two_layer(),
         };
         let view = BoardView::new(&board);
         let diags = erc_overvoltage(&view);
@@ -208,6 +209,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: crate::stackup::Stackup::two_layer(),
         };
         let view = BoardView::new(&board);
         let diags = erc_nc_pin_connected(&view);
@@ -227,6 +229,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: crate::stackup::Stackup::two_layer(),
         };
         let view = BoardView::new(&board);
         let diags = erc_floating_inputs(&view);

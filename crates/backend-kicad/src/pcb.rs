@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use copperleaf::{CompiledBoard, NetClass, NetIdx};
+use copperleaf::{CompiledBoard, NetClass, NetIdx, Stackup, StackupLayer};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
@@ -29,10 +29,10 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
         Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260206")]),
         kv("generator", "copperleaf"),
         kv("generator_version", "10.0"),
-        general_node(),
+        general_node(&board.stackup),
         kv("paper", "A4"),
-        layers_node(),
-        setup_node(),
+        layers_node(&board.stackup),
+        setup_node(&board.stackup),
     ];
 
     for (name, code) in &net_codes {
@@ -280,71 +280,70 @@ fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Se
     Sexpr::list(prop)
 }
 
-fn general_node() -> Sexpr {
+fn general_node(stackup: &Stackup) -> Sexpr {
+    let thickness = format_float(stackup.total_thickness_mm(), 1);
     Sexpr::list([
         Sexpr::atom("general"),
-        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom("1.6")]),
+        Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom(&thickness)]),
         Sexpr::list([Sexpr::atom("legacy_teardrops"), Sexpr::atom("no")]),
     ])
 }
 
 /// Layer table using KiCad's canonical (fixed) layer IDs.
-fn layers_node() -> Sexpr {
-    Sexpr::list([
-        Sexpr::atom("layers"),
-        Sexpr::list([Sexpr::atom("0"), Sexpr::str("F.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([Sexpr::atom("31"), Sexpr::str("B.Cu"), Sexpr::atom("signal")]),
-        Sexpr::list([
-            Sexpr::atom("32"),
-            Sexpr::str("B.Adhes"),
+///
+/// Copper layers are assigned dynamically: F.Cu = 0, B.Cu = 31, and inner
+/// layers In1.Cu, In2.Cu, … get sequential IDs 1, 2, ….
+fn layers_node(stackup: &Stackup) -> Sexpr {
+    let mut entries: Vec<Sexpr> = vec![Sexpr::atom("layers")];
+
+    // Copper layers.
+    let copper_count = stackup.copper_layer_count();
+    entries.push(Sexpr::list([
+        Sexpr::atom("0"),
+        Sexpr::str("F.Cu"),
+        Sexpr::atom("signal"),
+    ]));
+    // Inner copper layers.
+    for i in 1..(copper_count.saturating_sub(1)) {
+        let id = i; // In1.Cu → 1, In2.Cu → 2, ...
+        entries.push(Sexpr::list([
+            Sexpr::atom(id.to_string()),
+            Sexpr::str(&format!("In{}.Cu", i)),
+            Sexpr::atom("signal"),
+        ]));
+    }
+    entries.push(Sexpr::list([
+        Sexpr::atom("31"),
+        Sexpr::str("B.Cu"),
+        Sexpr::atom("signal"),
+    ]));
+
+    // Non-copper layers (canonical fixed IDs).
+    let non_copper: &[(usize, &str)] = &[
+        (32, "B.Adhes"),
+        (33, "F.Adhes"),
+        (34, "B.Paste"),
+        (35, "F.Paste"),
+        (36, "B.SilkS"),
+        (37, "F.SilkS"),
+        (38, "B.Mask"),
+        (39, "F.Mask"),
+        (44, "Edge.Cuts"),
+        (45, "Margin"),
+        (46, "B.CrtYd"),
+        (47, "F.CrtYd"),
+        (48, "B.Fab"),
+        (49, "F.Fab"),
+    ];
+    for &(id, name) in non_copper {
+        entries.push(Sexpr::list([
+            Sexpr::atom(id.to_string()),
+            Sexpr::str(name),
             Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("33"),
-            Sexpr::str("F.Adhes"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("34"),
-            Sexpr::str("B.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("35"),
-            Sexpr::str("F.Paste"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("36"),
-            Sexpr::str("B.SilkS"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("37"),
-            Sexpr::str("F.SilkS"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("38"), Sexpr::str("B.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("39"), Sexpr::str("F.Mask"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("44"),
-            Sexpr::str("Edge.Cuts"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("45"), Sexpr::str("Margin"), Sexpr::atom("user")]),
-        Sexpr::list([
-            Sexpr::atom("46"),
-            Sexpr::str("B.CrtYd"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("47"),
-            Sexpr::str("F.CrtYd"),
-            Sexpr::atom("user"),
-        ]),
-        Sexpr::list([Sexpr::atom("48"), Sexpr::str("B.Fab"), Sexpr::atom("user")]),
-        Sexpr::list([Sexpr::atom("49"), Sexpr::str("F.Fab"), Sexpr::atom("user")]),
-    ])
+        ]));
+    }
+
+    Sexpr::list(entries)
 }
 
 fn net_class_node(
@@ -398,10 +397,11 @@ fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<
     nodes
 }
 
-fn setup_node() -> Sexpr {
+fn setup_node(stackup: &Stackup) -> Sexpr {
     Sexpr::list([
         Sexpr::atom("setup"),
         Sexpr::list([Sexpr::atom("pad_to_mask_clearance"), Sexpr::atom("0")]),
+        stackup_node(stackup),
         Sexpr::list([
             Sexpr::atom("pcbplotparams"),
             Sexpr::list([
@@ -412,11 +412,105 @@ fn setup_node() -> Sexpr {
     ])
 }
 
+/// Emit the `(stackup …)` s-expr inside `setup`.
+fn stackup_node(stackup: &Stackup) -> Sexpr {
+    let mut entries: Vec<Sexpr> = vec![Sexpr::atom("stackup")];
+
+    // Top mask/silk (always present).
+    entries.push(stackup_layer("F.SilkS", "Top Silk Screen", None, None, None, None, None));
+    entries.push(stackup_layer("F.Mask", "Top Solder Mask", None, None, None, None, None));
+
+    let mut dielectric_counter = 1u32;
+
+    for (i, layer) in stackup.layers.iter().enumerate() {
+        match layer {
+            StackupLayer::Copper { thickness_mm, role: _ } => {
+                let name = copper_layer_name(i / 2, stackup.copper_layer_count());
+                let thickness_str = format_float(*thickness_mm, 3);
+                entries.push(stackup_layer(
+                    &name,
+                    "copper",
+                    Some(&thickness_str),
+                    None,
+                    None,
+                    None,
+                    None,
+                ));
+            }
+            StackupLayer::Dielectric { kind, thickness_mm, dielectric } => {
+                let thickness_str = format_float(*thickness_mm, 3);
+                let dk_str = format_float(dielectric.epsilon_r, 3);
+                let df_str = format_float(dielectric.loss_tangent, 3);
+                entries.push(stackup_layer(
+                    &format!("dielectric {}", dielectric_counter),
+                    kind,
+                    Some(&thickness_str),
+                    Some(&dielectric.material),
+                    Some(&dk_str),
+                    Some(&df_str),
+                    None,
+                ));
+                dielectric_counter += 1;
+            }
+        }
+    }
+
+    // Bottom mask/silk (always present).
+    entries.push(stackup_layer("B.Mask", "Bottom Solder Mask", None, None, None, None, None));
+    entries.push(stackup_layer("B.SilkS", "Bottom Silk Screen", None, None, None, None, None));
+
+    Sexpr::list(entries)
+}
+
+/// Build a single `(layer …)` entry within the stackup.
+#[allow(clippy::too_many_arguments)]
+fn stackup_layer(
+    name: &str,
+    layer_type: &str,
+    thickness: Option<&str>,
+    material: Option<&str>,
+    epsilon_r: Option<&str>,
+    loss_tangent: Option<&str>,
+    _colour: Option<&str>,
+) -> Sexpr {
+    let mut children: Vec<Sexpr> = vec![
+        Sexpr::atom("layer"),
+        Sexpr::str(name),
+        Sexpr::list([Sexpr::atom("type"), Sexpr::str(layer_type)]),
+    ];
+    if let Some(t) = thickness {
+        children.push(Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom(t)]));
+    }
+    if let Some(mat) = material {
+        children.push(Sexpr::list([Sexpr::atom("material"), Sexpr::str(mat)]));
+    }
+    if let Some(dk) = epsilon_r {
+        children.push(Sexpr::list([Sexpr::atom("epsilon_r"), Sexpr::atom(dk)]));
+    }
+    if let Some(df) = loss_tangent {
+        children.push(Sexpr::list([Sexpr::atom("loss_tangent"), Sexpr::atom(df)]));
+    }
+    Sexpr::list(children)
+}
+
+/// Return the KiCad layer name for the n-th copper layer from top.
+/// 0 → "F.Cu", last → "B.Cu", inner → "In{idx}.Cu".
+fn copper_layer_name(idx: usize, total: usize) -> String {
+    if idx == 0 {
+        "F.Cu".to_owned()
+    } else if idx + 1 == total {
+        "B.Cu".to_owned()
+    } else {
+        format!("In{}.Cu", idx)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use copperleaf::{
-        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetIdx, NetKind, Pin, UnitExt,
+        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetIdx, NetKind, Pin,
+        UnitExt,
     };
 
     fn test_board() -> CompiledBoard {
@@ -461,6 +555,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         }
     }
 

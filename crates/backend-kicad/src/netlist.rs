@@ -210,6 +210,7 @@ mod tests {
             constraints: vec![],
             width: 100.0,
             height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
         }
     }
 

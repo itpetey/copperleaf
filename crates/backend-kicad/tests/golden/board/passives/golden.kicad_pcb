@@ -25,6 +25,27 @@
     (49 "F.Fab" user))
   (setup
     (pad_to_mask_clearance 0)
+    (stackup
+      (layer "F.SilkS"
+        (type "Top Silk Screen"))
+      (layer "F.Mask"
+        (type "Top Solder Mask"))
+      (layer "F.Cu"
+        (type "copper")
+        (thickness 0.035))
+      (layer "dielectric 1"
+        (type "core")
+        (thickness 1.53)
+        (material "FR4")
+        (epsilon_r 4.5)
+        (loss_tangent 0.02))
+      (layer "B.Cu"
+        (type "copper")
+        (thickness 0.035))
+      (layer "B.Mask"
+        (type "Bottom Solder Mask"))
+      (layer "B.SilkS"
+        (type "Bottom Silk Screen")))
     (pcbplotparams
       (layerselection 0x00010fc_ffffffff)))
   (net_class "Default" ""
