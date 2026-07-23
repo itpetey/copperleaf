@@ -134,10 +134,10 @@ pub fn fp_text(kind: &str, value: &str, pos: (f64, f64), layer: &str) -> Sexpr {
 /// electrical pin (thermal vias and mechanical pads).  Schematic and netlist
 /// emitters add these as extra symbol pins so pin counts match.
 pub fn mech_pad_names(comp: &CompiledComponent) -> Vec<(String, String)> {
-    let (pads, pin_indices) = gather_pads_internal(comp);
+    let (pads, _pin_indices, is_electrical) = gather_pads_internal(comp);
     pads.iter()
-        .zip(pin_indices.iter())
-        .filter(|(_, i)| i.is_none())
+        .zip(is_electrical.iter())
+        .filter(|(_, elec)| !**elec)
         .enumerate()
         .map(|(i, (p, _))| (p.number.clone(), format!("MECH{}", i + 1)))
         .collect()
@@ -345,19 +345,20 @@ pub fn pads_extent(pads: &[Pad]) -> Option<(f64, f64, f64, f64)> {
 /// sequential pad numbers continuing after the last electrical pin so
 /// that every pad has a unique number matching its schematic pin.
 pub fn pads_from_component(comp: &CompiledComponent) -> Vec<Pad> {
-    let (mut pads, _pin_indices) = gather_pads_internal(comp);
-    normalise_anchor(&mut pads);
+    let (mut pads, _, _) = gather_pads_internal(comp);
+    normalise_anchor(&mut pads, comp.meta.fab_extent);
     pads
 }
 
 /// Like [`pads_from_component`], but also returns a parallel vector of
-/// pin indices: `Some(i)` for electrical pins (the `i`th pin in
-/// `comp.pins`), `None` for thermal vias and mechanical pads.
+/// pin indices: `Some(i)` for pads that inherit the net of pin `i`
+/// (electrical pins and their thermal vias), `None` for mechanical pads
+/// that have no net association.
 pub fn pads_from_component_with_indices(
     comp: &CompiledComponent,
 ) -> (Vec<Pad>, Vec<Option<usize>>) {
-    let (mut pads, pin_indices) = gather_pads_internal(comp);
-    normalise_anchor(&mut pads);
+    let (mut pads, pin_indices, _is_electrical) = gather_pads_internal(comp);
+    normalise_anchor(&mut pads, comp.meta.fab_extent);
     (pads, pin_indices)
 }
 
@@ -394,25 +395,35 @@ pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> Pad {
 }
 
 /// Internal helper: gather all pads with pin-index metadata, without
-/// normalisation.  Returns `(pads, pin_indices)` where `pin_indices[i]` is
-/// `Some(pin_index)` for electrical pins and `None` for thermal vias and
-/// mechanical pads.
-fn gather_pads_internal(comp: &CompiledComponent) -> (Vec<Pad>, Vec<Option<usize>>) {
+/// normalisation.  Returns `(pads, pin_indices, is_electrical)` where:
+///
+/// - `pin_indices[i]` is `Some(pin_index)` when the pad should inherit a net
+///   (electrical pins and their thermal vias), `None` for mechanical pads.
+/// - `is_electrical[i]` is `true` for electrical pins, `false` for thermal
+///   vias and mechanical pads.
+fn gather_pads_internal(
+    comp: &CompiledComponent,
+) -> (Vec<Pad>, Vec<Option<usize>>, Vec<bool>) {
     let mut pads = Vec::new();
     let mut pin_indices = Vec::new();
+    let mut is_electrical = Vec::new();
 
     for (i, pin) in comp.pins.iter().enumerate() {
         pads.push(resolve_pad(pin, i));
         pin_indices.push(Some(i));
+        is_electrical.push(true);
         for via in pin.thermal_vias() {
             pads.push(thermal_via_pad(via.pos, via.drill, via.size));
-            pin_indices.push(None);
+            // Thermal vias inherit the net of their parent pin.
+            pin_indices.push(Some(i));
+            is_electrical.push(false);
         }
     }
 
     for mech in &comp.mechanical {
         pads.push(resolve_mech_pad(mech));
         pin_indices.push(None);
+        is_electrical.push(false);
     }
 
     // Assign sequential pad numbers to any un-numbered pads (thermal vias
@@ -421,20 +432,20 @@ fn gather_pads_internal(comp: &CompiledComponent) -> (Vec<Pad>, Vec<Option<usize
     // pin number.
     let max_electrical = pads
         .iter()
-        .zip(pin_indices.iter())
-        .filter(|(_, i)| i.is_some())
+        .zip(is_electrical.iter())
+        .filter(|(_, elec)| **elec)
         .filter_map(|(p, _)| p.number.parse::<usize>().ok())
         .max()
         .unwrap_or(0);
     let mut next_num = max_electrical + 1;
-    for (pad, pi) in pads.iter_mut().zip(pin_indices.iter()) {
-        if pi.is_none() && pad.number.is_empty() {
+    for (pad, _pi) in pads.iter_mut().zip(pin_indices.iter()) {
+        if pad.number.is_empty() {
             pad.number = next_num.to_string();
             next_num += 1;
         }
     }
 
-    (pads, pin_indices)
+    (pads, pin_indices, is_electrical)
 }
 
 /// Four line segments forming a rectangle.

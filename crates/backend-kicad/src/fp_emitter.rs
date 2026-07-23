@@ -175,7 +175,7 @@ pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
         pads.push(resolve_mech_pad(&raw));
     }
 
-    fp_geom::normalise_anchor(&mut pads);
+    fp_geom::normalise_anchor(&mut pads, manifest.component.fab_extent);
     pads
 }
 

@@ -792,7 +792,12 @@ pub fn auto_pad_pos(index: usize) -> (f64, f64) {
 ///   pad 1 sits at the origin (KLC F7.2).
 /// - Fully automatic footprints (all pads on the 2.54 mm auto-row grid
 ///   starting from origin) are left untouched.
-pub fn normalise_anchor(pads: &mut [Pad]) {
+///
+/// When `fab_extent` is `Some`, the pad positions are already defined
+/// relative to an explicit body outline, so the TH anchor-to-origin step
+/// is skipped.  The caller is responsible for aligning outlines to the
+/// normalised pads.
+pub fn normalise_anchor(pads: &mut [Pad], fab_extent: Option<(f64, f64, f64, f64)>) {
     if pads.is_empty() {
         return;
     }
@@ -819,13 +824,17 @@ pub fn normalise_anchor(pads: &mut [Pad]) {
                 p.pos.1 -= cy;
             }
         }
-    } else if let Some(anchor) = pads.first().map(|p| p.pos) {
-        // Through-hole: first pad (the first electrical pin) at the origin.
-        for p in pads.iter_mut() {
-            p.pos.0 -= anchor.0;
-            p.pos.1 -= anchor.1;
+    } else if fab_extent.is_none() {
+        if let Some(anchor) = pads.first().map(|p| p.pos) {
+            // Through-hole: first pad (the first electrical pin) at the origin.
+            for p in pads.iter_mut() {
+                p.pos.0 -= anchor.0;
+                p.pos.1 -= anchor.1;
+            }
         }
     }
+    // When fab_extent is Some, pad positions are already defined relative to
+    // an explicit body outline; no anchor translation is needed.
 }
 
 /// Compute the axis-aligned bounding box of a set of pads.
@@ -1162,7 +1171,7 @@ mod tests {
             .map(|i| resolve_pad(&Pin::build("1").dio(), i))
             .collect();
         let original: Vec<_> = pads.iter().map(|p| p.pos).collect();
-        normalise_anchor(&mut pads);
+        normalise_anchor(&mut pads, None);
         for (i, p) in pads.iter().enumerate() {
             assert_eq!(p.pos, original[i]);
         }
@@ -1174,7 +1183,7 @@ mod tests {
             resolve_pad(&Pin::build("1").pos(1.0, 1.0).dio(), 0),
             resolve_pad(&Pin::build("2").pos(3.0, 3.0).dio(), 1),
         ];
-        normalise_anchor(&mut pads);
+        normalise_anchor(&mut pads, None);
         let (x1, y1, x2, y2) = pad_extent(&pads).unwrap();
         assert!((x1 + x2).abs() < 1e-9, "SMD anchor not centred: {x1}..{x2}");
         assert!((y1 + y2).abs() < 1e-9, "SMD anchor not centred: {y1}..{y2}");
@@ -1192,9 +1201,30 @@ mod tests {
                 1,
             ),
         ];
-        normalise_anchor(&mut pads);
+        normalise_anchor(&mut pads, None);
         assert_eq!(pads[0].pos, (0.0, 0.0));
         assert_eq!(pads[1].pos, (2.54, 0.0));
+    }
+
+    #[test]
+    fn normalise_anchor_th_with_fab_extent_preserved() {
+        // BH123A-like: symmetric TH pads with an explicit body outline.
+        // The pad positions are already correct relative to the body;
+        // normalise_anchor must not shift them.
+        let mut pads = vec![
+            resolve_pad(
+                &Pin::build("1").pos(18.985, 0.0).pad_type("thru_hole").dio(),
+                0,
+            ),
+            resolve_pad(
+                &Pin::build("2").pos(-18.985, 0.0).pad_type("thru_hole").dio(),
+                1,
+            ),
+        ];
+        let fab = (-21.5, -8.89, 21.5, 8.89);
+        normalise_anchor(&mut pads, Some(fab));
+        assert_eq!(pads[0].pos, (18.985, 0.0));
+        assert_eq!(pads[1].pos, (-18.985, 0.0));
     }
 
     fn default_pad() -> Pad {

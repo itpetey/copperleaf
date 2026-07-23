@@ -11,3 +11,4 @@ build_component!("conmhf4_smd_g_t.toml");
 build_component!("s2b_ph_sm4_tb_lf__sn_.toml");
 
 build_component!("con_sma_edge_s.toml");
+build_component!("bh123a.toml");

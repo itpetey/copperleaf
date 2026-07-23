@@ -61,8 +61,8 @@ impl copperleaf::Component for B82472p6152m000 {
             
             
             description: None,
-            model_3d: Some("/Users/pete/Downloads/B82472P6152M000/B82472P6152M000.step".into()),
             
+            model_3d: None,
             model_3d_data: Some("<elided:222024:8f70ae552d2524fe>".into()),
             
             model_3d_rotation: (-90.0, 0.0, 0.0),
