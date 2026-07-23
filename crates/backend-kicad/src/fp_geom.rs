@@ -493,6 +493,7 @@ mod tests {
                     .dio(),
             ],
             constraints: vec![],
+            layout: vec![],
             mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),
@@ -871,6 +872,7 @@ mod tests {
             meta: ComponentMeta::default(),
             pins: vec![],
             constraints: vec![],
+            layout: vec![],
             mechanical: vec![],
         }
     }

@@ -227,6 +227,12 @@ impl Rp2354a {
             Constraint::MaxJunction { temp: 85.0.celsius() },
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+        ]
+    }
 }
 
 impl copperleaf::Component for Rp2354a {
@@ -236,6 +242,10 @@ impl copperleaf::Component for Rp2354a {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {

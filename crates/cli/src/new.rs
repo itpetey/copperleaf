@@ -163,7 +163,7 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
         },
         pins: vec![],
         constraints: vec![],
-
+        layout: Default::default(),
         mechanical: vec![],
     };
 

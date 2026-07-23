@@ -264,6 +264,29 @@ pub struct ConstraintDef {
     pub max: Option<f64>,
 }
 
+/// Layout-specific constraint definition from the TOML `[layout]` table.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct LayoutDef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_class: Option<NetClassDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creepage: Option<CreepageDef>,
+}
+
+/// Net class definition inside `[layout]`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct NetClassDef {
+    pub min_width: String,
+    pub clearance: String,
+}
+
+/// Creepage definition inside `[layout]`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CreepageDef {
+    pub min: String,
+    pub voltage: String,
+}
+
 /// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
 /// or paste-only stencil aperture on an exposed pad.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -303,6 +326,8 @@ pub struct Manifest {
     pub pins: Vec<PinDef>,
     #[serde(rename = "constraint", default)]
     pub constraints: Vec<ConstraintDef>,
+    #[serde(default)]
+    pub layout: LayoutDef,
     /// Mechanical-only pads (mounting holes, fiducials, etc.) that are not
     /// electrical pins.
     #[serde(rename = "mechanical", default, skip_serializing_if = "Vec::is_empty")]
@@ -336,6 +361,7 @@ struct TemplateData {
     constants: Vec<ConstantRow>,
     builders: Vec<String>,
     constraints: Vec<String>,
+    layout_constraints: Vec<String>,
     mechanicals: Vec<String>,
     /// Whether any metadata is present (controls the `has_meta` section in the template).
     has_meta: bool,
@@ -681,6 +707,12 @@ fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
         })
     };
     match c.ty.as_str() {
+        "NetClass" => Err(CodegenError::UnknownConstraint {
+            ty: "NetClass (moved to [layout] table — use `[layout] net_class = { min_width = \"…\", clearance = \"…\" }`)".into(),
+        }),
+        "Creepage" => Err(CodegenError::UnknownConstraint {
+            ty: "Creepage (moved to [layout] table — use `[layout] creepage = { min = \"…\", voltage = \"…\" }`)".into(),
+        }),
         "Decoupling" => {
             let Some(values) = &c.values else {
                 return missing("values");
@@ -713,6 +745,24 @@ fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
         }
         _ => Err(CodegenError::UnknownConstraint { ty: c.ty.clone() }),
     }
+}
+
+/// Generate `LayoutConstraint::*` expressions from the `[layout]` table.
+fn layout_constraint_exprs(layout: &LayoutDef) -> Vec<String> {
+    let mut exprs = Vec::new();
+    if let Some(ref nc) = layout.net_class {
+        exprs.push(format!(
+            "copperleaf::LayoutConstraint::NetClass {{ min_width: {}, clearance: {} }}",
+            nc.min_width, nc.clearance
+        ));
+    }
+    if let Some(ref cr) = layout.creepage {
+        exprs.push(format!(
+            "copperleaf::LayoutConstraint::Creepage {{ min: {}, voltage: {} }}",
+            cr.min, cr.voltage
+        ));
+    }
+    exprs
 }
 
 fn default_mech_number() -> String {
@@ -901,6 +951,8 @@ fn render_component(
     let constraints: Result<Vec<String>, CodegenError> =
         manifest.constraints.iter().map(constraint_expr).collect();
 
+    let layout_constraints = layout_constraint_exprs(&manifest.layout);
+
     let mechanicals: Vec<String> = manifest.mechanical.iter().map(mechanical_expr).collect();
 
     let has_meta = manifest.component.lib_id.is_some()
@@ -928,6 +980,7 @@ fn render_component(
         constants,
         builders,
         constraints: constraints?,
+        layout_constraints,
         mechanicals,
         has_meta,
         symbol_id: manifest.component.lib_id.clone(),
@@ -1055,6 +1108,7 @@ mod tests {
                 thermal_vias: vec![],
             }],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         };
         let diags = validate(&manifest);
@@ -1103,7 +1157,7 @@ mod tests {
                 thermal_vias: vec![],
             }],
             constraints: vec![],
-
+            layout: Default::default(),
             mechanical: vec![],
         };
         let diags = validate(&manifest);

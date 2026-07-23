@@ -157,6 +157,7 @@ mod tests {
                         Pin::build("GND").gnd(),
                     ],
                     constraints: vec![],
+            layout: vec![],
                     mechanical: vec![],
                 },
                 copperleaf::CompiledComponent {
@@ -167,6 +168,7 @@ mod tests {
                         Pin::build("GPIO").dio(),
                     ],
                     constraints: vec![],
+            layout: vec![],
                     mechanical: vec![],
                 },
             ],
@@ -179,6 +181,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
                 Net {
                     name: "V3V3".into(),
@@ -188,6 +191,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
             ],
             connections: vec![
@@ -208,6 +212,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),

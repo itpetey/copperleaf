@@ -148,6 +148,12 @@ impl Mm8108Mf15457 {
             Constraint::MaxJunction { temp: 85.0.celsius() },
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+        ]
+    }
 }
 
 impl copperleaf::Component for Mm8108Mf15457 {
@@ -157,6 +163,10 @@ impl copperleaf::Component for Mm8108Mf15457 {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {

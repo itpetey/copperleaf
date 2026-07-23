@@ -63,6 +63,12 @@ impl Tps63031dskr {
             Constraint::Decoupling { values: vec![100.0.nf(), 10.0.uf()], per_pin: true },
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+        ]
+    }
 }
 
 impl copperleaf::Component for Tps63031dskr {
@@ -72,6 +78,10 @@ impl copperleaf::Component for Tps63031dskr {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {

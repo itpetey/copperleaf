@@ -5,11 +5,12 @@
 //! [`copperleaf_compile::run`](https://docs.rs/copperleaf-compile).
 
 use crate::{
-    CompileError, Component, ComponentMeta, Constraint, Net, NetIdx, Pad, Pin,
+    CompileError, Component, ComponentMeta, Constraint, LayoutConstraint, Net, NetIdx, Pad, Pin,
+    layout::{BoardSide, LayerSet, PlaceTarget, Region},
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     stackup::Stackup,
-    units::{Diagnostic, Qty, Severity, Volt},
+    units::{Diagnostic, Meter, Qty, Severity, Volt},
     util::deterministic_id,
 };
 
@@ -21,6 +22,7 @@ pub struct CompiledComponent {
     /// Mechanical (non-electrical) pads belonging to the component's footprint.
     pub mechanical: Vec<Pad>,
     pub constraints: Vec<Constraint>,
+    pub layout: Vec<LayoutConstraint>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,6 +39,7 @@ pub struct CompiledBoard {
     pub nets: Vec<Net>,
     pub connections: Vec<Connection>,
     pub constraints: Vec<Constraint>,
+    pub layout: Vec<LayoutConstraint>,
     /// Board width in millimetres.
     pub width: f64,
     /// Board height in millimetres.
@@ -90,6 +93,12 @@ pub struct Board {
     height: f64,
     /// PCB layer stackup (default: standard 2‑layer FR‑4).
     stackup: Stackup,
+    /// Per-component layout directives added via the builder API.
+    pub component_layouts: Vec<Vec<LayoutConstraint>>,
+    /// Per-net layout directives added via `assign_plane`, keyed by edge id.
+    pub net_layouts: std::collections::BTreeMap<usize, Vec<LayoutConstraint>>,
+    /// Board-level layout directives added via `keepout`.
+    pub board_layouts: Vec<LayoutConstraint>,
 }
 
 impl CompiledComponent {
@@ -109,6 +118,7 @@ impl CompiledComponent {
             meta: component.meta().clone(),
             pins,
             constraints: component.constraints(),
+            layout: component.layout_constraints(),
             mechanical: component.mechanical().to_vec(),
         }
     }
@@ -122,6 +132,7 @@ impl CompiledComponent {
             pins,
             mechanical: vec![],
             constraints: vec![],
+            layout: vec![],
         }
     }
 
@@ -133,6 +144,7 @@ impl CompiledComponent {
             pins,
             mechanical: vec![],
             constraints,
+            layout: vec![],
         }
     }
 }
@@ -192,6 +204,9 @@ impl Board {
             width: 100.0,
             height: 80.0,
             stackup: Stackup::two_layer(),
+            component_layouts: Vec::new(),
+            net_layouts: std::collections::BTreeMap::new(),
+            board_layouts: Vec::new(),
         }
     }
 
@@ -228,6 +243,7 @@ impl Board {
             name: name.to_owned(),
             component: Box::new(component),
         });
+        self.component_layouts.push(Vec::new());
         ComponentHandle(idx)
     }
 
@@ -284,6 +300,78 @@ impl Board {
         if let Some(ov) = self.net_overrides.get_mut(&handle.id) {
             ov.name = Some(name.to_owned());
         }
+    }
+
+    /// Fix a component at an exact position, rotation, and board side.
+    ///
+    /// The handle is validated against the component list; returns
+    /// [`CompileError`] on an invalid component, matching [`Board::connect`].
+    pub fn place_at(
+        &mut self,
+        handle: ComponentHandle,
+        pos: (f64, f64),
+        rotation: f64,
+        side: BoardSide,
+    ) -> Result<(), CompileError> {
+        self.validate_component(&handle)?;
+        self.component_layouts[handle.0].push(LayoutConstraint::PlaceAt {
+            pos,
+            rotation,
+            side,
+        });
+        Ok(())
+    }
+
+    /// Request that a component be placed near a target component, within
+    /// `max_radius`.
+    pub fn place_near(
+        &mut self,
+        handle: ComponentHandle,
+        target: ComponentHandle,
+        max_radius: Qty<Meter>,
+    ) -> Result<(), CompileError> {
+        self.validate_component(&handle)?;
+        self.validate_component(&target)?;
+        self.component_layouts[handle.0].push(LayoutConstraint::PlaceNear {
+            target: PlaceTarget::Component(target.0),
+            max_radius,
+        });
+        Ok(())
+    }
+
+    /// Mark a keepout region on the given layers (board-level directive).
+    pub fn keepout(&mut self, region: Region, layers: LayerSet) {
+        self.board_layouts
+            .push(LayoutConstraint::Keepout { region, layers });
+    }
+
+    /// Assign a net to a dedicated plane layer (e.g. GND on bottom copper).
+    ///
+    /// The handle is validated the same way as in [`Board::connect`] and
+    /// [`Board::net`].
+    pub fn assign_plane(
+        &mut self,
+        net_handle: NetHandle,
+        layer: usize,
+    ) -> Result<(), CompileError> {
+        self.net_layouts
+            .entry(net_handle.id)
+            .or_default()
+            .push(LayoutConstraint::Plane { layer });
+        Ok(())
+    }
+
+    fn validate_component(&self, handle: &ComponentHandle) -> Result<(), CompileError> {
+        if handle.0 >= self.components.len() {
+            return Err(CompileError::new(vec![Diagnostic {
+                code: "BOARD:INVALID_COMPONENT".into(),
+                severity: Severity::Error,
+                message: format!("component index {} does not exist", handle.0),
+                entities: vec![format!("{}", handle.0)],
+                hint: None,
+            }]));
+        }
+        Ok(())
     }
 
     fn validate_pin(&self, handle: &PinHandle) -> Option<Diagnostic> {

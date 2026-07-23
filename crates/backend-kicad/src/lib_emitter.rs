@@ -209,6 +209,7 @@ mod tests {
                 Pin::build("CLK").number("3").dio(),
             ],
             constraints: vec![],
+            layout: vec![],
             mechanical: vec![Pad {
                 number: String::new(),
                 pos: (0.0, 0.0),

@@ -1,4 +1,5 @@
 use crate::{
+    layout::LayoutConstraint,
     pin::SigSpec,
     units::Celsius,
     units::{Farad, Meter, Ohm, Qty, UnitExt, Volt},
@@ -38,14 +39,6 @@ pub enum Constraint {
     ReturnPath {
         requires_plane: bool,
     },
-    NetClass {
-        min_width: Qty<Meter>,
-        clearance: Qty<Meter>,
-    },
-    Creepage {
-        min: Qty<Meter>,
-        voltage: Qty<Volt>,
-    },
     Decoupling {
         values: Vec<Qty<Farad>>,
         per_pin: bool,
@@ -64,6 +57,7 @@ pub struct Net {
     pub kind: NetKind,
     pub class: NetClass,
     pub constraints: Vec<Constraint>,
+    pub layout: Vec<LayoutConstraint>,
 }
 
 /// Handle to an emerging net, returned by [`Board::connect`](crate::Board::connect)
@@ -84,6 +78,7 @@ impl Net {
             },
             class: NetClass::default(),
             constraints: vec![],
+            layout: vec![],
         }
     }
 

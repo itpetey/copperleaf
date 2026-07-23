@@ -134,6 +134,7 @@ mod tests {
                 pin_def(5, "EXP", "gnd"),
             ],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         }
     }

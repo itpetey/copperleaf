@@ -5,6 +5,9 @@ pub use board::{
     Board, BoardView, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle,
     Connection, RawNetOverride,
 };
+pub use layout::{
+    BoardSide, LayerSet, Layout, LayoutConstraint, PlaceTarget, Placement, Region, Track, Via, Zone,
+};
 pub use net::{Constraint, Net, NetClass, NetHandle, NetIdx, NetKind};
 pub use pin::{
     DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, Pin, PinBuilder,
@@ -20,6 +23,7 @@ pub use util::deterministic_id;
 pub mod board;
 pub mod erc;
 pub mod helpers;
+pub mod layout;
 pub mod net;
 pub mod pin;
 pub mod stackup;
@@ -30,6 +34,20 @@ pub mod util;
 pub trait Backend {
     type Error;
     fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error>;
+
+    /// Emit a compiled board with an optional solved layout.
+    ///
+    /// The default implementation ignores the layout and delegates to
+    /// [`emit`](Self::emit). Backends that support physical layout (e.g.
+    /// KiCad PCB) override this to emit placements, tracks, vias, and zones.
+    fn emit_with_layout(
+        &self,
+        output_dir: impl AsRef<Path>,
+        board: &CompiledBoard,
+        _layout: &Layout,
+    ) -> Result<(), Self::Error> {
+        self.emit(output_dir, board)
+    }
 }
 
 /// Represents a single part (e.g. a resistor, chip, etc.) on a PCB.
@@ -55,6 +73,11 @@ pub trait Component {
 
     /// Constraints declared by this component for synthesis and analysis.
     fn constraints(&self) -> Vec<Constraint> {
+        vec![]
+    }
+
+    /// Physical layout directives declared by this component for the solver.
+    fn layout_constraints(&self) -> Vec<LayoutConstraint> {
         vec![]
     }
 

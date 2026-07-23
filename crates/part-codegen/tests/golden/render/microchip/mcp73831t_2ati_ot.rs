@@ -44,6 +44,12 @@ impl Mcp73831t2atiOt {
         vec![
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+        ]
+    }
 }
 
 impl copperleaf::Component for Mcp73831t2atiOt {
@@ -53,6 +59,10 @@ impl copperleaf::Component for Mcp73831t2atiOt {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {

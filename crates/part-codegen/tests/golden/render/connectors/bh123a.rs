@@ -34,6 +34,12 @@ impl Bh123a {
         vec![
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+        ]
+    }
 }
 
 impl copperleaf::Component for Bh123a {
@@ -43,6 +49,10 @@ impl copperleaf::Component for Bh123a {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {
@@ -64,8 +74,8 @@ impl copperleaf::Component for Bh123a {
             model_3d: None,
             model_3d_data: Some("<elided:778128:1c43e8a3136dc0d4>".into()),
             
+            model_3d_rotation: (-90.0, 0.0, 0.0),
             
-            model_3d_rotation: (0.0, 0.0, 0.0),
             
             model_3d_offset: (0.0, 0.0, 0.0),
             fab_extent: Some((-21.5, -8.89, 21.5, 8.89)),

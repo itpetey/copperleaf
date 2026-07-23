@@ -50,6 +50,15 @@ impl {{{struct_name}}} {
             {{/constraints}}
         ]
     }
+
+    pub fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        use copperleaf::units::UnitExt;
+        vec![
+            {{#layout_constraints}}
+            {{{.}}},
+            {{/layout_constraints}}
+        ]
+    }
 }
 
 impl copperleaf::Component for {{{struct_name}}} {
@@ -59,6 +68,10 @@ impl copperleaf::Component for {{{struct_name}}} {
 
     fn constraints(&self) -> Vec<copperleaf::Constraint> {
         Self::constraints(self)
+    }
+
+    fn layout_constraints(&self) -> Vec<copperleaf::LayoutConstraint> {
+        Self::layout_constraints(self)
     }
 
     fn mechanical(&self) -> &[copperleaf::Pad] {

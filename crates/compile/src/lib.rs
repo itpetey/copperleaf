@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use copperleaf::{
-    CompiledComponent, Farad,
+    CompiledComponent, Farad, LayoutConstraint, PlaceTarget,
     board::{Board, CompiledBoard, ComponentEntry, Connection, RawNetOverride},
     erc,
     net::{Constraint, Net, NetClass, NetIdx, NetKind},
@@ -31,6 +31,10 @@ pub use copperleaf::CompileError;
 
 /// Default footprint package for synthesised decoupling capacitors.
 const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
+
+/// Default maximum radius for [`LayoutConstraint::PlaceNear`] directives
+/// auto-attached to synthesised decoupling capacitors.
+const DECOUPLING_PLACE_NEAR_RADIUS_MM: f64 = 5.0;
 
 #[derive(Clone, Debug)]
 pub struct NetInfo {
@@ -158,28 +162,54 @@ impl Default for CompileOptions {
 /// This is the entry point for the entire pipeline.  It validates
 /// connections first and then runs lowering, ERC, and synthesis.
 pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, CompileError> {
+    // Extract Board fields early to avoid partial-move conflicts.
+    let board_width = board.width();
+    let board_height = board.height();
+    let board_stackup = board.stackup().clone();
+    let board_components = board.components;
+    let board_connections = board.connections;
+    let board_net_overrides = board.net_overrides;
+    let board_single_pin_nets = board.single_pin_nets;
+    let board_component_layouts = board.component_layouts;
+    let board_net_layouts = board.net_layouts;
+    let board_board_layouts = board.board_layouts;
+
     // --- Phase 1: Lowering ---
-    let compiled = compile_components(&board.components);
-    let grouping = NetGrouping::build(&board.connections, &board.single_pin_nets);
+    let mut compiled = compile_components(&board_components);
+
+    // Merge builder-level component layout directives into compiled components.
+    for (i, layouts) in board_component_layouts.into_iter().enumerate() {
+        if let Some(comp) = compiled.get_mut(i) {
+            comp.layout.extend(layouts);
+        }
+    }
+    let grouping = NetGrouping::build(&board_connections, &board_single_pin_nets);
 
     let mut lowering_errors: Vec<Diagnostic> = Vec::new();
 
     // Build override lookups for single-pin nets keyed by (component, pin).
-    let single_net_overrides: BTreeMap<(usize, &str), RawNetOverride> = board
-        .single_pin_nets
+    let single_net_overrides: BTreeMap<(usize, &str), RawNetOverride> = board_single_pin_nets
         .iter()
         .map(|&(id, pin)| {
-            let ov = board.net_overrides.get(&id).cloned().unwrap_or_default();
+            let ov = board_net_overrides.get(&id).cloned().unwrap_or_default();
             ((pin.component, pin.pin), ov)
         })
         .collect();
 
+    // Build reverse map from (component, pin) → edge id for single-pin nets.
+    let single_pin_net_edges: BTreeMap<(usize, &str), usize> = board_single_pin_nets
+        .iter()
+        .map(|&(id, pin)| ((pin.component, pin.pin), id))
+        .collect();
+
     let (nets, connections) = build_nets_and_connections(
         &grouping,
-        &board.connections,
-        &board.net_overrides,
+        &board_connections,
+        &board_net_overrides,
         &single_net_overrides,
-        &board.components,
+        &board_net_layouts,
+        &single_pin_net_edges,
+        &board_components,
         &compiled,
         &mut lowering_errors,
     );
@@ -199,9 +229,10 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         nets,
         connections,
         constraints,
-        width: board.width(),
-        height: board.height(),
-        stackup: board.stackup().clone(),
+        layout: board_board_layouts,
+        width: board_width,
+        height: board_height,
+        stackup: board_stackup,
     };
 
     // --- Phase 2: Validation (ERC) ---
@@ -236,6 +267,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         nets: final_nets,
         connections: final_connections,
         constraints: board_struct.constraints,
+        layout: board_struct.layout,
         width: board_struct.width,
         height: board_struct.height,
         stackup: board_struct.stackup,
@@ -257,12 +289,23 @@ fn build_nets_and_connections(
     connections: &[RawConnection],
     overrides: &BTreeMap<usize, RawNetOverride>,
     single_net_overrides: &BTreeMap<(usize, &str), RawNetOverride>,
+    net_layouts: &BTreeMap<usize, Vec<LayoutConstraint>>,
+    single_pin_net_edges: &BTreeMap<(usize, &str), usize>,
     components: &[ComponentEntry],
     compiled: &[CompiledComponent],
     errors: &mut Vec<Diagnostic>,
 ) -> (Vec<Net>, Vec<Connection>) {
     let mut nets: Vec<Net> = Vec::new();
     let mut out_connections: Vec<Connection> = Vec::new();
+
+    // Build a reverse map from (component, pin) → edge ids for connections.
+    let mut pin_to_edge: HashMap<(usize, &str), Vec<usize>> = HashMap::new();
+    for conn in connections {
+        let a = (conn.from.component, conn.from.pin);
+        let b = (conn.to.component, conn.to.pin);
+        pin_to_edge.entry(a).or_default().push(conn.id);
+        pin_to_edge.entry(b).or_default().push(conn.id);
+    }
 
     for (&rep, members) in &grouping.groups {
         let (name, kind) = resolve_net(
@@ -277,11 +320,64 @@ fn build_nets_and_connections(
             errors,
         );
 
+        // Collect layout directives from edges belonging to this net group.
+        let mut net_layout = Vec::new();
+        let mut seen_edge_ids = std::collections::HashSet::new();
+        for &node_idx in members {
+            let (comp_idx, pin_name) = grouping.nodes[node_idx];
+            // Look up connection edges.
+            let key: (usize, &str) = (comp_idx, pin_name);
+            if let Some(edge_ids) = pin_to_edge.get(&key) {
+                for &edge_id in edge_ids {
+                    if seen_edge_ids.insert(edge_id) {
+                        if let Some(dirs) = net_layouts.get(&edge_id) {
+                            net_layout.extend(dirs.iter().cloned());
+                        }
+                    }
+                }
+            }
+            // Single-pin net edges.
+            if let Some(&edge_id) = single_pin_net_edges.get(&key) {
+                if seen_edge_ids.insert(edge_id) {
+                    if let Some(dirs) = net_layouts.get(&edge_id) {
+                        net_layout.extend(dirs.iter().cloned());
+                    }
+                }
+            }
+        }
+
+        // Resolve LayoutConstraint::NetClass directives into the net's class.
+        let mut resolved_class = NetClass::default();
+        let mut net_class_count = 0u32;
+        for directive in &net_layout {
+            if let LayoutConstraint::NetClass {
+                min_width,
+                clearance,
+            } = directive
+            {
+                net_class_count += 1;
+                if net_class_count > 1 {
+                    errors.push(Diagnostic {
+                        code: "NET:MULTIPLE_NET_CLASS".into(),
+                        severity: Severity::Error,
+                        message: format!("net '{}' has conflicting NetClass directives", name),
+                        entities: vec![name.clone()],
+                        hint: Some("ensure only one NetClass directive is attached to the net".into()),
+                    });
+                }
+                resolved_class = NetClass {
+                    min_width: Some(min_width.clone()),
+                    clearance: Some(clearance.clone()),
+                };
+            }
+        }
+
         nets.push(Net {
             name,
             kind,
-            class: NetClass::default(),
+            class: resolved_class,
             constraints: vec![],
+            layout: net_layout,
         });
         let net_idx = NetIdx(nets.len() - 1);
 
@@ -342,6 +438,7 @@ fn ground_net_idx_and_fallback(board: &CompiledBoard) -> (NetIdx, Option<Net>) {
         },
         class: NetClass::default(),
         constraints: vec![],
+        layout: vec![],
     };
     (idx, Some(net))
 }
@@ -402,7 +499,14 @@ fn place_decoupling_set(
         *next_c += 1;
 
         let comp_idx_in_final = board.components.len() + components.len();
-        components.push(make_capacitor_component(&refdes, *value, package));
+        let mut cap = make_capacitor_component(&refdes, *value, package);
+        // Auto-attach PlaceNear so the solver keeps this cap close to its
+        // target power pin.
+        cap.layout.push(LayoutConstraint::PlaceNear {
+            target: PlaceTarget::Component(comp_idx),
+            max_radius: DECOUPLING_PLACE_NEAR_RADIUS_MM.mm(),
+        });
+        components.push(cap);
         connections.push(Connection {
             component: comp_idx_in_final,
             pin: "1".into(),
@@ -727,6 +831,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
+            layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -734,6 +839,7 @@ mod tests {
                 net: NetIdx(0),
             }],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
@@ -765,6 +871,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
+            layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -772,6 +879,7 @@ mod tests {
                 net: NetIdx(0),
             }],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
@@ -814,6 +922,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
                 Net {
                     name: "GND".into(),
@@ -823,6 +932,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
             ],
             connections: vec![
@@ -838,6 +948,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
@@ -869,6 +980,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
                 Net {
                     name: "VDD".into(),
@@ -878,6 +990,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
                 Net {
                     name: "GND".into(),
@@ -887,6 +1000,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
+            layout: vec![],
                 },
             ],
             connections: vec![
@@ -902,6 +1016,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),

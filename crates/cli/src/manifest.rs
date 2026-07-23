@@ -73,6 +73,7 @@ pub fn manifest_from_footprint(
         component,
         pins,
         constraints: vec![],
+        layout: Default::default(),
         mechanical,
     }
 }
@@ -606,6 +607,7 @@ mod tests {
                 thermal_vias: vec![],
             }],
             constraints: vec![],
+            layout: Default::default(),
 
             mechanical: vec![],
         }
@@ -812,6 +814,7 @@ mod tests {
             },
             pins: vec![],
             constraints: vec![],
+            layout: Default::default(),
 
             mechanical: vec![],
         };

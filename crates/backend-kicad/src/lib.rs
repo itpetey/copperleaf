@@ -7,7 +7,7 @@
 use std::{fs, path::Path};
 
 use base64::Engine as _;
-use copperleaf::{Backend, BackendError, CompiledBoard};
+use copperleaf::{Backend, BackendError, CompiledBoard, Layout};
 
 pub use copperleaf::deterministic_id;
 pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
@@ -83,7 +83,49 @@ impl Backend for KiCad {
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(data)
                     .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
-                // Derive the filename from model_3d, or fall back to <refdes>.step.
+                let fallback = format!("{}.step", comp.refdes);
+                let filename = comp
+                    .meta
+                    .model_3d
+                    .as_deref()
+                    .and_then(|p| Path::new(p).file_name())
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&fallback);
+                let dst = out.join(filename);
+                fs::write(&dst, &bytes)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn emit_with_layout(
+        &self,
+        output_dir: impl AsRef<Path>,
+        board: &CompiledBoard,
+        layout: &Layout,
+    ) -> Result<(), Self::Error> {
+        let out = output_dir.as_ref().to_owned();
+        fs::create_dir_all(&out)?;
+
+        let pro = project::emit_project(&self.project_name);
+        fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
+
+        let sch = schematic::emit_schematic(board);
+        fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
+
+        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout));
+        fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
+
+        let net = netlist::emit_netlist(board);
+        fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+
+        // Write 3D models.
+        for comp in &board.components {
+            if let Some(ref data) = comp.meta.model_3d_data {
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(data)
+                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
                 let fallback = format!("{}.step", comp.refdes);
                 let filename = comp
                     .meta

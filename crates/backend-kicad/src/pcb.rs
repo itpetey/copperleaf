@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use copperleaf::{CompiledBoard, NetClass, NetIdx, Stackup, StackupLayer};
+use copperleaf::{BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Stackup, StackupLayer};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
@@ -60,6 +60,96 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
             board,
             project_name,
         ));
+    }
+
+    let pcb = Sexpr::list(std::iter::once(Sexpr::atom("kicad_pcb")).chain(children));
+    format!("{}\n", pcb)
+}
+
+/// Emit a KiCad PCB file with an optional solved layout.
+///
+/// When `layout` is `Some`, placements, rotations, and board side come from
+/// the layout instead of auto-placement, and tracks, vias, and zones are
+/// emitted as copper elements.  When `None`, behaviour is identical to
+/// [`emit_pcb`].
+pub fn emit_pcb_with_layout(
+    board: &CompiledBoard,
+    project_name: &str,
+    layout: Option<&Layout>,
+) -> String {
+    let net_codes = build_net_codes(board);
+    let net_to_code: HashMap<usize, usize> = net_codes
+        .iter()
+        .enumerate()
+        .map(|(idx, (_, code))| (idx, *code))
+        .collect();
+
+    let pin_to_net: HashMap<(usize, &str), NetIdx> = board
+        .connections
+        .iter()
+        .map(|c| ((c.component, c.pin.as_str()), c.net))
+        .collect();
+
+    let mut children: Vec<Sexpr> = vec![
+        Sexpr::list([Sexpr::atom("version"), Sexpr::atom("20260206")]),
+        kv("generator", "copperleaf"),
+        kv("generator_version", "10.0"),
+        general_node(&board.stackup),
+        kv("paper", "A4"),
+        layers_node(&board.stackup),
+        setup_node(&board.stackup),
+    ];
+
+    for (name, code) in &net_codes {
+        children.push(Sexpr::list([
+            Sexpr::atom("net"),
+            Sexpr::atom(code.to_string()),
+            Sexpr::str(name),
+        ]));
+    }
+
+    children.extend(net_class_nodes(board, &net_codes));
+    children.extend(board_outline(board.width, board.height));
+
+    // Placements: from layout if available, otherwise auto-place.
+    if let Some(layout) = layout {
+        // Build a lookup from component index to placement.
+        let placement_by_component: HashMap<usize, &copperleaf::Placement> = layout
+            .placements
+            .iter()
+            .map(|p| (p.component, p))
+            .collect();
+
+        for (idx, comp) in board.components.iter().enumerate() {
+            let placement = placement_by_component.get(&idx);
+            children.push(footprint_node_with_placement(
+                idx,
+                comp,
+                placement.copied(),
+                &pin_to_net,
+                &net_to_code,
+                board,
+                project_name,
+            ));
+        }
+
+        // Emit copper: tracks, vias, zones.
+        children.extend(emit_tracks(layout, &net_to_code, board));
+        children.extend(emit_vias(layout, &net_to_code, board));
+        children.extend(emit_zones(layout, &net_to_code, board));
+    } else {
+        let placements = auto_place(board, board.width);
+        for (idx, comp) in board.components.iter().enumerate() {
+            children.push(footprint_node(
+                idx,
+                comp,
+                placements[idx],
+                &pin_to_net,
+                &net_to_code,
+                board,
+                project_name,
+            ));
+        }
     }
 
     let pcb = Sexpr::list(std::iter::once(Sexpr::atom("kicad_pcb")).chain(children));
@@ -505,11 +595,271 @@ fn copper_layer_name(idx: usize, total: usize) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Layout-aware footprint node with rotation and side support.
+// ---------------------------------------------------------------------------
+
+/// Like [`footprint_node`] but takes an optional [`Placement`] for rotation
+/// and board side.  Falls back to auto-placement style when `placement` is
+/// `None`.
+fn footprint_node_with_placement(
+    idx: usize,
+    comp: &copperleaf::CompiledComponent,
+    placement: Option<&copperleaf::Placement>,
+    pin_to_net: &HashMap<(usize, &str), NetIdx>,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+    project_name: &str,
+) -> Sexpr {
+    let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
+    let extent = fp_geom::pads_extent(&pads);
+
+    let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
+    let fp_name = footprint_ref(comp);
+    let seed = format!("pcb:{}", comp.refdes);
+
+    let (ref_y, val_y) = match extent {
+        Some((x1, y1, _, y2)) => {
+            let _ = x1;
+            (y1 - 1.52, y2 + 1.52)
+        }
+        None => (-2.54, 2.54),
+    };
+
+    let (at_x, at_y, rotation, layer) = if let Some(p) = placement {
+        (p.at.0, p.at.1, p.rotation, match p.side {
+            BoardSide::Front => "F.Cu",
+            BoardSide::Back => "B.Cu",
+        })
+    } else {
+        // Fallback: auto-place position.  This path is not normally hit when a
+        // layout is supplied but keeps the function type-safe for the general case.
+        (0.0f64, 0.0f64, 0.0f64, "F.Cu")
+    };
+
+    let mut children = vec![
+        Sexpr::atom("footprint"),
+        Sexpr::str(&fp_name),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_grid_float(at_x)),
+            Sexpr::atom(format_grid_float(at_y)),
+            Sexpr::atom(format_grid_float(rotation)),
+        ]),
+        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
+        footprint_property(
+            "Value",
+            &crate::common::refdes_prefix(&comp.refdes),
+            0.0,
+            val_y,
+            true,
+        ),
+        fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
+        Sexpr::list([Sexpr::atom("path"), Sexpr::str(format!("/{}", fp_uuid))]),
+        Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
+        Sexpr::list([
+            Sexpr::atom("sheetfile"),
+            Sexpr::str(format!("{}.kicad_sch", project_name)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("attr"),
+            Sexpr::atom(fp_geom::footprint_attr(&pads)),
+        ]),
+    ];
+
+    if let Some(ext) = extent {
+        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed), comp.meta.fab_extent) {
+            children.push(node);
+        }
+    }
+
+    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
+        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
+        let net = pin_index.and_then(|i| {
+            let pin = &comp.pins[i];
+            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
+                net_to_code
+                    .get(&net_idx.0)
+                    .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
+            })
+        });
+        children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
+    }
+
+    let model_path_for_pcb = match comp.meta.model_3d {
+        Some(ref path) => Path::new(path)
+            .file_name()
+            .map(|s| s.to_str().unwrap().to_owned()),
+        None if comp.meta.model_3d_data.is_some() => Some(format!("{}.step", comp.refdes)),
+        None => None,
+    };
+    children.push(fp_geom::model_sexpr(
+        &fp_name,
+        model_path_for_pcb.as_deref(),
+        comp.meta.model_3d_offset,
+        comp.meta.model_3d_rotation,
+    ));
+
+    Sexpr::list(children)
+}
+
+// ---------------------------------------------------------------------------
+// Copper emission helpers — tracks, vias, zones.
+// ---------------------------------------------------------------------------
+
+fn emit_tracks(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    for track in &layout.tracks {
+        let Some(&net_code) = net_to_code.get(&track.net.0) else {
+            continue;
+        };
+        let layer = copper_layer_name(track.layer, board.stackup.copper_layer_count());
+        let width = track.width.as_base() * 1000.0; // m → mm
+        let path: Vec<(f64, f64)> = track.path.clone();
+
+        if path.len() < 2 {
+            continue;
+        }
+
+        for w in path.windows(2) {
+            let seg_uuid = deterministic_id(&format!(
+                "pcb:segment:{}:{}:{:.3}:{:.3}",
+                track.net.0, track.layer, w[0].0, w[0].1
+            ));
+            nodes.push(Sexpr::list([
+                Sexpr::atom("segment"),
+                Sexpr::list([
+                    Sexpr::atom("start"),
+                    Sexpr::atom(format_grid_float(w[0].0)),
+                    Sexpr::atom(format_grid_float(w[0].1)),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("end"),
+                    Sexpr::atom(format_grid_float(w[1].0)),
+                    Sexpr::atom(format_grid_float(w[1].1)),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("width"),
+                    Sexpr::atom(format_grid_float(width)),
+                ]),
+                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+                Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+                Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
+            ]));
+        }
+    }
+    nodes
+}
+
+fn emit_vias(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    let num_copper = board.stackup.copper_layer_count();
+    for via in &layout.vias {
+        let Some(&net_code) = net_to_code.get(&via.net.0) else {
+            continue;
+        };
+        let via_uuid = deterministic_id(&format!(
+            "pcb:via:{}:{}:{:.3}:{:.3}",
+            via.net.0, via.layers.0, via.at.0, via.at.1
+        ));
+        let diam = via.diameter.as_base() * 1000.0;
+        let drill = via.drill.as_base() * 1000.0;
+        let layer_start = copper_layer_name(via.layers.0, num_copper);
+        let layer_end = copper_layer_name(via.layers.1, num_copper);
+
+        nodes.push(Sexpr::list([
+            Sexpr::atom("via"),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_grid_float(via.at.0)),
+                Sexpr::atom(format_grid_float(via.at.1)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("size"),
+                Sexpr::atom(format_grid_float(diam)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("drill"),
+                Sexpr::atom(format_grid_float(drill)),
+            ]),
+            Sexpr::list([
+                Sexpr::atom("layers"),
+                Sexpr::str(&layer_start),
+                Sexpr::str(&layer_end),
+            ]),
+            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&via_uuid)]),
+        ]));
+    }
+    nodes
+}
+
+fn emit_zones(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    for zone in &layout.zones {
+        let Some(&net_code) = net_to_code.get(&zone.net.0) else {
+            continue;
+        };
+        let zone_uuid = deterministic_id(&format!(
+            "pcb:zone:{}:{}",
+            zone.net.0, zone.layer
+        ));
+        let layer = copper_layer_name(zone.layer, board.stackup.copper_layer_count());
+        let net_name = &board.nets[zone.net.0].name;
+
+        let mut poly_pts: Vec<Sexpr> = zone
+            .outline
+            .iter()
+            .map(|&(x, y)| {
+                Sexpr::list([
+                    Sexpr::atom("xy"),
+                    Sexpr::atom(format_grid_float(x)),
+                    Sexpr::atom(format_grid_float(y)),
+                ])
+            })
+            .collect();
+
+        // Close the polygon.
+        if let Some(&first) = zone.outline.first() {
+            poly_pts.push(Sexpr::list([
+                Sexpr::atom("xy"),
+                Sexpr::atom(format_grid_float(first.0)),
+                Sexpr::atom(format_grid_float(first.1)),
+            ]));
+        }
+
+        nodes.push(Sexpr::list([
+            Sexpr::atom("zone"),
+            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+            Sexpr::list([Sexpr::atom("net_name"), Sexpr::str(net_name)]),
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&zone_uuid)]),
+            Sexpr::list(std::iter::once(Sexpr::atom("polygon")).chain(poly_pts)),
+        ]));
+    }
+    nodes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use copperleaf::{
-        CompiledComponent, ComponentMeta, Connection, Net, NetClass, NetIdx, NetKind, Pin,
+        CompiledComponent, ComponentMeta, Connection, Layout, Net, NetClass, NetIdx, NetKind, Pin,
         UnitExt,
     };
 
@@ -536,6 +886,7 @@ mod tests {
                         .gnd(),
                 ],
                 constraints: vec![],
+            layout: vec![],
                 mechanical: vec![],
             }],
             nets: vec![Net {
@@ -546,6 +897,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
+            layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -553,6 +905,7 @@ mod tests {
                 net: NetIdx(0),
             }],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
@@ -587,5 +940,109 @@ mod tests {
         assert!(out.contains("(31 \"B.Cu\" signal)"), "{}", out);
         assert!(out.contains("(44 \"Edge.Cuts\" user)"), "{}", out);
         assert!(out.contains("(47 \"F.CrtYd\" user)"), "{}", out);
+    }
+
+    // ------------------------------------------------------------------
+    // Layout-aware emission tests
+    // ------------------------------------------------------------------
+
+    /// Build a minimal layout with one placement, one track, one via, and one zone.
+    fn test_layout() -> Layout {
+        use copperleaf::{BoardSide, NetIdx, Placement, Track, Via, Zone};
+        Layout {
+            placements: vec![Placement {
+                component: 0,
+                at: (10.0, 40.0),
+                rotation: 90.0,
+                side: BoardSide::Front,
+            }],
+            tracks: vec![Track {
+                net: NetIdx(0),
+                layer: 0, // F.Cu
+                width: 0.25.mm(),
+                path: vec![(5.0, 5.0), (15.0, 5.0)],
+            }],
+            vias: vec![Via {
+                net: NetIdx(0),
+                at: (15.0, 5.0),
+                drill: 0.4.mm(),
+                diameter: 0.8.mm(),
+                layers: (0, 1), // F.Cu to B.Cu
+            }],
+            zones: vec![Zone {
+                net: NetIdx(0),
+                layer: 1, // B.Cu
+                outline: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 80.0), (0.0, 80.0)],
+            }],
+        }
+    }
+
+    #[test]
+    fn emit_with_layout_includes_placement_rotation() {
+        let board = test_board();
+        let layout = test_layout();
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        // Placement at (10, 40) with rotation 90°.
+        assert!(out.contains("(at 10 40 90)"), "missing rotated placement: {}", out);
+        // Front-side component should be on F.Cu.
+        assert!(out.contains("(layer \"F.Cu\")"), "{}", out);
+    }
+
+    #[test]
+    fn emit_with_layout_includes_segments() {
+        let board = test_board();
+        let layout = test_layout();
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        assert!(out.contains("(segment"), "missing segment: {}", out);
+        assert!(out.contains("(start 5 5)"), "{}", out);
+        assert!(out.contains("(end 15 5)"), "{}", out);
+        assert!(out.contains("(width 0.25)"), "{}", out);
+    }
+
+    #[test]
+    fn emit_with_layout_includes_vias() {
+        let board = test_board();
+        let layout = test_layout();
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        assert!(out.contains("(via"), "missing via: {}", out);
+        assert!(out.contains("(at 15 5)"), "{}", out);
+        assert!(out.contains("(size 0.8)"), "{}", out);
+        assert!(out.contains("(drill 0.4)"), "{}", out);
+    }
+
+    #[test]
+    fn emit_with_layout_includes_zones() {
+        let board = test_board();
+        let layout = test_layout();
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        assert!(out.contains("(zone"), "missing zone: {}", out);
+        assert!(out.contains("(layer \"B.Cu\")"), "{}", out);
+        assert!(out.contains("(polygon"), "{}", out);
+    }
+
+    #[test]
+    fn emit_without_layout_is_byte_identical_to_emit_pcb() {
+        let board = test_board();
+        let out1 = emit_pcb(&board, "test");
+        let out2 = emit_pcb_with_layout(&board, "test", None);
+        assert_eq!(out1, out2, "no-layout emit_with_layout must match emit_pcb byte-for-byte");
+    }
+
+    #[test]
+    fn emit_with_empty_layout_produces_no_copper() {
+        let board = test_board();
+        let empty = Layout {
+            placements: vec![],
+            tracks: vec![],
+            vias: vec![],
+            zones: vec![],
+        };
+        let out = emit_pcb_with_layout(&board, "test", Some(&empty));
+        // No copper elements emitted (no segments, vias, or zones).
+        assert!(!out.contains("(segment"));
+        assert!(!out.contains("(zone"));
+        // "via (" — the copper element, not via_dia/via_drill properties.
+        assert!(!out.contains("(via "));
+        assert!(!out.contains("(via\n"));
     }
 }

@@ -328,6 +328,7 @@ mod tests {
                 pin_def(2, "GND", (2.54, 0.0)),
             ],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         }
     }
@@ -382,6 +383,7 @@ mod tests {
             },
             pins: vec![],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         };
         let out = emit_footprint(&manifest).unwrap();
@@ -497,6 +499,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         };
         let pads = pads_from_manifest(&manifest);
@@ -540,6 +543,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         };
         let pads = pads_from_manifest(&manifest);
@@ -629,6 +633,7 @@ mod tests {
                 },
             ],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         };
         let pads = pads_from_manifest(&manifest);
@@ -702,6 +707,7 @@ mod tests {
             },
             pins: vec![pin],
             constraints: vec![],
+            layout: Default::default(),
             mechanical: vec![],
         }
     }

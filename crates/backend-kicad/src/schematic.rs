@@ -395,6 +395,7 @@ mod tests {
                         .pin(),
                 ],
                 constraints: vec![],
+            layout: vec![],
                 mechanical: vec![],
             }],
             nets: vec![Net {
@@ -405,6 +406,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
+            layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -412,6 +414,7 @@ mod tests {
                 net: NetIdx(0),
             }],
             constraints: vec![],
+            layout: vec![],
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
