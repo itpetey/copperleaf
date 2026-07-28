@@ -4,22 +4,6 @@ use copperleaf::{
     Board, CompileError, Component, ComponentMeta, Farad, Hertz, Ohm, Pin, PinHandle, PinRef,
     PowerSpec, Qty, Role, UnitExt,
 };
-
-/// Format a capacitance in farads as a human-readable string (e.g. `"100nF"`, `"10uF"`).
-fn format_capacitance(farads: Qty<Farad>) -> String {
-    let v = farads.as_base();
-    if v < 1.0e-9 {
-        format!("{:.0}pF", v * 1.0e12)
-    } else if v < 1.0e-6 {
-        format!("{:.0}nF", v * 1.0e9)
-    } else if v < 1.0e-3 {
-        format!("{:.1}uF", v * 1.0e6)
-    } else if v < 1.0 {
-        format!("{:.1}mF", v * 1.0e3)
-    } else {
-        format!("{:.0}F", v)
-    }
-}
 use copperleaf_part_macro::build_component;
 
 use crate::footprint::Package;
@@ -337,6 +321,22 @@ pub fn pullup(
     Ok(())
 }
 
+/// Format a capacitance in farads as a human-readable string (e.g. `"100nF"`, `"10uF"`).
+fn format_capacitance(farads: Qty<Farad>) -> String {
+    let v = farads.as_base();
+    if v < 1.0e-9 {
+        format!("{:.0}pF", v * 1.0e12)
+    } else if v < 1.0e-6 {
+        format!("{:.0}nF", v * 1.0e9)
+    } else if v < 1.0e-3 {
+        format!("{:.1}uF", v * 1.0e6)
+    } else if v < 1.0 {
+        format!("{:.1}mF", v * 1.0e3)
+    } else {
+        format!("{:.0}F", v)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,5 +488,4 @@ mod tests {
         assert!(matches!(c.pins()[0].role(), Role::DigitalIO));
         assert!(matches!(c.pins()[1].role(), Role::DigitalIO));
     }
-
 }

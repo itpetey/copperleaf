@@ -29,9 +29,9 @@ pub mod fp_emitter;
 pub mod fp_geom;
 pub mod fp_parser;
 pub mod lib_emitter;
-pub mod pcb_parser;
 pub mod netlist;
 pub mod pcb;
+pub mod pcb_parser;
 pub mod project;
 pub mod schematic;
 pub mod sexpr;
@@ -57,6 +57,32 @@ impl KiCad {
     pub fn with_project_name(mut self, name: impl Into<String>) -> Self {
         self.project_name = name.into();
         self
+    }
+}
+
+impl KiCad {
+    /// Update an existing PCB file with a new [`CompiledBoard`], preserving
+    /// all physical layout (placements, tracks, vias, zones).
+    ///
+    /// Reads the existing `.kicad_pcb` from `output_dir` (derived from the
+    /// configured project name), parses layout data, remaps nets by name to
+    /// the new board, and regenerates all output files.
+    ///
+    /// Copper elements referencing deleted nets are silently dropped. New
+    /// components without an existing placement are placed at `(0, 0)` on the
+    /// front side.
+    pub fn emit_update(
+        &self,
+        output_dir: impl AsRef<Path>,
+        board: &CompiledBoard,
+    ) -> Result<(), BackendError> {
+        let out = output_dir.as_ref();
+        let pcb_path = out.join(format!("{}.kicad_pcb", self.project_name));
+        let pcb_source = fs::read_to_string(&pcb_path)?;
+        let parsed = pcb_parser::parse_pcb(&pcb_source)
+            .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
+        let layout = parsed.to_layout(board);
+        self.emit_with_layout(output_dir, board, &layout)
     }
 }
 
@@ -144,32 +170,6 @@ impl Backend for KiCad {
         }
 
         Ok(())
-    }
-}
-
-impl KiCad {
-    /// Update an existing PCB file with a new [`CompiledBoard`], preserving
-    /// all physical layout (placements, tracks, vias, zones).
-    ///
-    /// Reads the existing `.kicad_pcb` from `output_dir` (derived from the
-    /// configured project name), parses layout data, remaps nets by name to
-    /// the new board, and regenerates all output files.
-    ///
-    /// Copper elements referencing deleted nets are silently dropped. New
-    /// components without an existing placement are placed at `(0, 0)` on the
-    /// front side.
-    pub fn emit_update(
-        &self,
-        output_dir: impl AsRef<Path>,
-        board: &CompiledBoard,
-    ) -> Result<(), BackendError> {
-        let out = output_dir.as_ref();
-        let pcb_path = out.join(format!("{}.kicad_pcb", self.project_name));
-        let pcb_source = fs::read_to_string(&pcb_path)?;
-        let parsed = pcb_parser::parse_pcb(&pcb_source)
-            .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
-        let layout = parsed.to_layout(board);
-        self.emit_with_layout(output_dir, board, &layout)
     }
 }
 

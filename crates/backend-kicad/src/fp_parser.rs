@@ -42,6 +42,19 @@ pub fn parse_footprint(path: impl AsRef<Path>) -> Result<Vec<PadDef>, ParseError
     Ok(extract_pads(&sexpr))
 }
 
+/// Extract the fabrication (body) outline extent from a `.kicad_mod` file's
+/// `(fp_line ... (layer F.Fab) ...)` nodes.
+///
+/// Returns `(x1, y1, x2, y2)` in millimetres, or `None` if there are no
+/// F.Fab lines.
+pub fn parse_footprint_fab_extent(
+    path: impl AsRef<Path>,
+) -> Result<Option<(f64, f64, f64, f64)>, ParseError> {
+    let source = std::fs::read_to_string(path.as_ref())?;
+    let sexpr = parse(&source)?;
+    Ok(extract_fab_extent(&sexpr))
+}
+
 /// Parse a `.pretty` footprint library directory, returning one entry per
 /// `.kicad_mod` file found inside.
 pub fn parse_footprint_lib(
@@ -77,19 +90,6 @@ pub fn parse_footprint_model(path: impl AsRef<Path>) -> Result<Option<String>, P
     Ok(extract_model_path(&sexpr))
 }
 
-/// Extract the fabrication (body) outline extent from a `.kicad_mod` file's
-/// `(fp_line ... (layer F.Fab) ...)` nodes.
-///
-/// Returns `(x1, y1, x2, y2)` in millimetres, or `None` if there are no
-/// F.Fab lines.
-pub fn parse_footprint_fab_extent(
-    path: impl AsRef<Path>,
-) -> Result<Option<(f64, f64, f64, f64)>, ParseError> {
-    let source = std::fs::read_to_string(path.as_ref())?;
-    let sexpr = parse(&source)?;
-    Ok(extract_fab_extent(&sexpr))
-}
-
 /// Extract the 3D model path for a named footprint within a `.pretty` library
 /// directory.
 pub fn parse_footprint_model_lib(
@@ -115,6 +115,18 @@ pub fn parse_footprint_model_lib(
     Ok(None)
 }
 
+fn collect_fab_lines(node: &Sexpr, lines: &mut Vec<((f64, f64), (f64, f64))>) {
+    let Sexpr::List(children) = node else {
+        return;
+    };
+    if let Some(line) = parse_fab_line(node) {
+        lines.push(line);
+    }
+    for child in children {
+        collect_fab_lines(child, lines);
+    }
+}
+
 fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     let Sexpr::List(children) = node else {
         return;
@@ -125,26 +137,6 @@ fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
     for child in children {
         collect_pads(child, pads);
     }
-}
-
-/// Walk the S-expression tree looking for a `(model <path> ...)` node and
-/// return the model path string if found.
-fn extract_model_path(node: &Sexpr) -> Option<String> {
-    let Sexpr::List(children) = node else {
-        return None;
-    };
-    if let Some(Sexpr::Atom(head)) = children.first()
-        && head == "model"
-        && let Some(path_node) = children.get(1)
-    {
-        return Some(path_node.as_string());
-    }
-    for child in children {
-        if let Some(path) = extract_model_path(child) {
-            return Some(path);
-        }
-    }
-    None
 }
 
 /// Walk the S-expression tree and compute the bounding box of all
@@ -168,16 +160,30 @@ fn extract_fab_extent(node: &Sexpr) -> Option<(f64, f64, f64, f64)> {
     Some((min_x, min_y, max_x, max_y))
 }
 
-fn collect_fab_lines(node: &Sexpr, lines: &mut Vec<((f64, f64), (f64, f64))>) {
+/// Walk the S-expression tree looking for a `(model <path> ...)` node and
+/// return the model path string if found.
+fn extract_model_path(node: &Sexpr) -> Option<String> {
     let Sexpr::List(children) = node else {
-        return;
+        return None;
     };
-    if let Some(line) = parse_fab_line(node) {
-        lines.push(line);
+    if let Some(Sexpr::Atom(head)) = children.first()
+        && head == "model"
+        && let Some(path_node) = children.get(1)
+    {
+        return Some(path_node.as_string());
     }
     for child in children {
-        collect_fab_lines(child, lines);
+        if let Some(path) = extract_model_path(child) {
+            return Some(path);
+        }
     }
+    None
+}
+
+fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
+    let mut pads = Vec::new();
+    collect_pads(sexpr, &mut pads);
+    pads
 }
 
 /// If `node` is an `(fp_line ... (layer F.Fab) ...)`, return its
@@ -233,12 +239,6 @@ fn parse_fab_line(node: &Sexpr) -> Option<((f64, f64), (f64, f64))> {
     }
 
     if is_fab { Some((start?, end?)) } else { None }
-}
-
-fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
-    let mut pads = Vec::new();
-    collect_pads(sexpr, &mut pads);
-    pads
 }
 
 fn parse_pad_node(node: &Sexpr) -> Option<PadDef> {

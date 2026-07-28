@@ -24,21 +24,23 @@ impl TestPad {
     /// The pad is centred at the origin, suitable for pogo-pin contact.
     pub fn new(width: f64, height: f64) -> Self {
         Self {
-            pins: vec![Pin::build("1")
-                .role(Role::Passive)
-                .power_spec(PowerSpec {
-                    v_min: 0.0.volt(),
-                    v_max: 5.0.volt(),
-                    v_nom: None,
-                    i_max: 1.0.amp(),
-                })
-                .pos(0.0, 0.0)
-                .width(width)
-                .height(height)
-                .pad_type("smd")
-                .pad_shape("circle")
-                .layers("F.Cu F.Mask")
-                .pin()],
+            pins: vec![
+                Pin::build("1")
+                    .role(Role::Passive)
+                    .power_spec(PowerSpec {
+                        v_min: 0.0.volt(),
+                        v_max: 5.0.volt(),
+                        v_nom: None,
+                        i_max: 1.0.amp(),
+                    })
+                    .pos(0.0, 0.0)
+                    .width(width)
+                    .height(height)
+                    .pad_type("smd")
+                    .pad_shape("circle")
+                    .layers("F.Cu F.Mask")
+                    .pin(),
+            ],
         }
     }
 

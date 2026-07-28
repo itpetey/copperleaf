@@ -401,9 +401,7 @@ pub fn thermal_via_pad(pos: (f64, f64), drill: f64, size: f64) -> Pad {
 ///   (electrical pins and their thermal vias), `None` for mechanical pads.
 /// - `is_electrical[i]` is `true` for electrical pins, `false` for thermal
 ///   vias and mechanical pads.
-fn gather_pads_internal(
-    comp: &CompiledComponent,
-) -> (Vec<Pad>, Vec<Option<usize>>, Vec<bool>) {
+fn gather_pads_internal(comp: &CompiledComponent) -> (Vec<Pad>, Vec<Option<usize>>, Vec<bool>) {
     let mut pads = Vec::new();
     let mut pin_indices = Vec::new();
     let mut is_electrical = Vec::new();

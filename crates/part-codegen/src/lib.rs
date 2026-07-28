@@ -264,15 +264,6 @@ pub struct ConstraintDef {
     pub max: Option<f64>,
 }
 
-/// Layout-specific constraint definition from the TOML `[layout]` table.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct LayoutDef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub net_class: Option<NetClassDef>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub creepage: Option<CreepageDef>,
-}
-
 /// Net class definition inside `[layout]`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetClassDef {
@@ -285,6 +276,15 @@ pub struct NetClassDef {
 pub struct CreepageDef {
     pub min: String,
     pub voltage: String,
+}
+
+/// Layout-specific constraint definition from the TOML `[layout]` table.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct LayoutDef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_class: Option<NetClassDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creepage: Option<CreepageDef>,
 }
 
 /// A mechanical pad — not an electrical pin — e.g. a mounting hole, fiducial,
@@ -747,6 +747,18 @@ fn constraint_expr(c: &ConstraintDef) -> Result<String, CodegenError> {
     }
 }
 
+fn default_mech_number() -> String {
+    "None".into()
+}
+
+fn default_mech_pad_type() -> String {
+    "np_thru_hole".into()
+}
+
+fn default_mech_shape() -> String {
+    "circle".into()
+}
+
 /// Generate `LayoutConstraint::*` expressions from the `[layout]` table.
 fn layout_constraint_exprs(layout: &LayoutDef) -> Vec<String> {
     let mut exprs = Vec::new();
@@ -763,18 +775,6 @@ fn layout_constraint_exprs(layout: &LayoutDef) -> Vec<String> {
         ));
     }
     exprs
-}
-
-fn default_mech_number() -> String {
-    "None".into()
-}
-
-fn default_mech_pad_type() -> String {
-    "np_thru_hole".into()
-}
-
-fn default_mech_shape() -> String {
-    "circle".into()
 }
 
 fn load_template(path: &str) -> Result<MustacheRenderer, CodegenError> {

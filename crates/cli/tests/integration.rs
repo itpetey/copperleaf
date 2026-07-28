@@ -6,15 +6,6 @@ fn copperleaf() -> Command {
     cmd
 }
 
-/// Scaffold a minimal workspace `Cargo.toml` so that `--crate` works.
-fn setup_workspace(dir: &std::path::Path) {
-    std::fs::write(
-        dir.join("Cargo.toml"),
-        "[workspace]\nmembers = []\n",
-    )
-    .unwrap();
-}
-
 /// A footprint with 4 pads + 9 paste-only apertures (like a QFN exposed pad stencil).
 fn footprint_with_paste() -> &'static str {
     r#"(footprint "QFN_PASTE"
@@ -270,6 +261,193 @@ fn new_datasheet_invalid_pdf_fails_gracefully() {
     assert!(!out.exists());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("CLI:PDF_EXTRACT"));
+}
+
+#[test]
+fn new_dir_auto_detects_lib_id_from_footprint_name() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    // The footprint name inside the file is "TEST".
+    std::fs::write(&src.join("whatever.kicad_mod"), sample_footprint()).unwrap();
+
+    // No --lib-id — auto-detect "TEST" from the footprint S-expression.
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
+}
+
+#[test]
+fn new_dir_auto_detects_lib_id_from_single_symbol() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+
+    // No --lib-id — auto-detect "TEST" from the single-symbol file.
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
+}
+
+#[test]
+fn new_dir_discovers_symbol_and_footprint() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("name = \"VDD\""));
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+    assert!(toml.contains("rotation = 90.0"));
+}
+
+#[test]
+fn new_dir_empty_directory_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let empty = dir.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+
+    let output = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&empty)
+        .arg("--crate")
+        .arg("testvendor")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:NO_SOURCE"));
+}
+
+#[test]
+fn new_dir_footprint_only_works() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+}
+
+#[test]
+fn new_dir_multi_symbol_without_lib_id_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("multi.kicad_sym"), multi_symbol_lib()).unwrap();
+
+    let output = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
+    assert!(stderr.contains("Multiple symbols found"));
+}
+
+#[test]
+fn new_dir_symbol_only_works() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("name = \"VDD\""));
 }
 
 #[test]
@@ -545,6 +723,11 @@ fn sample_symbol_lib() -> &'static str {
 )"#
 }
 
+/// Scaffold a minimal workspace `Cargo.toml` so that `--crate` works.
+fn setup_workspace(dir: &std::path::Path) {
+    std::fs::write(dir.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+}
+
 fn two_pad_footprint() -> &'static str {
     r#"(footprint "TEST"
   (pad "1" smd rect (at -2.0 1.0 90.0) (size 0.5 0.25))
@@ -559,6 +742,94 @@ fn two_pin_symbol_lib() -> &'static str {
     (pin gnd line (at -5.08 -2.54 0) (length 2.54) (name "GND") (number "2"))
   )
 )"#
+}
+
+#[test]
+fn update_dir_auto_detects_lib_id() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    // Create from symbol only.
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+
+    copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+
+    // Update via --dir without --lib-id.
+    let update_dir = dir.path().join("update_src");
+    std::fs::create_dir(&update_dir).unwrap();
+    // Only need a footprint — the symbol auto-detects "TEST".
+    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("update")
+        .arg("--crate")
+        .arg("testvendor")
+        .arg("--dir")
+        .arg(&update_dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+}
+
+#[test]
+fn update_dir_discovers_and_merges() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    // Create from symbol only first.
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+
+    copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+
+    // Now put footprint in a directory and update via --dir.
+    let update_dir = dir.path().join("update_src");
+    std::fs::create_dir(&update_dir).unwrap();
+    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("update")
+        .arg("--crate")
+        .arg("testvendor")
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--dir")
+        .arg(&update_dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+    assert!(toml.contains("rotation = 90.0"));
 }
 
 #[test]
@@ -787,283 +1058,4 @@ fn wrong_symbol_lib() -> &'static str {
     (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "3"))
   )
 )"#
-}
-
-// ── --dir tests ──────────────────────────────────────────────────────
-
-#[test]
-fn new_dir_discovers_symbol_and_footprint() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
-    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("kind = \"pwr\""));
-    assert!(toml.contains("name = \"VDD\""));
-    assert!(toml.contains("pos = [-2.0, 1.0]"));
-    assert!(toml.contains("rotation = 90.0"));
-}
-
-#[test]
-fn update_dir_discovers_and_merges() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    // Create from symbol only first.
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-
-    copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-
-    // Now put footprint in a directory and update via --dir.
-    let update_dir = dir.path().join("update_src");
-    std::fs::create_dir(&update_dir).unwrap();
-    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("update")
-        .arg("--crate")
-        .arg("testvendor")
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--dir")
-        .arg(&update_dir)
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("pos = [-2.0, 1.0]"));
-    assert!(toml.contains("rotation = 90.0"));
-}
-
-#[test]
-fn new_dir_empty_directory_errors() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let empty = dir.path().join("empty");
-    std::fs::create_dir(&empty).unwrap();
-
-    let output = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&empty)
-        .arg("--crate")
-        .arg("testvendor")
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:NO_SOURCE"));
-}
-
-#[test]
-fn new_dir_symbol_only_works() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("kind = \"pwr\""));
-    assert!(toml.contains("name = \"VDD\""));
-}
-
-#[test]
-fn new_dir_footprint_only_works() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("pos = [-2.0, 1.0]"));
-}
-
-// ── --dir auto-detection tests (--lib-id omitted) ───────────────────
-
-#[test]
-fn new_dir_auto_detects_lib_id_from_single_symbol() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
-
-    // No --lib-id — auto-detect "TEST" from the single-symbol file.
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("lib_id = \"TEST\""));
-}
-
-#[test]
-fn new_dir_auto_detects_lib_id_from_footprint_name() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    // The footprint name inside the file is "TEST".
-    std::fs::write(&src.join("whatever.kicad_mod"), sample_footprint()).unwrap();
-
-    // No --lib-id — auto-detect "TEST" from the footprint S-expression.
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("lib_id = \"TEST\""));
-}
-
-#[test]
-fn update_dir_auto_detects_lib_id() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    // Create from symbol only.
-    let sym = dir.path().join("test.kicad_sym");
-    std::fs::write(&sym, sample_symbol_lib()).unwrap();
-
-    copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--symbol")
-        .arg(&sym)
-        .arg("--lib-id")
-        .arg("TEST")
-        .arg("--crate")
-        .arg("testvendor")
-        .status()
-        .unwrap();
-
-    // Update via --dir without --lib-id.
-    let update_dir = dir.path().join("update_src");
-    std::fs::create_dir(&update_dir).unwrap();
-    // Only need a footprint — the symbol auto-detects "TEST".
-    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
-
-    let status = copperleaf()
-        .current_dir(dir.path())
-        .arg("update")
-        .arg("--crate")
-        .arg("testvendor")
-        .arg("--dir")
-        .arg(&update_dir)
-        .status()
-        .unwrap();
-    assert!(status.success());
-
-    let out = dir.path().join("parts/testvendor/test.toml");
-    let toml = std::fs::read_to_string(&out).unwrap();
-    assert!(toml.contains("pos = [-2.0, 1.0]"));
-}
-
-#[test]
-fn new_dir_multi_symbol_without_lib_id_fails() {
-    let dir = tempfile::tempdir().unwrap();
-    setup_workspace(dir.path());
-
-    let src = dir.path().join("src");
-    std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("multi.kicad_sym"), multi_symbol_lib()).unwrap();
-
-    let output = copperleaf()
-        .current_dir(dir.path())
-        .arg("new")
-        .arg("--dir")
-        .arg(&src)
-        .arg("--crate")
-        .arg("testvendor")
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
-    assert!(stderr.contains("Multiple symbols found"));
 }

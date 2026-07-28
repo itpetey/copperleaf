@@ -29,41 +29,24 @@ pub fn check(layout: &Layout, board: &CompiledBoard) -> Vec<Diagnostic> {
     diagnostics
 }
 
-// ---------------------------------------------------------------------------
-// Track width validation
-// ---------------------------------------------------------------------------
-
-/// Verify each track's width against its net's `NetClass::min_width`.
-fn check_track_widths(layout: &Layout, board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+/// Detect tracks that self-intersect (should not happen with a topological
+/// router, but we verify it independently).
+fn check_self_intersections(layout: &Layout, diagnostics: &mut Vec<Diagnostic>) {
     for track in &layout.tracks {
         if diagnostics.len() >= MAX_DIAGNOSTICS {
             break;
         }
-        let net = board.net(track.net);
-        let min_width = resolve_min_width(&net.layout, &net.class);
-
-        if let Some(min) = min_width
-            && track.width.as_base() < min.as_base()
-        {
+        if has_self_intersection(&track.path) {
             diagnostics.push(Diagnostic {
-                    code: "LAYOUT:TRACK_WIDTH_VIOLATION".into(),
-                    severity: Severity::Warning,
-                    message: format!(
-                        "track on net '{}' has width {:.3} mm, minimum is {:.3} mm",
-                        net.name,
-                        track.width.as_base() * 1000.0,
-                        min.as_base() * 1000.0,
-                    ),
-                    entities: vec![net.name.clone()],
-                    hint: Some("increase track width or adjust net class".into()),
-                });
+                code: "LAYOUT:SELF_INTERSECTION".into(),
+                severity: Severity::Warning,
+                message: "track self-intersects".into(),
+                entities: vec![],
+                hint: Some("this is a solver bug; please report".into()),
+            });
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Track clearance validation (track ↔ track)
-// ---------------------------------------------------------------------------
 
 /// Verify clearance between every pair of tracks on shared layers.
 fn check_track_clearances(
@@ -130,9 +113,33 @@ fn check_track_clearances(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Zone minimum width check
-// ---------------------------------------------------------------------------
+/// Verify each track's width against its net's `NetClass::min_width`.
+fn check_track_widths(layout: &Layout, board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    for track in &layout.tracks {
+        if diagnostics.len() >= MAX_DIAGNOSTICS {
+            break;
+        }
+        let net = board.net(track.net);
+        let min_width = resolve_min_width(&net.layout, &net.class);
+
+        if let Some(min) = min_width
+            && track.width.as_base() < min.as_base()
+        {
+            diagnostics.push(Diagnostic {
+                code: "LAYOUT:TRACK_WIDTH_VIOLATION".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "track on net '{}' has width {:.3} mm, minimum is {:.3} mm",
+                    net.name,
+                    track.width.as_base() * 1000.0,
+                    min.as_base() * 1000.0,
+                ),
+                entities: vec![net.name.clone()],
+                hint: Some("increase track width or adjust net class".into()),
+            });
+        }
+    }
+}
 
 /// Verify that zone outlines have at least the minimum width required by
 /// the net class (basic sanity check on the polygon).
@@ -156,59 +163,6 @@ fn check_zone_min_width(layout: &Layout, board: &CompiledBoard, diagnostics: &mu
             });
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Self-intersection detection
-// ---------------------------------------------------------------------------
-
-/// Detect tracks that self-intersect (should not happen with a topological
-/// router, but we verify it independently).
-fn check_self_intersections(layout: &Layout, diagnostics: &mut Vec<Diagnostic>) {
-    for track in &layout.tracks {
-        if diagnostics.len() >= MAX_DIAGNOSTICS {
-            break;
-        }
-        if has_self_intersection(&track.path) {
-            diagnostics.push(Diagnostic {
-                code: "LAYOUT:SELF_INTERSECTION".into(),
-                severity: Severity::Warning,
-                message: "track self-intersects".into(),
-                entities: vec![],
-                hint: Some("this is a solver bug; please report".into()),
-            });
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Resolve the minimum track width from a net's layout constraints.
-fn resolve_min_width(
-    layout_constraints: &[LayoutConstraint],
-    default: &copperleaf::NetClass,
-) -> Option<Qty<Meter>> {
-    for constraint in layout_constraints {
-        if let LayoutConstraint::NetClass { min_width, .. } = constraint {
-            return Some(*min_width);
-        }
-    }
-    default.min_width
-}
-
-/// Resolve the required clearance from a net's layout constraints.
-fn required_clearance(
-    layout_constraints: &[LayoutConstraint],
-    default: &copperleaf::NetClass,
-) -> Option<Qty<Meter>> {
-    for constraint in layout_constraints {
-        if let LayoutConstraint::NetClass { clearance, .. } = constraint {
-            return Some(*clearance);
-        }
-    }
-    default.clearance
 }
 
 /// Compute the minimum Euclidean distance between any two line segments from
@@ -235,43 +189,30 @@ fn compute_min_path_distance(a: &[(f64, f64)], b: &[(f64, f64)]) -> f64 {
     min_dist
 }
 
-/// Minimum distance between two line segments in 2D.
-fn segment_distance(seg_a: ((f64, f64), (f64, f64)), seg_b: ((f64, f64), (f64, f64))) -> f64 {
-    // Check if segments intersect.
-    if segments_intersect(seg_a, seg_b) {
-        return 0.0;
-    }
-
-    // Distance from endpoints of one segment to the other.
-    let d1 = point_to_segment_distance(seg_a.0, seg_b);
-    let d2 = point_to_segment_distance(seg_a.1, seg_b);
-    let d3 = point_to_segment_distance(seg_b.0, seg_a);
-    let d4 = point_to_segment_distance(seg_b.1, seg_a);
-
-    d1.min(d2).min(d3).min(d4)
-}
-
 /// Signed area / cross product of three points.
 fn cross(a: (f64, f64), b: (f64, f64), c: (f64, f64)) -> f64 {
     (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
 }
 
-/// Check if two line segments intersect.
-fn segments_intersect(s1: ((f64, f64), (f64, f64)), s2: ((f64, f64), (f64, f64))) -> bool {
-    let d1 = cross(s2.0, s2.1, s1.0);
-    let d2 = cross(s2.0, s2.1, s1.1);
-    let d3 = cross(s1.0, s1.1, s2.0);
-    let d4 = cross(s1.0, s1.1, s2.1);
-
-    if d1 == 0.0 && d2 == 0.0 && d3 == 0.0 && d4 == 0.0 {
-        // Collinear: check bounding box overlap.
-        return point_on_segment_bbox(s1.0, s2)
-            || point_on_segment_bbox(s1.1, s2)
-            || point_on_segment_bbox(s2.0, s1)
-            || point_on_segment_bbox(s2.1, s1);
+/// Check if a polyline path self-intersects.
+fn has_self_intersection(path: &[(f64, f64)]) -> bool {
+    if path.len() < 4 {
+        return false;
     }
-
-    ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0))
+    for i in 0..path.len().saturating_sub(2) {
+        let seg_i = (path[i], path[i + 1]);
+        for j in (i + 2)..path.len().saturating_sub(1) {
+            // Adjacent segments share an endpoint — ignore those.
+            if j == i + 1 {
+                continue;
+            }
+            let seg_j = (path[j], path[j + 1]);
+            if segments_intersect(seg_i, seg_j) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Check if a point lies within the bounding box of a segment (collinear case).
@@ -306,25 +247,64 @@ fn point_to_segment_distance(p: (f64, f64), s: ((f64, f64), (f64, f64))) -> f64 
     (ex * ex + ey * ey).sqrt()
 }
 
-/// Check if a polyline path self-intersects.
-fn has_self_intersection(path: &[(f64, f64)]) -> bool {
-    if path.len() < 4 {
-        return false;
-    }
-    for i in 0..path.len().saturating_sub(2) {
-        let seg_i = (path[i], path[i + 1]);
-        for j in (i + 2)..path.len().saturating_sub(1) {
-            // Adjacent segments share an endpoint — ignore those.
-            if j == i + 1 {
-                continue;
-            }
-            let seg_j = (path[j], path[j + 1]);
-            if segments_intersect(seg_i, seg_j) {
-                return true;
-            }
+/// Resolve the required clearance from a net's layout constraints.
+fn required_clearance(
+    layout_constraints: &[LayoutConstraint],
+    default: &copperleaf::NetClass,
+) -> Option<Qty<Meter>> {
+    for constraint in layout_constraints {
+        if let LayoutConstraint::NetClass { clearance, .. } = constraint {
+            return Some(*clearance);
         }
     }
-    false
+    default.clearance
+}
+
+/// Resolve the minimum track width from a net's layout constraints.
+fn resolve_min_width(
+    layout_constraints: &[LayoutConstraint],
+    default: &copperleaf::NetClass,
+) -> Option<Qty<Meter>> {
+    for constraint in layout_constraints {
+        if let LayoutConstraint::NetClass { min_width, .. } = constraint {
+            return Some(*min_width);
+        }
+    }
+    default.min_width
+}
+
+/// Minimum distance between two line segments in 2D.
+fn segment_distance(seg_a: ((f64, f64), (f64, f64)), seg_b: ((f64, f64), (f64, f64))) -> f64 {
+    // Check if segments intersect.
+    if segments_intersect(seg_a, seg_b) {
+        return 0.0;
+    }
+
+    // Distance from endpoints of one segment to the other.
+    let d1 = point_to_segment_distance(seg_a.0, seg_b);
+    let d2 = point_to_segment_distance(seg_a.1, seg_b);
+    let d3 = point_to_segment_distance(seg_b.0, seg_a);
+    let d4 = point_to_segment_distance(seg_b.1, seg_a);
+
+    d1.min(d2).min(d3).min(d4)
+}
+
+/// Check if two line segments intersect.
+fn segments_intersect(s1: ((f64, f64), (f64, f64)), s2: ((f64, f64), (f64, f64))) -> bool {
+    let d1 = cross(s2.0, s2.1, s1.0);
+    let d2 = cross(s2.0, s2.1, s1.1);
+    let d3 = cross(s1.0, s1.1, s2.0);
+    let d4 = cross(s1.0, s1.1, s2.1);
+
+    if d1 == 0.0 && d2 == 0.0 && d3 == 0.0 && d4 == 0.0 {
+        // Collinear: check bounding box overlap.
+        return point_on_segment_bbox(s1.0, s2)
+            || point_on_segment_bbox(s1.1, s2)
+            || point_on_segment_bbox(s2.0, s1)
+            || point_on_segment_bbox(s2.1, s1);
+    }
+
+    ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0))
 }
 
 #[cfg(test)]

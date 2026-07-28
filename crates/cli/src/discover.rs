@@ -5,10 +5,10 @@
 //! auto-detecting a component's `lib_id` from the discovered files so that
 //! `--lib-id` is only needed for disambiguation.
 
+use std::path::{Path, PathBuf};
+
 use copperleaf::{Diagnostic, Severity};
 use copperleaf_backend_kicad::{Sexpr, parse, parse_symbol_lib};
-
-use std::path::{Path, PathBuf};
 
 /// The result of scanning a directory for KiCad source files.
 #[derive(Debug)]

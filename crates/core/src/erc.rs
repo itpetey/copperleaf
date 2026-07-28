@@ -149,7 +149,8 @@ fn is_nc_pin(pin: &Pin) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DesignRules,
+    use crate::{
+        DesignRules,
         board::{BoardView, CompiledComponent, Connection},
         net::{Net, NetClass, NetIdx},
         pin::Pin,

@@ -343,7 +343,13 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     let mut footprint = None;
     let mut datasheet = None;
     let mut description = None;
-    collect_pins_and_properties(&children[2..], &mut pins, &mut footprint, &mut datasheet, &mut description);
+    collect_pins_and_properties(
+        &children[2..],
+        &mut pins,
+        &mut footprint,
+        &mut datasheet,
+        &mut description,
+    );
 
     Some(SymbolDef {
         lib_id,

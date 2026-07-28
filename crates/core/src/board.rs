@@ -6,11 +6,11 @@
 
 use crate::{
     CompileError, Component, ComponentMeta, Constraint, LayoutConstraint, Net, NetIdx, Pad, Pin,
+    design_rules::DesignRules,
     layout::{BoardSide, LayerSet, PlaceTarget, Region},
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     stackup::Stackup,
-    design_rules::DesignRules,
     units::{Diagnostic, Meter, Qty, Severity, Volt},
     util::deterministic_id,
 };

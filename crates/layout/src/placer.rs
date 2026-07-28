@@ -6,16 +6,9 @@
 
 use std::collections::HashMap;
 
-use copperleaf::{
-    BoardSide, Layout, LayoutConstraint, NetIdx, Placement,
-    units::Diagnostic,
-};
+use copperleaf::{BoardSide, Layout, LayoutConstraint, NetIdx, Placement, units::Diagnostic};
 
 use crate::{SolveOptions, translate::AdapterInput};
-
-// ---------------------------------------------------------------------------
-// Placer state
-// ---------------------------------------------------------------------------
 
 /// One component tracked by the placer.
 struct Component {
@@ -213,10 +206,6 @@ pub fn place(input: &AdapterInput, _options: &SolveOptions) -> (Layout, Vec<Diag
     (layout, diagnostics)
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// Extract board width and height from the outline polygon.
 fn board_size(outline: &[(f64, f64)]) -> (f64, f64) {
     let max_x = outline.iter().map(|p| p.0).fold(0.0_f64, f64::max);
@@ -243,17 +232,6 @@ fn build_net_map(input: &AdapterInput) -> HashMap<usize, Vec<usize>> {
     map
 }
 
-/// Extract fixed-placement constraint from a component's layout directives.
-/// Returns `(is_fixed, anchor_pos, rotation, side)`.
-fn fixed_constraint(layout: &[LayoutConstraint]) -> (bool, (f64, f64), f64, BoardSide) {
-    for c in layout {
-        if let LayoutConstraint::PlaceAt { pos, rotation, side } = c {
-            return (true, *pos, *rotation, *side);
-        }
-    }
-    (false, (0.0, 0.0), 0.0, BoardSide::Front)
-}
-
 /// Compute approximate half-extents of a component from its pad positions.
 fn component_half_extents(comp: &crate::translate::ComponentInfo) -> (f64, f64) {
     if comp.pads.is_empty() {
@@ -267,18 +245,29 @@ fn component_half_extents(comp: &crate::translate::ComponentInfo) -> (f64, f64) 
             let y1 = pad.pos.1 - pad.height / 2.0;
             let x2 = pad.pos.0 + pad.width / 2.0;
             let y2 = pad.pos.1 + pad.height / 2.0;
-            (
-                min_x.min(x1),
-                min_y.min(y1),
-                max_x.max(x2),
-                max_y.max(y2),
-            )
+            (min_x.min(x1), min_y.min(y1), max_x.max(x2), max_y.max(y2))
         },
     );
 
     let w = ((max_x - min_x) / 2.0).max(1.0); // at least 1 mm half-width
     let h = ((max_y - min_y) / 2.0).max(1.0);
     (w, h)
+}
+
+/// Extract fixed-placement constraint from a component's layout directives.
+/// Returns `(is_fixed, anchor_pos, rotation, side)`.
+fn fixed_constraint(layout: &[LayoutConstraint]) -> (bool, (f64, f64), f64, BoardSide) {
+    for c in layout {
+        if let LayoutConstraint::PlaceAt {
+            pos,
+            rotation,
+            side,
+        } = c
+        {
+            return (true, *pos, *rotation, *side);
+        }
+    }
+    (false, (0.0, 0.0), 0.0, BoardSide::Front)
 }
 
 /// Generate plane zones from input net data.

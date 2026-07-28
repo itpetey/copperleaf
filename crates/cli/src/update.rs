@@ -143,102 +143,6 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Merge symbol data from a file into the manifest.
-fn merge_symbol_source(
-    manifest: &mut copperleaf_part_codegen::Manifest,
-    symbol_path: &str,
-    cli_lib_id: &str,
-    kindmap: &KindMap,
-    default_kind: &str,
-) -> Result<(), CliError> {
-    manifest::check_extension(
-        symbol_path,
-        "kicad_mod",
-        "CLI:FOOTPRINT_AS_SYMBOL",
-        "a footprint file",
-        "a symbol",
-        "--footprint",
-    )?;
-    let sym_source = std::fs::read_to_string(symbol_path)?;
-    let symbols = parse_symbol_lib(&sym_source)?;
-
-    let lib_id = manifest::resolve_symbol_lib_id(
-        Some(cli_lib_id),
-        manifest.component.lib_id.as_deref(),
-        &symbols,
-        symbol_path,
-    )?;
-    // Idiot check: verify the source matches this part.
-    if let Some(ref existing) = manifest.component.lib_id
-        && *existing != lib_id
-    {
-        return Err(CliError::Diagnostic(Diagnostic {
-            code: "CLI:LIB_ID_MISMATCH".into(),
-            severity: Severity::Error,
-            message: format!(
-                "Part TOML has lib_id '{}', but source contains '{}'",
-                existing, lib_id
-            ),
-            entities: vec![existing.clone(), lib_id.to_string()],
-            hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
-        }));
-    }
-    let Some(symbol) = find_symbol(&symbols, &lib_id) else {
-        return Err(CliError::Diagnostic(Diagnostic {
-            code: "CLI:SYMBOL_NOT_FOUND".into(),
-            severity: Severity::Error,
-            message: format!("Symbol '{}' not found in '{}'", lib_id, symbol_path),
-            entities: vec![lib_id.to_string()],
-            hint: None,
-        }));
-    };
-    // Flatten inheritance so pins from parent symbols (possibly in a
-    // different file) are included.  Re-parse the flattened S-expression
-    // to extract the complete pin set.
-    let flattened = flatten_extends(symbol, &symbols);
-    let flat_pins = parse_single_symbol(&flattened)
-        .map(|s| s.pins)
-        .unwrap_or_else(|| symbol.pins.clone());
-    // Idiot check: warn if pin counts don't match.
-    if !manifest.pins.is_empty() && flat_pins.len() != manifest.pins.len() {
-        crate::print_diagnostic(&Diagnostic {
-            code: "CLI:PIN_COUNT_MISMATCH".into(),
-            severity: Severity::Warning,
-            message: format!(
-                "Symbol has {} pins, but part TOML has {}",
-                flat_pins.len(),
-                manifest.pins.len()
-            ),
-            entities: vec![],
-            hint: Some("This may indicate the wrong symbol for this part".into()),
-        });
-    }
-    let diags = manifest::merge_symbol(manifest, &flat_pins, kindmap, default_kind);
-    for d in &diags {
-        crate::print_diagnostic(d);
-    }
-    // Inherit datasheet from symbol if the manifest doesn't have one.
-    if manifest.component.datasheet.is_none() {
-        manifest.component.datasheet = symbol.datasheet.clone();
-    }
-    // Merge symbol description into title (not stored as its own key).
-    // Only do this when the title still matches the bare lib_id — if the
-    // user has customised it we leave it alone.
-    if let Some(ref desc) = symbol.description
-        && let Some(clean) = manifest::clean_description(desc)
-    {
-        let default_title = manifest
-            .component
-            .lib_id
-            .as_deref()
-            .unwrap_or("");
-        if manifest.component.title == default_title {
-            manifest.component.title = format!("{} — {}", default_title, clean);
-        }
-    }
-    Ok(())
-}
-
 /// Merge footprint data from a file into the manifest.
 fn merge_footprint_source(
     manifest: &mut copperleaf_part_codegen::Manifest,
@@ -329,9 +233,7 @@ fn merge_footprint_source(
         } else {
             footprint_path.into()
         };
-        if let Ok(Some(extent)) =
-            copperleaf_backend_kicad::parse_footprint_fab_extent(&fab_path)
-        {
+        if let Ok(Some(extent)) = copperleaf_backend_kicad::parse_footprint_fab_extent(&fab_path) {
             manifest.component.fab_extent = Some(extent);
         }
     }
@@ -340,10 +242,7 @@ fn merge_footprint_source(
     // by --model-3d.
     if manifest.component.model_3d.is_none() && args.model_3d.is_none() {
         let extracted_model = if std::fs::metadata(footprint_path)?.is_dir() {
-            copperleaf_backend_kicad::parse_footprint_model_lib(
-                footprint_path,
-                resolved_lib_id,
-            )?
+            copperleaf_backend_kicad::parse_footprint_model_lib(footprint_path, resolved_lib_id)?
         } else {
             copperleaf_backend_kicad::parse_footprint_model(footprint_path)?
         };
@@ -354,5 +253,97 @@ fn merge_footprint_source(
         }
     }
 
+    Ok(())
+}
+
+/// Merge symbol data from a file into the manifest.
+fn merge_symbol_source(
+    manifest: &mut copperleaf_part_codegen::Manifest,
+    symbol_path: &str,
+    cli_lib_id: &str,
+    kindmap: &KindMap,
+    default_kind: &str,
+) -> Result<(), CliError> {
+    manifest::check_extension(
+        symbol_path,
+        "kicad_mod",
+        "CLI:FOOTPRINT_AS_SYMBOL",
+        "a footprint file",
+        "a symbol",
+        "--footprint",
+    )?;
+    let sym_source = std::fs::read_to_string(symbol_path)?;
+    let symbols = parse_symbol_lib(&sym_source)?;
+
+    let lib_id = manifest::resolve_symbol_lib_id(
+        Some(cli_lib_id),
+        manifest.component.lib_id.as_deref(),
+        &symbols,
+        symbol_path,
+    )?;
+    // Idiot check: verify the source matches this part.
+    if let Some(ref existing) = manifest.component.lib_id
+        && *existing != lib_id
+    {
+        return Err(CliError::Diagnostic(Diagnostic {
+            code: "CLI:LIB_ID_MISMATCH".into(),
+            severity: Severity::Error,
+            message: format!(
+                "Part TOML has lib_id '{}', but source contains '{}'",
+                existing, lib_id
+            ),
+            entities: vec![existing.clone(), lib_id.to_string()],
+            hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
+        }));
+    }
+    let Some(symbol) = find_symbol(&symbols, &lib_id) else {
+        return Err(CliError::Diagnostic(Diagnostic {
+            code: "CLI:SYMBOL_NOT_FOUND".into(),
+            severity: Severity::Error,
+            message: format!("Symbol '{}' not found in '{}'", lib_id, symbol_path),
+            entities: vec![lib_id.to_string()],
+            hint: None,
+        }));
+    };
+    // Flatten inheritance so pins from parent symbols (possibly in a
+    // different file) are included.  Re-parse the flattened S-expression
+    // to extract the complete pin set.
+    let flattened = flatten_extends(symbol, &symbols);
+    let flat_pins = parse_single_symbol(&flattened)
+        .map(|s| s.pins)
+        .unwrap_or_else(|| symbol.pins.clone());
+    // Idiot check: warn if pin counts don't match.
+    if !manifest.pins.is_empty() && flat_pins.len() != manifest.pins.len() {
+        crate::print_diagnostic(&Diagnostic {
+            code: "CLI:PIN_COUNT_MISMATCH".into(),
+            severity: Severity::Warning,
+            message: format!(
+                "Symbol has {} pins, but part TOML has {}",
+                flat_pins.len(),
+                manifest.pins.len()
+            ),
+            entities: vec![],
+            hint: Some("This may indicate the wrong symbol for this part".into()),
+        });
+    }
+    let diags = manifest::merge_symbol(manifest, &flat_pins, kindmap, default_kind);
+    for d in &diags {
+        crate::print_diagnostic(d);
+    }
+    // Inherit datasheet from symbol if the manifest doesn't have one.
+    if manifest.component.datasheet.is_none() {
+        manifest.component.datasheet = symbol.datasheet.clone();
+    }
+    // Merge symbol description into title (not stored as its own key).
+    // Only do this when the title still matches the bare lib_id — if the
+    // user has customised it we leave it alone.
+    if let Some(ref desc) = symbol.description
+        && let Some(clean) = manifest::clean_description(desc)
+    {
+        let default_title = manifest.component.lib_id.as_deref().unwrap_or("");
+        if manifest.component.title == default_title {
+            manifest.component.title = format!("{} — {}", default_title, clean);
+        }
+    }
     Ok(())
 }

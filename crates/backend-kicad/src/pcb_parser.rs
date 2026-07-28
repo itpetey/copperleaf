@@ -8,29 +8,9 @@
 
 use std::collections::HashMap;
 
-use copperleaf::{BoardSide, CompiledBoard, Layout, NetIdx, Placement, Track, Via, Zone};
-use copperleaf::UnitExt;
+use copperleaf::{BoardSide, CompiledBoard, Layout, NetIdx, Placement, Track, UnitExt, Via, Zone};
 
 use crate::sexpr::{self, ParseError, Sexpr};
-
-// ---------------------------------------------------------------------------
-// Parsed representation
-// ---------------------------------------------------------------------------
-
-/// Raw data extracted from an existing `.kicad_pcb` file.
-#[derive(Clone, Debug, Default)]
-pub struct ParsedPcb {
-    /// Old net code (1-based integer) → net name.
-    pub net_names: HashMap<usize, String>,
-    /// Refdes → raw placement data.
-    pub placements: HashMap<String, RawPlacement>,
-    /// Track segments (one per straight-line segment in the PCB).
-    pub tracks: Vec<RawSegment>,
-    /// Vias.
-    pub vias: Vec<RawVia>,
-    /// Copper zones / pours.
-    pub zones: Vec<RawZone>,
-}
 
 /// Raw placement extracted from a footprint node.
 #[derive(Clone, Debug)]
@@ -70,74 +50,20 @@ pub struct RawZone {
     pub outline: Vec<(f64, f64)>,
 }
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
-/// Parse a `.kicad_pcb` file into a [`ParsedPcb`].
-pub fn parse_pcb(input: &str) -> Result<ParsedPcb, ParseError> {
-    let root = sexpr::parse(input)?;
-    let Sexpr::List(children) = &root else {
-        return Err(ParseError::UnexpectedEof);
-    };
-
-    // The root must be a `kicad_pcb` list.
-    if children.is_empty() || children[0].as_string() != "kicad_pcb" {
-        return Err(ParseError::UnexpectedChar {
-            ch: '?',
-            pos: 0,
-        });
-    }
-
-    let mut parsed = ParsedPcb::default();
-
-    for node in &children[1..] {
-        let Sexpr::List(parts) = node else {
-            continue;
-        };
-        if parts.is_empty() {
-            continue;
-        }
-        let Sexpr::Atom(tag) = &parts[0] else {
-            continue;
-        };
-
-        match tag.as_str() {
-            "net" => {
-                if let Some((code, name)) = parse_net(parts) {
-                    parsed.net_names.insert(code, name);
-                }
-            }
-            "footprint" => {
-                if let Some((refdes, placement)) = parse_footprint(parts) {
-                    parsed.placements.insert(refdes, placement);
-                }
-            }
-            "segment" => {
-                if let Some(seg) = parse_segment(parts) {
-                    parsed.tracks.push(seg);
-                }
-            }
-            "via" => {
-                if let Some(via) = parse_via_node(parts) {
-                    parsed.vias.push(via);
-                }
-            }
-            "zone" => {
-                if let Some(zone) = parse_zone_node(parts) {
-                    parsed.zones.push(zone);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    Ok(parsed)
+/// Raw data extracted from an existing `.kicad_pcb` file.
+#[derive(Clone, Debug, Default)]
+pub struct ParsedPcb {
+    /// Old net code (1-based integer) → net name.
+    pub net_names: HashMap<usize, String>,
+    /// Refdes → raw placement data.
+    pub placements: HashMap<String, RawPlacement>,
+    /// Track segments (one per straight-line segment in the PCB).
+    pub tracks: Vec<RawSegment>,
+    /// Vias.
+    pub vias: Vec<RawVia>,
+    /// Copper zones / pours.
+    pub zones: Vec<RawZone>,
 }
-
-// ---------------------------------------------------------------------------
-// Conversion to Layout
-// ---------------------------------------------------------------------------
 
 impl ParsedPcb {
     /// Convert this parsed PCB to a [`Layout`] suitable for
@@ -250,18 +176,80 @@ impl ParsedPcb {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Low-level parse helpers
-// ---------------------------------------------------------------------------
+/// Parse a `.kicad_pcb` file into a [`ParsedPcb`].
+pub fn parse_pcb(input: &str) -> Result<ParsedPcb, ParseError> {
+    let root = sexpr::parse(input)?;
+    let Sexpr::List(children) = &root else {
+        return Err(ParseError::UnexpectedEof);
+    };
 
-/// Parse a `(net CODE "NAME")` node.  CODE is the KiCad 1-based net number.
-fn parse_net(parts: &[Sexpr]) -> Option<(usize, String)> {
-    if parts.len() < 3 {
-        return None;
+    // The root must be a `kicad_pcb` list.
+    if children.is_empty() || children[0].as_string() != "kicad_pcb" {
+        return Err(ParseError::UnexpectedChar { ch: '?', pos: 0 });
     }
-    let code: usize = parts[1].as_string().parse().ok()?;
-    let name = parts[2].as_string();
-    Some((code, name))
+
+    let mut parsed = ParsedPcb::default();
+
+    for node in &children[1..] {
+        let Sexpr::List(parts) = node else {
+            continue;
+        };
+        if parts.is_empty() {
+            continue;
+        }
+        let Sexpr::Atom(tag) = &parts[0] else {
+            continue;
+        };
+
+        match tag.as_str() {
+            "net" => {
+                if let Some((code, name)) = parse_net(parts) {
+                    parsed.net_names.insert(code, name);
+                }
+            }
+            "footprint" => {
+                if let Some((refdes, placement)) = parse_footprint(parts) {
+                    parsed.placements.insert(refdes, placement);
+                }
+            }
+            "segment" => {
+                if let Some(seg) = parse_segment(parts) {
+                    parsed.tracks.push(seg);
+                }
+            }
+            "via" => {
+                if let Some(via) = parse_via_node(parts) {
+                    parsed.vias.push(via);
+                }
+            }
+            "zone" => {
+                if let Some(zone) = parse_zone_node(parts) {
+                    parsed.zones.push(zone);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(parsed)
+}
+
+/// Map a KiCad copper layer name to a zero-based layer index.
+///
+/// `"F.Cu"` → 0, `"In1.Cu"` → 1, `"In2.Cu"` → 2, …, `"B.Cu"` → N-1.
+fn layer_name_to_index(name: &str, copper_count: usize) -> Option<usize> {
+    match name {
+        "F.Cu" => Some(0),
+        "B.Cu" => Some(copper_count.checked_sub(1)?),
+        other => {
+            // Expect "InN.Cu".
+            if !other.starts_with("In") || !other.ends_with(".Cu") {
+                return None;
+            }
+            let num_str = &other[2..other.len() - 3];
+            num_str.parse::<usize>().ok()
+        }
+    }
 }
 
 /// Parse a footprint node, returning `(refdes, RawPlacement)`.
@@ -320,6 +308,49 @@ fn parse_footprint(parts: &[Sexpr]) -> Option<(String, RawPlacement)> {
             layer,
         },
     ))
+}
+
+/// Parse a `(net CODE "NAME")` node.  CODE is the KiCad 1-based net number.
+fn parse_net(parts: &[Sexpr]) -> Option<(usize, String)> {
+    if parts.len() < 3 {
+        return None;
+    }
+    let code: usize = parts[1].as_string().parse().ok()?;
+    let name = parts[2].as_string();
+    Some((code, name))
+}
+
+/// Parse a `(polygon (xy X Y) (xy X Y) ...)` list.
+///
+/// If the last point duplicates the first (closing the polygon), it is
+/// stripped so the outline matches the [`Zone`] representation.
+fn parse_polygon(props: &[Sexpr]) -> Vec<(f64, f64)> {
+    let mut pts = Vec::new();
+    for child in &props[1..] {
+        let Sexpr::List(parts) = child else {
+            continue;
+        };
+        if parts.len() < 3 {
+            continue;
+        }
+        if parts[0].as_string() != "xy" {
+            continue;
+        }
+        let x: f64 = match parts[1].as_string().parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let y: f64 = match parts[2].as_string().parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        pts.push((x, y));
+    }
+    // Strip closing point if it duplicates the first.
+    if pts.len() > 1 && pts.first() == pts.last() {
+        pts.pop();
+    }
+    pts
 }
 
 /// Parse a `(segment ...)` node.
@@ -489,102 +520,41 @@ fn parse_zone_node(parts: &[Sexpr]) -> Option<RawZone> {
     })
 }
 
-/// Parse a `(polygon (xy X Y) (xy X Y) ...)` list.
-///
-/// If the last point duplicates the first (closing the polygon), it is
-/// stripped so the outline matches the [`Zone`] representation.
-fn parse_polygon(props: &[Sexpr]) -> Vec<(f64, f64)> {
-    let mut pts = Vec::new();
-    for child in &props[1..] {
-        let Sexpr::List(parts) = child else {
-            continue;
-        };
-        if parts.len() < 3 {
-            continue;
-        }
-        if parts[0].as_string() != "xy" {
-            continue;
-        }
-        let x: f64 = match parts[1].as_string().parse() {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let y: f64 = match parts[2].as_string().parse() {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        pts.push((x, y));
-    }
-    // Strip closing point if it duplicates the first.
-    if pts.len() > 1 && pts.first() == pts.last() {
-        pts.pop();
-    }
-    pts
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Map a KiCad copper layer name to a zero-based layer index.
-///
-/// `"F.Cu"` → 0, `"In1.Cu"` → 1, `"In2.Cu"` → 2, …, `"B.Cu"` → N-1.
-fn layer_name_to_index(name: &str, copper_count: usize) -> Option<usize> {
-    match name {
-        "F.Cu" => Some(0),
-        "B.Cu" => Some(copper_count.checked_sub(1)?),
-        other => {
-            // Expect "InN.Cu".
-            if !other.starts_with("In") || !other.ends_with(".Cu") {
-                return None;
-            }
-            let num_str = &other[2..other.len() - 3];
-            num_str.parse::<usize>().ok()
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copperleaf::{
-        CompiledBoard, CompiledComponent, ComponentMeta, Connection, Layout, Net, NetClass, NetIdx,
-        NetKind, Pin, Stackup, DesignRules,
-    };
     use copperleaf::units::UnitExt;
+    use copperleaf::{
+        CompiledBoard, CompiledComponent, ComponentMeta, Connection, DesignRules, Layout, Net,
+        NetClass, NetIdx, NetKind, Pin, Stackup,
+    };
 
     fn two_layer_board() -> CompiledBoard {
         CompiledBoard {
-            components: vec![
-                CompiledComponent {
-                    refdes: "U1".into(),
-                    meta: ComponentMeta::default(),
-                    pins: vec![
-                        Pin::build("VDD")
-                            .number("1")
-                            .pos(-1.0, 0.0)
-                            .width(0.6)
-                            .height(1.2)
-                            .pad_type("smd")
-                            .pwr_fixed(3.3.volt(), 0.1.amp())
-                            .pin(),
-                        Pin::build("GND")
-                            .number("2")
-                            .pos(1.0, 0.0)
-                            .width(0.6)
-                            .height(1.2)
-                            .pad_type("smd")
-                            .gnd(),
-                    ],
-                    constraints: vec![],
-                    layout: vec![],
-                    mechanical: vec![],
-                },
-            ],
+            components: vec![CompiledComponent {
+                refdes: "U1".into(),
+                meta: ComponentMeta::default(),
+                pins: vec![
+                    Pin::build("VDD")
+                        .number("1")
+                        .pos(-1.0, 0.0)
+                        .width(0.6)
+                        .height(1.2)
+                        .pad_type("smd")
+                        .pwr_fixed(3.3.volt(), 0.1.amp())
+                        .pin(),
+                    Pin::build("GND")
+                        .number("2")
+                        .pos(1.0, 0.0)
+                        .width(0.6)
+                        .height(1.2)
+                        .pad_type("smd")
+                        .gnd(),
+                ],
+                constraints: vec![],
+                layout: vec![],
+                mechanical: vec![],
+            }],
             nets: vec![Net {
                 name: "V3V3".into(),
                 kind: NetKind::Power {

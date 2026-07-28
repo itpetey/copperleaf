@@ -58,6 +58,42 @@ pub struct Stackup {
     pub layers: Vec<StackupLayer>,
 }
 
+impl Dielectric {
+    /// Standard FR‑4 material (εᵣ = 4.5, tan δ = 0.02).
+    pub fn fr4() -> Self {
+        Self {
+            material: "FR4".to_owned(),
+            epsilon_r: 4.5,
+            loss_tangent: 0.02,
+        }
+    }
+
+    /// Create a custom dielectric material.
+    pub fn new(material: &str, epsilon_r: f64, loss_tangent: f64) -> Self {
+        Self {
+            material: material.to_owned(),
+            epsilon_r,
+            loss_tangent,
+        }
+    }
+}
+
+impl StackupLayer {
+    /// Convenience constructor for a copper layer.
+    pub fn copper(thickness_mm: f64, role: LayerRole) -> Self {
+        Self::Copper { thickness_mm, role }
+    }
+
+    /// Convenience constructor for a dielectric layer.
+    pub fn dielectric(kind: &str, thickness_mm: f64, material: Dielectric) -> Self {
+        Self::Dielectric {
+            kind: kind.to_owned(),
+            thickness_mm,
+            dielectric: material,
+        }
+    }
+}
+
 impl Stackup {
     /// Standard 2‑layer FR‑4 board (1.6 mm total thickness).
     ///
@@ -107,42 +143,6 @@ impl Stackup {
             .iter()
             .filter(|l| matches!(l, StackupLayer::Copper { .. }))
             .count()
-    }
-}
-
-impl StackupLayer {
-    /// Convenience constructor for a copper layer.
-    pub fn copper(thickness_mm: f64, role: LayerRole) -> Self {
-        Self::Copper { thickness_mm, role }
-    }
-
-    /// Convenience constructor for a dielectric layer.
-    pub fn dielectric(kind: &str, thickness_mm: f64, material: Dielectric) -> Self {
-        Self::Dielectric {
-            kind: kind.to_owned(),
-            thickness_mm,
-            dielectric: material,
-        }
-    }
-}
-
-impl Dielectric {
-    /// Standard FR‑4 material (εᵣ = 4.5, tan δ = 0.02).
-    pub fn fr4() -> Self {
-        Self {
-            material: "FR4".to_owned(),
-            epsilon_r: 4.5,
-            loss_tangent: 0.02,
-        }
-    }
-
-    /// Create a custom dielectric material.
-    pub fn new(material: &str, epsilon_r: f64, loss_tangent: f64) -> Self {
-        Self {
-            material: material.to_owned(),
-            epsilon_r,
-            loss_tangent,
-        }
     }
 }
 

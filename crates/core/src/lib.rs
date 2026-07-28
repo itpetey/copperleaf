@@ -5,6 +5,7 @@ pub use board::{
     Board, BoardView, CompiledBoard, CompiledComponent, ComponentEntry, ComponentHandle,
     Connection, RawNetOverride,
 };
+pub use design_rules::DesignRules;
 pub use layout::{
     BoardSide, LayerSet, Layout, LayoutConstraint, PlaceTarget, Placement, Region, Track, Via, Zone,
 };
@@ -15,19 +16,18 @@ pub use pin::{
     ThermalVia, auto_pad_pos, normalise_anchor, pad_extent, resolve_mech_pad, resolve_pad,
 };
 pub use stackup::{Dielectric, LayerRole, Stackup, StackupLayer};
-pub use design_rules::DesignRules;
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
 pub use util::deterministic_id;
 
 pub mod board;
+pub mod design_rules;
 pub mod erc;
 pub mod helpers;
 pub mod layout;
 pub mod net;
 pub mod pin;
-pub mod design_rules;
 pub mod stackup;
 pub mod units;
 pub mod util;

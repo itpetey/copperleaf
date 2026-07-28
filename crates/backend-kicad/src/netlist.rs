@@ -32,10 +32,7 @@ fn components_node(board: &CompiledBoard) -> Sexpr {
                 kv("ref", &c.refdes),
                 kv(
                     "value",
-                    c.meta
-                        .capacitance
-                        .as_deref()
-                        .unwrap_or(&owned_value),
+                    c.meta.capacitance.as_deref().unwrap_or(&owned_value),
                 ),
             ];
 
@@ -157,7 +154,7 @@ mod tests {
                         Pin::build("GND").gnd(),
                     ],
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                     mechanical: vec![],
                 },
                 copperleaf::CompiledComponent {
@@ -168,7 +165,7 @@ mod tests {
                         Pin::build("GPIO").dio(),
                     ],
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                     mechanical: vec![],
                 },
             ],
@@ -181,7 +178,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
                 Net {
                     name: "V3V3".into(),
@@ -191,7 +188,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
             ],
             connections: vec![

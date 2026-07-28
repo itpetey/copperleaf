@@ -6,9 +6,8 @@
 
 use crate::units::{Meter, Qty, Volt};
 
-// ---------------------------------------------------------------------------
-// Supporting vocabulary types
-// ---------------------------------------------------------------------------
+/// Index into [`CompiledBoard::nets`](crate::CompiledBoard::nets).
+pub type LayoutNetIdx = crate::NetIdx;
 
 /// Which side of the board a component, keepout, or zone lives on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,10 +37,6 @@ pub enum PlaceTarget {
     /// A component by its index into `CompiledBoard.components`.
     Component(usize),
 }
-
-// ---------------------------------------------------------------------------
-// LayoutConstraint — physical directives
-// ---------------------------------------------------------------------------
 
 /// Physical layout directives consumed by the solver and layout DRC.
 ///
@@ -76,26 +71,6 @@ pub enum LayoutConstraint {
     /// Dedicate a copper layer as a plane / pour (net-level only).  The
     /// net is excluded from routing and emitted as a board-outline zone.
     Plane { layer: usize },
-}
-
-// ---------------------------------------------------------------------------
-// Layout IR — placed into core so backends can consume it without depending
-// on `copperleaf-layout`.  Phase 2 populates this.
-// ---------------------------------------------------------------------------
-
-/// Index into [`CompiledBoard::nets`](crate::CompiledBoard::nets).
-pub type LayoutNetIdx = crate::NetIdx;
-
-/// The solved physical layout — placements, tracks, vias, and zones.
-///
-/// No type from the solver crate (`topola`) appears here; this is the
-/// format boundary the solver writes and backends read.
-#[derive(Clone, Debug)]
-pub struct Layout {
-    pub placements: Vec<Placement>,
-    pub tracks: Vec<Track>,
-    pub vias: Vec<Via>,
-    pub zones: Vec<Zone>,
 }
 
 /// One component's physical placement.
@@ -137,4 +112,16 @@ pub struct Zone {
     pub net: LayoutNetIdx,
     pub layer: usize,
     pub outline: Vec<(f64, f64)>,
+}
+
+/// The solved physical layout — placements, tracks, vias, and zones.
+///
+/// No type from the solver crate (`topola`) appears here; this is the
+/// format boundary the solver writes and backends read.
+#[derive(Clone, Debug)]
+pub struct Layout {
+    pub placements: Vec<Placement>,
+    pub tracks: Vec<Track>,
+    pub vias: Vec<Via>,
+    pub zones: Vec<Zone>,
 }

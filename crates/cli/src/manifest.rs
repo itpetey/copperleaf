@@ -362,6 +362,19 @@ pub(crate) fn check_extension(
     Ok(())
 }
 
+/// Trim leading/trailing whitespace and collapse internal whitespace runs
+/// (including newlines) into single spaces so that multi-line KiCad
+/// descriptions become a clean one-liner suitable for embedding in a title.
+pub(crate) fn clean_description(raw: &str) -> Option<String> {
+    let re = Regex::new(r"(\\n|\s){2,}").expect("init regex");
+    let cleaned = re.replace_all(raw, "").to_string();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
 /// Read and base64-encode a 3D model file, storing it in the manifest, if a
 /// model path is set and data hasn't already been embedded.
 pub(crate) fn embed_model_data(manifest: &mut Manifest) {
@@ -562,19 +575,6 @@ fn purpose_for_kind(kind: &str) -> &'static str {
         "gnd" => "Ground",
         "pwr" | "pwr_fixed" | "pwr_out" => "Supply",
         _ => "I/O",
-    }
-}
-
-/// Trim leading/trailing whitespace and collapse internal whitespace runs
-/// (including newlines) into single spaces so that multi-line KiCad
-/// descriptions become a clean one-liner suitable for embedding in a title.
-pub(crate) fn clean_description(raw: &str) -> Option<String> {
-    let re = Regex::new(r"(\\n|\s){2,}").expect("init regex");
-    let cleaned = re.replace_all(raw, "").to_string();
-    if cleaned.is_empty() {
-        None
-    } else {
-        Some(cleaned)
     }
 }
 

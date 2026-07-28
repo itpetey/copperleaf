@@ -29,12 +29,11 @@ use copperleaf_parts_passives::footprint::Package;
 /// Re-exported from `copperleaf` so callers have a single `CompileError` type.
 pub use copperleaf::CompileError;
 
-/// Default footprint package for synthesised decoupling capacitors.
-const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
-
 /// Default maximum radius for [`LayoutConstraint::PlaceNear`] directives
 /// auto-attached to synthesised decoupling capacitors.
 const DECOUPLING_PLACE_NEAR_RADIUS_MM: f64 = 5.0;
+/// Default footprint package for synthesised decoupling capacitors.
+const DEFAULT_CAP_FOOTPRINT: Package = Package::M1608;
 
 #[derive(Clone, Debug)]
 pub struct NetInfo {

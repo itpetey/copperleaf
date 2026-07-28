@@ -231,6 +231,151 @@ fn board_outline(width: f64, height: f64) -> Vec<Sexpr> {
         .collect()
 }
 
+/// Return the KiCad layer name for the n-th copper layer from top.
+/// 0 → "F.Cu", last → "B.Cu", inner → "In{idx}.Cu".
+fn copper_layer_name(idx: usize, total: usize) -> String {
+    if idx == 0 {
+        "F.Cu".to_owned()
+    } else if idx + 1 == total {
+        "B.Cu".to_owned()
+    } else {
+        format!("In{}.Cu", idx)
+    }
+}
+
+fn emit_tracks(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    for track in &layout.tracks {
+        let Some(&net_code) = net_to_code.get(&track.net.0) else {
+            continue;
+        };
+        let layer = copper_layer_name(track.layer, board.stackup.copper_layer_count());
+        let width = track.width.as_base() * 1000.0; // m → mm
+        let path: Vec<(f64, f64)> = track.path.clone();
+
+        if path.len() < 2 {
+            continue;
+        }
+
+        for w in path.windows(2) {
+            let seg_uuid = deterministic_id(&format!(
+                "pcb:segment:{}:{}:{:.3}:{:.3}",
+                track.net.0, track.layer, w[0].0, w[0].1
+            ));
+            nodes.push(Sexpr::list([
+                Sexpr::atom("segment"),
+                Sexpr::list([
+                    Sexpr::atom("start"),
+                    Sexpr::atom(format_grid_float(w[0].0)),
+                    Sexpr::atom(format_grid_float(w[0].1)),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("end"),
+                    Sexpr::atom(format_grid_float(w[1].0)),
+                    Sexpr::atom(format_grid_float(w[1].1)),
+                ]),
+                Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
+                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+                Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+                Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
+            ]));
+        }
+    }
+    nodes
+}
+
+fn emit_vias(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    let num_copper = board.stackup.copper_layer_count();
+    for via in &layout.vias {
+        let Some(&net_code) = net_to_code.get(&via.net.0) else {
+            continue;
+        };
+        let via_uuid = deterministic_id(&format!(
+            "pcb:via:{}:{}:{:.3}:{:.3}",
+            via.net.0, via.layers.0, via.at.0, via.at.1
+        ));
+        let diam = via.diameter.as_base() * 1000.0;
+        let drill = via.drill.as_base() * 1000.0;
+        let layer_start = copper_layer_name(via.layers.0, num_copper);
+        let layer_end = copper_layer_name(via.layers.1, num_copper);
+
+        nodes.push(Sexpr::list([
+            Sexpr::atom("via"),
+            Sexpr::list([
+                Sexpr::atom("at"),
+                Sexpr::atom(format_grid_float(via.at.0)),
+                Sexpr::atom(format_grid_float(via.at.1)),
+            ]),
+            Sexpr::list([Sexpr::atom("size"), Sexpr::atom(format_grid_float(diam))]),
+            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_grid_float(drill))]),
+            Sexpr::list([
+                Sexpr::atom("layers"),
+                Sexpr::str(&layer_start),
+                Sexpr::str(&layer_end),
+            ]),
+            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&via_uuid)]),
+        ]));
+    }
+    nodes
+}
+
+fn emit_zones(
+    layout: &Layout,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+) -> Vec<Sexpr> {
+    let mut nodes = Vec::new();
+    for zone in &layout.zones {
+        let Some(&net_code) = net_to_code.get(&zone.net.0) else {
+            continue;
+        };
+        let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
+        let layer = copper_layer_name(zone.layer, board.stackup.copper_layer_count());
+        let net_name = &board.nets[zone.net.0].name;
+
+        let mut poly_pts: Vec<Sexpr> = zone
+            .outline
+            .iter()
+            .map(|&(x, y)| {
+                Sexpr::list([
+                    Sexpr::atom("xy"),
+                    Sexpr::atom(format_grid_float(x)),
+                    Sexpr::atom(format_grid_float(y)),
+                ])
+            })
+            .collect();
+
+        // Close the polygon.
+        if let Some(&first) = zone.outline.first() {
+            poly_pts.push(Sexpr::list([
+                Sexpr::atom("xy"),
+                Sexpr::atom(format_grid_float(first.0)),
+                Sexpr::atom(format_grid_float(first.1)),
+            ]));
+        }
+
+        nodes.push(Sexpr::list([
+            Sexpr::atom("zone"),
+            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
+            Sexpr::list([Sexpr::atom("net_name"), Sexpr::str(net_name)]),
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&zone_uuid)]),
+            Sexpr::list(std::iter::once(Sexpr::atom("polygon")).chain(poly_pts)),
+        ]));
+    }
+    nodes
+}
+
 fn footprint_node(
     idx: usize,
     comp: &copperleaf::CompiledComponent,
@@ -323,6 +468,123 @@ fn footprint_node(
 
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
     // The .step files live in a models/ subdirectory next to the project.
+    let model_path_for_pcb = match comp.meta.model_3d {
+        Some(ref path) => Path::new(path)
+            .file_name()
+            .map(|s| format!("models/{}", s.to_str().unwrap())),
+        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
+        None => None,
+    };
+    children.push(fp_geom::model_sexpr(
+        &fp_name,
+        model_path_for_pcb.as_deref(),
+        comp.meta.model_3d_offset,
+        comp.meta.model_3d_rotation,
+    ));
+
+    Sexpr::list(children)
+}
+
+/// Like [`footprint_node`] but takes an optional [`Placement`] for rotation
+/// and board side.  Falls back to auto-placement style when `placement` is
+/// `None`.
+fn footprint_node_with_placement(
+    idx: usize,
+    comp: &copperleaf::CompiledComponent,
+    placement: Option<&copperleaf::Placement>,
+    pin_to_net: &HashMap<(usize, &str), NetIdx>,
+    net_to_code: &HashMap<usize, usize>,
+    board: &CompiledBoard,
+    project_name: &str,
+) -> Sexpr {
+    let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
+    let extent = fp_geom::pads_extent(&pads);
+
+    let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
+    let fp_name = footprint_ref(comp);
+    let seed = format!("pcb:{}", comp.refdes);
+
+    let (ref_y, val_y) = match extent {
+        Some((x1, y1, _, y2)) => {
+            let _ = x1;
+            (y1 - 1.52, y2 + 1.52)
+        }
+        None => (-2.54, 2.54),
+    };
+
+    let (at_x, at_y, rotation, layer) = if let Some(p) = placement {
+        (
+            p.at.0,
+            p.at.1,
+            p.rotation,
+            match p.side {
+                BoardSide::Front => "F.Cu",
+                BoardSide::Back => "B.Cu",
+            },
+        )
+    } else {
+        // Fallback: auto-place position.  This path is not normally hit when a
+        // layout is supplied but keeps the function type-safe for the general case.
+        (0.0f64, 0.0f64, 0.0f64, "F.Cu")
+    };
+
+    let mut children = vec![
+        Sexpr::atom("footprint"),
+        Sexpr::str(&fp_name),
+        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
+        Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
+        Sexpr::list([
+            Sexpr::atom("at"),
+            Sexpr::atom(format_grid_float(at_x)),
+            Sexpr::atom(format_grid_float(at_y)),
+            Sexpr::atom(format_grid_float(rotation)),
+        ]),
+        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
+        footprint_property(
+            "Value",
+            &crate::common::refdes_prefix(&comp.refdes),
+            0.0,
+            val_y,
+            true,
+        ),
+        fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
+        Sexpr::list([Sexpr::atom("path"), Sexpr::str(format!("/{}", fp_uuid))]),
+        Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
+        Sexpr::list([
+            Sexpr::atom("sheetfile"),
+            Sexpr::str(format!("{}.kicad_sch", project_name)),
+        ]),
+        Sexpr::list([
+            Sexpr::atom("attr"),
+            Sexpr::atom(fp_geom::footprint_attr(&pads)),
+        ]),
+    ];
+
+    if let Some(ext) = extent {
+        for node in fp_geom::outline_sexprs(
+            ext,
+            fp_geom::pin1_pos(&pads),
+            Some(&seed),
+            comp.meta.fab_extent,
+        ) {
+            children.push(node);
+        }
+    }
+
+    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
+        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
+        let net = pin_index.and_then(|i| {
+            let pin = &comp.pins[i];
+            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
+                net_to_code
+                    .get(&net_idx.0)
+                    .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
+            })
+        });
+        children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
+    }
+
     let model_path_for_pcb = match comp.meta.model_3d {
         Some(ref path) => Path::new(path)
             .file_name()
@@ -503,6 +765,37 @@ fn setup_node(stackup: &Stackup) -> Sexpr {
     ])
 }
 
+/// Build a single `(layer …)` entry within the stackup.
+#[allow(clippy::too_many_arguments)]
+fn stackup_layer(
+    name: &str,
+    layer_type: &str,
+    thickness: Option<&str>,
+    material: Option<&str>,
+    epsilon_r: Option<&str>,
+    loss_tangent: Option<&str>,
+    _colour: Option<&str>,
+) -> Sexpr {
+    let mut children: Vec<Sexpr> = vec![
+        Sexpr::atom("layer"),
+        Sexpr::str(name),
+        Sexpr::list([Sexpr::atom("type"), Sexpr::str(layer_type)]),
+    ];
+    if let Some(t) = thickness {
+        children.push(Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom(t)]));
+    }
+    if let Some(mat) = material {
+        children.push(Sexpr::list([Sexpr::atom("material"), Sexpr::str(mat)]));
+    }
+    if let Some(dk) = epsilon_r {
+        children.push(Sexpr::list([Sexpr::atom("epsilon_r"), Sexpr::atom(dk)]));
+    }
+    if let Some(df) = loss_tangent {
+        children.push(Sexpr::list([Sexpr::atom("loss_tangent"), Sexpr::atom(df)]));
+    }
+    Sexpr::list(children)
+}
+
 /// Emit the `(stackup …)` s-expr inside `setup`.
 fn stackup_node(stackup: &Stackup) -> Sexpr {
     let mut entries: Vec<Sexpr> = vec![Sexpr::atom("stackup")];
@@ -590,307 +883,6 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     ));
 
     Sexpr::list(entries)
-}
-
-/// Build a single `(layer …)` entry within the stackup.
-#[allow(clippy::too_many_arguments)]
-fn stackup_layer(
-    name: &str,
-    layer_type: &str,
-    thickness: Option<&str>,
-    material: Option<&str>,
-    epsilon_r: Option<&str>,
-    loss_tangent: Option<&str>,
-    _colour: Option<&str>,
-) -> Sexpr {
-    let mut children: Vec<Sexpr> = vec![
-        Sexpr::atom("layer"),
-        Sexpr::str(name),
-        Sexpr::list([Sexpr::atom("type"), Sexpr::str(layer_type)]),
-    ];
-    if let Some(t) = thickness {
-        children.push(Sexpr::list([Sexpr::atom("thickness"), Sexpr::atom(t)]));
-    }
-    if let Some(mat) = material {
-        children.push(Sexpr::list([Sexpr::atom("material"), Sexpr::str(mat)]));
-    }
-    if let Some(dk) = epsilon_r {
-        children.push(Sexpr::list([Sexpr::atom("epsilon_r"), Sexpr::atom(dk)]));
-    }
-    if let Some(df) = loss_tangent {
-        children.push(Sexpr::list([Sexpr::atom("loss_tangent"), Sexpr::atom(df)]));
-    }
-    Sexpr::list(children)
-}
-
-/// Return the KiCad layer name for the n-th copper layer from top.
-/// 0 → "F.Cu", last → "B.Cu", inner → "In{idx}.Cu".
-fn copper_layer_name(idx: usize, total: usize) -> String {
-    if idx == 0 {
-        "F.Cu".to_owned()
-    } else if idx + 1 == total {
-        "B.Cu".to_owned()
-    } else {
-        format!("In{}.Cu", idx)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Layout-aware footprint node with rotation and side support.
-// ---------------------------------------------------------------------------
-
-/// Like [`footprint_node`] but takes an optional [`Placement`] for rotation
-/// and board side.  Falls back to auto-placement style when `placement` is
-/// `None`.
-fn footprint_node_with_placement(
-    idx: usize,
-    comp: &copperleaf::CompiledComponent,
-    placement: Option<&copperleaf::Placement>,
-    pin_to_net: &HashMap<(usize, &str), NetIdx>,
-    net_to_code: &HashMap<usize, usize>,
-    board: &CompiledBoard,
-    project_name: &str,
-) -> Sexpr {
-    let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
-    let extent = fp_geom::pads_extent(&pads);
-
-    let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
-    let fp_name = footprint_ref(comp);
-    let seed = format!("pcb:{}", comp.refdes);
-
-    let (ref_y, val_y) = match extent {
-        Some((x1, y1, _, y2)) => {
-            let _ = x1;
-            (y1 - 1.52, y2 + 1.52)
-        }
-        None => (-2.54, 2.54),
-    };
-
-    let (at_x, at_y, rotation, layer) = if let Some(p) = placement {
-        (
-            p.at.0,
-            p.at.1,
-            p.rotation,
-            match p.side {
-                BoardSide::Front => "F.Cu",
-                BoardSide::Back => "B.Cu",
-            },
-        )
-    } else {
-        // Fallback: auto-place position.  This path is not normally hit when a
-        // layout is supplied but keeps the function type-safe for the general case.
-        (0.0f64, 0.0f64, 0.0f64, "F.Cu")
-    };
-
-    let mut children = vec![
-        Sexpr::atom("footprint"),
-        Sexpr::str(&fp_name),
-        Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
-        Sexpr::list([Sexpr::atom("locked"), Sexpr::atom("no")]),
-        Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
-        Sexpr::list([
-            Sexpr::atom("at"),
-            Sexpr::atom(format_grid_float(at_x)),
-            Sexpr::atom(format_grid_float(at_y)),
-            Sexpr::atom(format_grid_float(rotation)),
-        ]),
-        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
-        footprint_property(
-            "Value",
-            &crate::common::refdes_prefix(&comp.refdes),
-            0.0,
-            val_y,
-            true,
-        ),
-        fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
-        Sexpr::list([Sexpr::atom("path"), Sexpr::str(format!("/{}", fp_uuid))]),
-        Sexpr::list([Sexpr::atom("sheetname"), Sexpr::str("/")]),
-        Sexpr::list([
-            Sexpr::atom("sheetfile"),
-            Sexpr::str(format!("{}.kicad_sch", project_name)),
-        ]),
-        Sexpr::list([
-            Sexpr::atom("attr"),
-            Sexpr::atom(fp_geom::footprint_attr(&pads)),
-        ]),
-    ];
-
-    if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(
-            ext,
-            fp_geom::pin1_pos(&pads),
-            Some(&seed),
-            comp.meta.fab_extent,
-        ) {
-            children.push(node);
-        }
-    }
-
-    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
-        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
-        let net = pin_index.and_then(|i| {
-            let pin = &comp.pins[i];
-            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
-                net_to_code
-                    .get(&net_idx.0)
-                    .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
-            })
-        });
-        children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
-    }
-
-    let model_path_for_pcb = match comp.meta.model_3d {
-        Some(ref path) => Path::new(path)
-            .file_name()
-            .map(|s| format!("models/{}", s.to_str().unwrap())),
-        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
-        None => None,
-    };
-    children.push(fp_geom::model_sexpr(
-        &fp_name,
-        model_path_for_pcb.as_deref(),
-        comp.meta.model_3d_offset,
-        comp.meta.model_3d_rotation,
-    ));
-
-    Sexpr::list(children)
-}
-
-// ---------------------------------------------------------------------------
-// Copper emission helpers — tracks, vias, zones.
-// ---------------------------------------------------------------------------
-
-fn emit_tracks(
-    layout: &Layout,
-    net_to_code: &HashMap<usize, usize>,
-    board: &CompiledBoard,
-) -> Vec<Sexpr> {
-    let mut nodes = Vec::new();
-    for track in &layout.tracks {
-        let Some(&net_code) = net_to_code.get(&track.net.0) else {
-            continue;
-        };
-        let layer = copper_layer_name(track.layer, board.stackup.copper_layer_count());
-        let width = track.width.as_base() * 1000.0; // m → mm
-        let path: Vec<(f64, f64)> = track.path.clone();
-
-        if path.len() < 2 {
-            continue;
-        }
-
-        for w in path.windows(2) {
-            let seg_uuid = deterministic_id(&format!(
-                "pcb:segment:{}:{}:{:.3}:{:.3}",
-                track.net.0, track.layer, w[0].0, w[0].1
-            ));
-            nodes.push(Sexpr::list([
-                Sexpr::atom("segment"),
-                Sexpr::list([
-                    Sexpr::atom("start"),
-                    Sexpr::atom(format_grid_float(w[0].0)),
-                    Sexpr::atom(format_grid_float(w[0].1)),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("end"),
-                    Sexpr::atom(format_grid_float(w[1].0)),
-                    Sexpr::atom(format_grid_float(w[1].1)),
-                ]),
-                Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
-                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
-                Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
-                Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
-            ]));
-        }
-    }
-    nodes
-}
-
-fn emit_vias(
-    layout: &Layout,
-    net_to_code: &HashMap<usize, usize>,
-    board: &CompiledBoard,
-) -> Vec<Sexpr> {
-    let mut nodes = Vec::new();
-    let num_copper = board.stackup.copper_layer_count();
-    for via in &layout.vias {
-        let Some(&net_code) = net_to_code.get(&via.net.0) else {
-            continue;
-        };
-        let via_uuid = deterministic_id(&format!(
-            "pcb:via:{}:{}:{:.3}:{:.3}",
-            via.net.0, via.layers.0, via.at.0, via.at.1
-        ));
-        let diam = via.diameter.as_base() * 1000.0;
-        let drill = via.drill.as_base() * 1000.0;
-        let layer_start = copper_layer_name(via.layers.0, num_copper);
-        let layer_end = copper_layer_name(via.layers.1, num_copper);
-
-        nodes.push(Sexpr::list([
-            Sexpr::atom("via"),
-            Sexpr::list([
-                Sexpr::atom("at"),
-                Sexpr::atom(format_grid_float(via.at.0)),
-                Sexpr::atom(format_grid_float(via.at.1)),
-            ]),
-            Sexpr::list([Sexpr::atom("size"), Sexpr::atom(format_grid_float(diam))]),
-            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_grid_float(drill))]),
-            Sexpr::list([
-                Sexpr::atom("layers"),
-                Sexpr::str(&layer_start),
-                Sexpr::str(&layer_end),
-            ]),
-            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
-            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&via_uuid)]),
-        ]));
-    }
-    nodes
-}
-
-fn emit_zones(
-    layout: &Layout,
-    net_to_code: &HashMap<usize, usize>,
-    board: &CompiledBoard,
-) -> Vec<Sexpr> {
-    let mut nodes = Vec::new();
-    for zone in &layout.zones {
-        let Some(&net_code) = net_to_code.get(&zone.net.0) else {
-            continue;
-        };
-        let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
-        let layer = copper_layer_name(zone.layer, board.stackup.copper_layer_count());
-        let net_name = &board.nets[zone.net.0].name;
-
-        let mut poly_pts: Vec<Sexpr> = zone
-            .outline
-            .iter()
-            .map(|&(x, y)| {
-                Sexpr::list([
-                    Sexpr::atom("xy"),
-                    Sexpr::atom(format_grid_float(x)),
-                    Sexpr::atom(format_grid_float(y)),
-                ])
-            })
-            .collect();
-
-        // Close the polygon.
-        if let Some(&first) = zone.outline.first() {
-            poly_pts.push(Sexpr::list([
-                Sexpr::atom("xy"),
-                Sexpr::atom(format_grid_float(first.0)),
-                Sexpr::atom(format_grid_float(first.1)),
-            ]));
-        }
-
-        nodes.push(Sexpr::list([
-            Sexpr::atom("zone"),
-            Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
-            Sexpr::list([Sexpr::atom("net_name"), Sexpr::str(net_name)]),
-            Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
-            Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&zone_uuid)]),
-            Sexpr::list(std::iter::once(Sexpr::atom("polygon")).chain(poly_pts)),
-        ]));
-    }
-    nodes
 }
 
 #[cfg(test)]

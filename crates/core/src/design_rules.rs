@@ -158,7 +158,10 @@ mod tests {
     #[test]
     fn default_has_positive_clearance() {
         let rules = DesignRules::default();
-        assert!(rules.min_clearance > 0.0, "Quilter requires min_clearance > 0");
+        assert!(
+            rules.min_clearance > 0.0,
+            "Quilter requires min_clearance > 0"
+        );
     }
 
     #[test]
@@ -188,7 +191,8 @@ mod tests {
     #[test]
     fn jlcpcb_edge_clearance() {
         for rules in [DesignRules::jlcpcb_2layer(), DesignRules::jlcpcb_4layer()] {
-            assert!((rules.min_copper_edge_clearance - 0.3).abs() < 0.01,
+            assert!(
+                (rules.min_copper_edge_clearance - 0.3).abs() < 0.01,
                 "edge clearance should be ~0.3 mm"
             );
         }

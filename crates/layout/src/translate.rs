@@ -14,34 +14,6 @@ use copperleaf::{
 
 use crate::LayoutError;
 
-/// The input model passed to the topola adapter.
-///
-/// This is the format boundary: everything the adapter needs to build a
-/// Topola board and drive autoplacement, using only copperleaf types.
-#[derive(Clone, Debug)]
-#[allow(dead_code)] // fields consumed by topola_adapter
-pub struct AdapterInput {
-    /// Board outline polygon vertices in mm: `Vec<(x_mm, y_mm)>`.
-    pub outline: Vec<(f64, f64)>,
-    /// Every component on the board with its resolved pads.
-    pub components: Vec<ComponentInfo>,
-    /// Every net on the board with its resolved class and layout directives.
-    pub nets: Vec<NetInfo>,
-    /// Copper layer definitions.
-    pub layers: Vec<LayerInfo>,
-}
-
-/// One component's translated information.
-#[derive(Clone, Debug)]
-pub struct ComponentInfo {
-    /// Reference designator, e.g. `"C1"`.
-    pub refdes: String,
-    /// Resolved pad geometry for every pin (one pad per pin).
-    pub pads: Vec<PadInfo>,
-    /// Per-component layout directives (PlaceAt, PlaceNear, etc.).
-    pub layout: Vec<LayoutConstraint>,
-}
-
 /// A resolved pad with geometry and net association.
 #[derive(Clone, Debug)]
 pub struct PadInfo {
@@ -55,6 +27,17 @@ pub struct PadInfo {
     pub pad_type: PadType,
     /// Net this pad is connected to, if any.
     pub net: Option<NetIdx>,
+}
+
+/// One component's translated information.
+#[derive(Clone, Debug)]
+pub struct ComponentInfo {
+    /// Reference designator, e.g. `"C1"`.
+    pub refdes: String,
+    /// Resolved pad geometry for every pin (one pad per pin).
+    pub pads: Vec<PadInfo>,
+    /// Per-component layout directives (PlaceAt, PlaceNear, etc.).
+    pub layout: Vec<LayoutConstraint>,
 }
 
 /// A net as seen by the adapter.
@@ -77,9 +60,22 @@ pub struct LayerInfo {
     pub name: String,
 }
 
-// ---------------------------------------------------------------------------
-// Top-level translation
-// ---------------------------------------------------------------------------
+/// The input model passed to the topola adapter.
+///
+/// This is the format boundary: everything the adapter needs to build a
+/// Topola board and drive autoplacement, using only copperleaf types.
+#[derive(Clone, Debug)]
+#[allow(dead_code)] // fields consumed by topola_adapter
+pub struct AdapterInput {
+    /// Board outline polygon vertices in mm: `Vec<(x_mm, y_mm)>`.
+    pub outline: Vec<(f64, f64)>,
+    /// Every component on the board with its resolved pads.
+    pub components: Vec<ComponentInfo>,
+    /// Every net on the board with its resolved class and layout directives.
+    pub nets: Vec<NetInfo>,
+    /// Copper layer definitions.
+    pub layers: Vec<LayerInfo>,
+}
 
 /// Translate a compiled board into the adapter input model.
 ///
@@ -106,10 +102,6 @@ pub fn translate_board(board: &CompiledBoard) -> Result<AdapterInput, LayoutErro
     })
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// Derive a rectangular board outline from width/height.
 fn board_outline(board: &CompiledBoard) -> Vec<(f64, f64)> {
     let w = board.width;
@@ -117,26 +109,16 @@ fn board_outline(board: &CompiledBoard) -> Vec<(f64, f64)> {
     vec![(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
 }
 
-/// Extract copper layers from the stackup.
-fn translate_layers(stackup: &Stackup) -> Vec<LayerInfo> {
-    let mut layers = Vec::new();
-
-    // The stackup's `layers()` returns an ordered list.  Copper layers are
-    // interleaved with dielectrics; we only keep the copper ones.  We need
-    // consistent naming for the adapter.
-    for (i, layer) in stackup.layers.iter().enumerate() {
-        match layer {
-            StackupLayer::Copper { .. } => {
-                layers.push(LayerInfo {
-                    index: i,
-                    name: copper_layer_name(layers.len()),
-                });
-            }
-            StackupLayer::Dielectric { .. } => {}
+/// Build a map from `(component_index, pin_index)` to `NetIdx`.
+fn build_pin_net_map(board: &CompiledBoard) -> std::collections::HashMap<(usize, usize), NetIdx> {
+    let mut map = std::collections::HashMap::new();
+    for conn in &board.connections {
+        let comp = &board.components[conn.component];
+        if let Some(pin_idx) = comp.pins.iter().position(|p| p.name() == conn.pin) {
+            map.insert((conn.component, pin_idx), conn.net);
         }
     }
-
-    layers
+    map
 }
 
 /// Generate standard KiCad-style copper layer names.
@@ -145,24 +127,6 @@ fn copper_layer_name(idx: usize) -> String {
         0 => "F.Cu".into(),
         n => format!("In{}.Cu", n),
     }
-}
-
-/// Translate nets: resolve `NetClass` from layout constraints and collect
-/// per-net layout directives.
-fn translate_nets(nets: &[Net]) -> Vec<NetInfo> {
-    nets.iter()
-        .map(|net| {
-            // Resolve NetClass: explicit `LayoutConstraint::NetClass` on
-            // the net wins; absent directives leave the default class.
-            let resolved_class = resolve_net_class(&net.layout, &net.class);
-
-            NetInfo {
-                name: net.name.clone(),
-                class: resolved_class,
-                layout: net.layout.clone(),
-            }
-        })
-        .collect()
 }
 
 /// Resolve `NetClass` from a net's `LayoutConstraint` list.
@@ -227,14 +191,42 @@ fn translate_components(board: &CompiledBoard) -> Result<Vec<ComponentInfo>, Lay
     Ok(components)
 }
 
-/// Build a map from `(component_index, pin_index)` to `NetIdx`.
-fn build_pin_net_map(board: &CompiledBoard) -> std::collections::HashMap<(usize, usize), NetIdx> {
-    let mut map = std::collections::HashMap::new();
-    for conn in &board.connections {
-        let comp = &board.components[conn.component];
-        if let Some(pin_idx) = comp.pins.iter().position(|p| p.name() == conn.pin) {
-            map.insert((conn.component, pin_idx), conn.net);
+/// Extract copper layers from the stackup.
+fn translate_layers(stackup: &Stackup) -> Vec<LayerInfo> {
+    let mut layers = Vec::new();
+
+    // The stackup's `layers()` returns an ordered list.  Copper layers are
+    // interleaved with dielectrics; we only keep the copper ones.  We need
+    // consistent naming for the adapter.
+    for (i, layer) in stackup.layers.iter().enumerate() {
+        match layer {
+            StackupLayer::Copper { .. } => {
+                layers.push(LayerInfo {
+                    index: i,
+                    name: copper_layer_name(layers.len()),
+                });
+            }
+            StackupLayer::Dielectric { .. } => {}
         }
     }
-    map
+
+    layers
+}
+
+/// Translate nets: resolve `NetClass` from layout constraints and collect
+/// per-net layout directives.
+fn translate_nets(nets: &[Net]) -> Vec<NetInfo> {
+    nets.iter()
+        .map(|net| {
+            // Resolve NetClass: explicit `LayoutConstraint::NetClass` on
+            // the net wins; absent directives leave the default class.
+            let resolved_class = resolve_net_class(&net.layout, &net.class);
+
+            NetInfo {
+                name: net.name.clone(),
+                class: resolved_class,
+                layout: net.layout.clone(),
+            }
+        })
+        .collect()
 }

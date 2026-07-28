@@ -34,14 +34,14 @@
 
 use copperleaf::CompiledBoard;
 
+pub use error::LayoutError;
+pub use report::LayoutReport;
+
 mod drc;
 pub mod error;
 mod placer;
 pub mod report;
 mod translate;
-
-pub use error::LayoutError;
-pub use report::LayoutReport;
 
 /// Solver effort level (controls placement iteration count).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
