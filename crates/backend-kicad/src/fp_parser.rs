@@ -8,6 +8,10 @@ use std::path::Path;
 
 use crate::sexpr::{ParseError, Sexpr, parse};
 
+/// Start and end points of a fabrication-layer line segment, each as
+/// `(x, y)` in millimetres.
+type FabSegment = ((f64, f64), (f64, f64));
+
 /// A single pad extracted from a KiCad footprint.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PadDef {
@@ -115,7 +119,7 @@ pub fn parse_footprint_model_lib(
     Ok(None)
 }
 
-fn collect_fab_lines(node: &Sexpr, lines: &mut Vec<((f64, f64), (f64, f64))>) {
+fn collect_fab_lines(node: &Sexpr, lines: &mut Vec<FabSegment>) {
     let Sexpr::List(children) = node else {
         return;
     };
@@ -142,7 +146,7 @@ fn collect_pads(node: &Sexpr, pads: &mut Vec<PadDef>) {
 /// Walk the S-expression tree and compute the bounding box of all
 /// `(fp_line ... (layer F.Fab) ...)` nodes.
 fn extract_fab_extent(node: &Sexpr) -> Option<(f64, f64, f64, f64)> {
-    let mut lines: Vec<((f64, f64), (f64, f64))> = Vec::new();
+    let mut lines: Vec<FabSegment> = Vec::new();
     collect_fab_lines(node, &mut lines);
     if lines.is_empty() {
         return None;
@@ -188,7 +192,7 @@ fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {
 
 /// If `node` is an `(fp_line ... (layer F.Fab) ...)`, return its
 /// `(start, end)` coordinates.
-fn parse_fab_line(node: &Sexpr) -> Option<((f64, f64), (f64, f64))> {
+fn parse_fab_line(node: &Sexpr) -> Option<FabSegment> {
     let Sexpr::List(children) = node else {
         return None;
     };
@@ -228,11 +232,10 @@ fn parse_fab_line(node: &Sexpr) -> Option<((f64, f64), (f64, f64))> {
                 end = Some((xs.parse().ok()?, ys.parse().ok()?));
             }
             "layer" => {
-                if let Some(layer) = parts.get(1) {
-                    if layer.as_string() == "F.Fab" {
+                if let Some(layer) = parts.get(1)
+                    && layer.as_string() == "F.Fab" {
                         is_fab = true;
                     }
-                }
             }
             _ => {}
         }

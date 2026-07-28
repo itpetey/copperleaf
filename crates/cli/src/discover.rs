@@ -43,13 +43,11 @@ pub fn discover(dir: &Path) -> Result<Discovered, std::io::Error> {
                     footprint_mod = Some(path);
                 }
             }
-        } else if ft.is_dir() {
-            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                if name.ends_with(".pretty") && footprint_pretty.is_none() {
+        } else if ft.is_dir()
+            && let Some(name) = path.file_name().and_then(|s| s.to_str())
+                && name.ends_with(".pretty") && footprint_pretty.is_none() {
                     footprint_pretty = Some(path);
                 }
-            }
-        }
     }
 
     let footprint = footprint_mod.or(footprint_pretty);

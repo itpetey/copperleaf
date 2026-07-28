@@ -286,6 +286,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
 
 /// Turn every group of connected pins into a [`Net`] and a set of
 /// [`Connection`]s.  Each net is resolved in one pass via [`resolve_net`].
+#[allow(clippy::too_many_arguments)]
 fn build_nets_and_connections(
     grouping: &NetGrouping,
     connections: &[RawConnection],
@@ -331,21 +332,18 @@ fn build_nets_and_connections(
             let key: (usize, &str) = (comp_idx, pin_name);
             if let Some(edge_ids) = pin_to_edge.get(&key) {
                 for &edge_id in edge_ids {
-                    if seen_edge_ids.insert(edge_id) {
-                        if let Some(dirs) = net_layouts.get(&edge_id) {
+                    if seen_edge_ids.insert(edge_id)
+                        && let Some(dirs) = net_layouts.get(&edge_id) {
                             net_layout.extend(dirs.iter().cloned());
                         }
-                    }
                 }
             }
             // Single-pin net edges.
-            if let Some(&edge_id) = single_pin_net_edges.get(&key) {
-                if seen_edge_ids.insert(edge_id) {
-                    if let Some(dirs) = net_layouts.get(&edge_id) {
+            if let Some(&edge_id) = single_pin_net_edges.get(&key)
+                && seen_edge_ids.insert(edge_id)
+                    && let Some(dirs) = net_layouts.get(&edge_id) {
                         net_layout.extend(dirs.iter().cloned());
                     }
-                }
-            }
         }
 
         // Resolve LayoutConstraint::NetClass directives into the net's class.
@@ -370,8 +368,8 @@ fn build_nets_and_connections(
                     });
                 }
                 resolved_class = NetClass {
-                    min_width: Some(min_width.clone()),
-                    clearance: Some(clearance.clone()),
+                    min_width: Some(*min_width),
+                    clearance: Some(*clearance),
                 };
             }
         }

@@ -267,7 +267,7 @@ fn emit_tracks(
                     Sexpr::atom(format_grid_float(w[1].1)),
                 ]),
                 Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
-                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
                 Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
                 Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
             ]));
@@ -306,8 +306,8 @@ fn emit_vias(
             Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_grid_float(drill))]),
             Sexpr::list([
                 Sexpr::atom("layers"),
-                Sexpr::str(&layer_start),
-                Sexpr::str(&layer_end),
+                Sexpr::str(layer_start),
+                Sexpr::str(layer_end),
             ]),
             Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
             Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&via_uuid)]),
@@ -355,7 +355,7 @@ fn emit_zones(
             Sexpr::atom("zone"),
             Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
             Sexpr::list([Sexpr::atom("net_name"), Sexpr::str(net_name)]),
-            Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
             Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&zone_uuid)]),
             Sexpr::list(std::iter::once(Sexpr::atom("polygon")).chain(poly_pts)),
         ]));
@@ -648,7 +648,7 @@ fn layers_node(stackup: &Stackup) -> Sexpr {
         let id = i; // In1.Cu → 1, In2.Cu → 2, ...
         entries.push(Sexpr::list([
             Sexpr::atom(id.to_string()),
-            Sexpr::str(&format!("In{}.Cu", i)),
+            Sexpr::str(format!("In{}.Cu", i)),
             Sexpr::atom("signal"),
         ]));
     }
@@ -818,7 +818,7 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
             } => {
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
-                    &name,
+                    name,
                     "copper",
                     Some(&thickness_str),
                     None,

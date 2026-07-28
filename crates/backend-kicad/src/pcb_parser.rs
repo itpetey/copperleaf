@@ -276,8 +276,7 @@ fn parse_footprint(parts: &[Sexpr]) -> Option<(String, RawPlacement)> {
                     let y: f64 = props[2].as_string().parse().ok()?;
                     let rot: f64 = props
                         .get(3)
-                        .map(|s| s.as_string().parse().ok())
-                        .flatten()
+                        .and_then(|s| s.as_string().parse().ok())
                         .unwrap_or(0.0);
                     at = Some((x, y, rot));
                 }
@@ -287,12 +286,11 @@ fn parse_footprint(parts: &[Sexpr]) -> Option<(String, RawPlacement)> {
                     layer = props[1].as_string();
                 }
             }
-            "property" => {
+            "property"
                 // (property "Reference" "U1" (at ...) ...)
-                if props.len() >= 3 && props[1].as_string() == "Reference" {
+                if props.len() >= 3 && props[1].as_string() == "Reference" => {
                     refdes = Some(props[2].as_string());
                 }
-            }
             _ => {}
         }
     }
@@ -397,11 +395,10 @@ fn parse_segment(parts: &[Sexpr]) -> Option<RawSegment> {
                     layer = Some(props[1].as_string());
                 }
             }
-            "net" => {
-                if props.len() >= 2 {
+            "net"
+                if props.len() >= 2 => {
                     net_code = props[1].as_string().parse().ok();
                 }
-            }
             _ => {}
         }
     }
@@ -459,11 +456,10 @@ fn parse_via_node(parts: &[Sexpr]) -> Option<RawVia> {
                     layer_end = Some(props[2].as_string());
                 }
             }
-            "net" => {
-                if props.len() >= 2 {
+            "net"
+                if props.len() >= 2 => {
                     net_code = props[1].as_string().parse().ok();
                 }
-            }
             _ => {}
         }
     }

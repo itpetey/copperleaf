@@ -108,7 +108,7 @@ pub fn place(input: &AdapterInput, _options: &SolveOptions) -> (Layout, Vec<Diag
         }
 
         // Attraction: components sharing a net pull toward their centroid.
-        for (_net_idx, comp_indices) in &net_to_comps {
+        for comp_indices in net_to_comps.values() {
             if comp_indices.len() < 2 {
                 continue;
             }

@@ -161,10 +161,10 @@ pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
 
     // Inject board-level design rules into the project file.
     // Without this, tools like Quilter see min_clearance=0 and reject the board.
-    if let Some(r) = rules {
-        if let Some(board) = root.get_mut("board") {
-            if let Some(design) = board.get_mut("design_settings") {
-                if let Some(obj) = design.as_object_mut() {
+    if let Some(r) = rules
+        && let Some(board) = root.get_mut("board")
+            && let Some(design) = board.get_mut("design_settings")
+                && let Some(obj) = design.as_object_mut() {
                     obj.insert(
                         "rules".to_string(),
                         json!({
@@ -190,9 +190,6 @@ pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
                         }),
                     );
                 }
-            }
-        }
-    }
 
     serde_json::to_string_pretty(&root).unwrap_or_else(|_| "{}".into()) + "\n"
 }
