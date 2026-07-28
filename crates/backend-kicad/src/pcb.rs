@@ -236,12 +236,13 @@ fn emit_tracks(
     net_to_code: &HashMap<usize, usize>,
     board: &CompiledBoard,
 ) -> Vec<Sexpr> {
+    let layer_t = board.stackup.copper_layer_count();
     let mut nodes = Vec::new();
     for track in &layout.tracks {
         let Some(&net_code) = net_to_code.get(&track.net.0) else {
             continue;
         };
-        let layer = board.stackup.nth_copper(track.layer).name();
+        let layer = normalised_layer_name(track.layer, layer_t);
         let width = track.width.as_base() * 1000.0; // m → mm
         let path: Vec<(f64, f64)> = track.path.clone();
 
@@ -267,7 +268,7 @@ fn emit_tracks(
                     Sexpr::atom(format_grid_float(w[1].1)),
                 ]),
                 Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
-                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
+                Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
                 Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
                 Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
             ]));
@@ -282,6 +283,7 @@ fn emit_vias(
     board: &CompiledBoard,
 ) -> Vec<Sexpr> {
     let mut nodes = Vec::new();
+    let layer_t = board.stackup.copper_layer_count();
     for via in &layout.vias {
         let Some(&net_code) = net_to_code.get(&via.net.0) else {
             continue;
@@ -292,8 +294,8 @@ fn emit_vias(
         ));
         let diam = via.diameter.as_base() * 1000.0;
         let drill = via.drill.as_base() * 1000.0;
-        let layer_start = board.stackup.nth_copper(via.layers.0).name();
-        let layer_end = board.stackup.nth_copper(via.layers.1).name();
+        let layer_start = normalised_layer_name(via.layers.0, layer_t);
+        let layer_end = normalised_layer_name(via.layers.1, layer_t);
 
         nodes.push(Sexpr::list([
             Sexpr::atom("via"),
@@ -322,12 +324,13 @@ fn emit_zones(
     board: &CompiledBoard,
 ) -> Vec<Sexpr> {
     let mut nodes = Vec::new();
+    let layer_t = board.stackup.copper_layer_count();
     for zone in &layout.zones {
         let Some(&net_code) = net_to_code.get(&zone.net.0) else {
             continue;
         };
         let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
-        let layer = board.stackup.nth_copper(zone.layer).name();
+        let layer = normalised_layer_name(zone.layer, layer_t);
         let net_name = &board.nets[zone.net.0].name;
 
         let mut poly_pts: Vec<Sexpr> = zone
@@ -629,25 +632,19 @@ fn general_node(stackup: &Stackup) -> Sexpr {
     ])
 }
 
-/// Layer table using KiCad's canonical (fixed) layer IDs.
-///
-/// Copper layers are assigned dynamically: F.Cu = 0, B.Cu = 31, and inner
-/// layers In1.Cu, In2.Cu, … get sequential IDs 1, 2, ….
+/// Layer table using KiCad's canonical (fixed) layer IDs
 fn layers_node(stackup: &Stackup) -> Sexpr {
     let mut entries: Vec<Sexpr> = vec![Sexpr::atom("layers")];
 
-    // Copper layers.
-    let copper_count = stackup.copper_layer_count();
+    // Copper layers
     entries.push(Sexpr::list([
         Sexpr::atom("0"),
         Sexpr::str("F.Cu"),
         Sexpr::atom("signal"),
     ]));
-    // Inner copper layers.
-    for i in 1..(copper_count.saturating_sub(1)) {
-        let id = i; // In1.Cu → 1, In2.Cu → 2, ...
+    for i in 1..stackup.copper_layer_count() - 1 {
         entries.push(Sexpr::list([
-            Sexpr::atom(id.to_string()),
+            Sexpr::atom(i.to_string()),
             Sexpr::str(format!("In{}.Cu", i)),
             Sexpr::atom("signal"),
         ]));
@@ -659,7 +656,7 @@ fn layers_node(stackup: &Stackup) -> Sexpr {
     ]));
 
     // Non-copper layers (canonical fixed IDs).
-    let non_copper: &[(usize, &str)] = &[
+    for &(id, name) in &[
         (32, "B.Adhes"),
         (33, "F.Adhes"),
         (34, "B.Paste"),
@@ -674,8 +671,7 @@ fn layers_node(stackup: &Stackup) -> Sexpr {
         (47, "F.CrtYd"),
         (48, "B.Fab"),
         (49, "F.Fab"),
-    ];
-    for &(id, name) in non_copper {
+    ] {
         entries.push(Sexpr::list([
             Sexpr::atom(id.to_string()),
             Sexpr::str(name),
@@ -735,6 +731,14 @@ fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<
         nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
     }
     nodes
+}
+
+fn normalised_layer_name(idx: usize, total: usize) -> String {
+    match idx {
+        0 => "F.Cu".into(),
+        i if i == total - 1 => "B.Cu".into(),
+        i => format!("In{i}.Cu"),
+    }
 }
 
 fn setup_node(stackup: &Stackup) -> Sexpr {
@@ -809,16 +813,18 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
 
     let mut dielectric_counter = 1u32;
 
-    for layer in &stackup.layers {
+    let layer_t = stackup.layers.len();
+    for (idx, layer) in stackup.layers.iter().enumerate() {
         match layer {
             StackupLayer::Copper {
-                name,
                 thickness_mm,
                 role: _,
+                ..
             } => {
+                let name = normalised_layer_name(idx, layer_t);
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
-                    name,
+                    &name,
                     "copper",
                     Some(&thickness_str),
                     None,

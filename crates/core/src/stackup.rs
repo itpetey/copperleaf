@@ -60,6 +60,16 @@ pub struct Stackup {
     pub layers: Vec<StackupLayer>,
 }
 
+impl LayerRole {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Signal => "signal",
+            Self::Plane => "plane",
+            Self::Mixed => "mixed",
+        }
+    }
+}
+
 impl Dielectric {
     /// Standard FR‑4 material (εᵣ = 4.5, tan δ = 0.02).
     pub fn fr4() -> Self {
@@ -84,7 +94,7 @@ impl StackupLayer {
     /// Convenience constructor for a copper layer.
     pub fn copper(name: &str, thickness_mm: f64, role: LayerRole) -> Self {
         Self::Copper {
-            name: format!("{name}.Cu"),
+            name: name.into(),
             thickness_mm,
             role,
         }
@@ -103,6 +113,13 @@ impl StackupLayer {
         match self {
             Self::Copper { name, .. } => name,
             Self::Dielectric { kind, .. } => kind,
+        }
+    }
+
+    pub fn role(&self) -> &str {
+        match self {
+            Self::Copper { role, .. } => role.as_str(),
+            Self::Dielectric { .. } => "dielectric",
         }
     }
 }

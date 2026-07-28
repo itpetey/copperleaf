@@ -4,8 +4,6 @@
 //! The fields on the adapter types are consumed by [`super::topola_adapter`];
 //! dead-code warnings are suppressed at the module level.
 
-#![allow(dead_code)]
-
 use copperleaf::{
     CompiledBoard, LayoutConstraint, Net, NetClass, NetIdx,
     pin::{PadType, resolve_pad},
@@ -65,7 +63,7 @@ pub struct LayerInfo {
 /// This is the format boundary: everything the adapter needs to build a
 /// Topola board and drive autoplacement, using only copperleaf types.
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // fields consumed by topola_adapter
+// fields consumed by topola_adapter
 pub struct AdapterInput {
     /// Board outline polygon vertices in mm: `Vec<(x_mm, y_mm)>`.
     pub outline: Vec<(f64, f64)>,
@@ -83,7 +81,6 @@ pub struct AdapterInput {
 ///
 /// Returns [`LayoutError::NoBoardOutline`] if both `width` and `height` are
 /// zero (no outline defined).
-#[allow(dead_code)]
 pub fn translate_board(board: &CompiledBoard) -> Result<AdapterInput, LayoutError> {
     if board.width <= 0.0 && board.height <= 0.0 {
         return Err(LayoutError::NoBoardOutline);
@@ -119,14 +116,6 @@ fn build_pin_net_map(board: &CompiledBoard) -> std::collections::HashMap<(usize,
         }
     }
     map
-}
-
-/// Generate standard KiCad-style copper layer names.
-fn copper_layer_name(idx: usize) -> String {
-    match idx {
-        0 => "F.Cu".into(),
-        n => format!("In{}.Cu", n),
-    }
 }
 
 /// Resolve `NetClass` from a net's `LayoutConstraint` list.
@@ -200,10 +189,10 @@ fn translate_layers(stackup: &Stackup) -> Vec<LayerInfo> {
     // consistent naming for the adapter.
     for (i, layer) in stackup.layers.iter().enumerate() {
         match layer {
-            StackupLayer::Copper { .. } => {
+            StackupLayer::Copper { name, .. } => {
                 layers.push(LayerInfo {
                     index: i,
-                    name: copper_layer_name(layers.len()),
+                    name: name.into(),
                 });
             }
             StackupLayer::Dielectric { .. } => {}
