@@ -185,7 +185,10 @@ mod tests {
     #[test]
     fn two_layer_starts_and_ends_with_copper() {
         let s = Stackup::two_layer();
-        assert!(matches!(s.layers.first(), Some(StackupLayer::Copper { .. })));
+        assert!(matches!(
+            s.layers.first(),
+            Some(StackupLayer::Copper { .. })
+        ));
         assert!(matches!(s.layers.last(), Some(StackupLayer::Copper { .. })));
     }
 

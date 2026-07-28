@@ -7,6 +7,7 @@ use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use copperleaf::{Diagnostic, Severity};
 
+mod discover;
 mod generate;
 mod kindmap;
 mod llm;
@@ -44,6 +45,9 @@ struct NewArgs {
     /// Datasheet PDF file (not yet supported).
     #[arg(long, group = "source")]
     datasheet: Option<String>,
+    /// Directory containing KiCad source files (auto-discovers .kicad_sym and .kicad_mod).
+    #[arg(long, group = "source")]
+    dir: Option<String>,
     /// Library identifier within the source file.
     #[arg(long)]
     lib_id: Option<String>,
@@ -76,8 +80,13 @@ struct NewArgs {
 #[derive(Parser)]
 #[command(group = clap::ArgGroup::new("source").multiple(false))]
 struct UpdateArgs {
-    /// Existing part TOML file.
-    part_toml: String,
+    /// Vendor parts crate containing the part TOML.
+    #[arg(long)]
+    crate_: String,
+    /// Library identifier — used to locate the part TOML and match source symbols.
+    /// Auto-detected from --dir contents when not provided.
+    #[arg(long)]
+    lib_id: Option<String>,
     /// KiCad symbol library file.
     #[arg(long, group = "source")]
     symbol: Option<String>,
@@ -87,10 +96,10 @@ struct UpdateArgs {
     /// Datasheet PDF file (not yet supported).
     #[arg(long, group = "source")]
     datasheet: Option<String>,
-    /// Library identifier within the source file.
-    #[arg(long)]
-    lib_id: Option<String>,
-    /// Output file path (defaults to overwriting the input).
+    /// Directory containing KiCad source files (auto-discovers .kicad_sym and .kicad_mod).
+    #[arg(long, group = "source")]
+    dir: Option<String>,
+    /// Output file path (defaults to the part TOML inside the vendor crate).
     #[arg(long, short)]
     out: Option<String>,
     /// TOML file overriding the built-in pin type → kind map.

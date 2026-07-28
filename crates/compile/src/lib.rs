@@ -165,6 +165,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
     // Extract Board fields early to avoid partial-move conflicts.
     let board_width = board.width();
     let board_height = board.height();
+    let board_design_rules = board.design_rules().clone();
     let board_stackup = board.stackup().clone();
     let board_components = board.components;
     let board_connections = board.connections;
@@ -233,6 +234,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         width: board_width,
         height: board_height,
         stackup: board_stackup,
+        design_rules: board_design_rules.clone(),
     };
 
     // --- Phase 2: Validation (ERC) ---
@@ -271,6 +273,7 @@ pub fn run(board: Board, options: &CompileOptions) -> Result<CompileReport, Comp
         width: board_struct.width,
         height: board_struct.height,
         stackup: board_struct.stackup,
+        design_rules: board_struct.design_rules,
     };
 
     let summary = build_summary(&final_board);
@@ -362,7 +365,9 @@ fn build_nets_and_connections(
                         severity: Severity::Error,
                         message: format!("net '{}' has conflicting NetClass directives", name),
                         entities: vec![name.clone()],
-                        hint: Some("ensure only one NetClass directive is attached to the net".into()),
+                        hint: Some(
+                            "ensure only one NetClass directive is attached to the net".into(),
+                        ),
                     });
                 }
                 resolved_class = NetClass {
@@ -831,7 +836,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
-            layout: vec![],
+                layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -843,6 +848,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
         };
         let (comps, diags, conns, fallback) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);
@@ -871,7 +877,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
-            layout: vec![],
+                layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -883,6 +889,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
@@ -922,7 +929,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
                 Net {
                     name: "GND".into(),
@@ -932,7 +939,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
             ],
             connections: vec![
@@ -952,6 +959,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 1);
@@ -980,7 +988,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
                 Net {
                     name: "VDD".into(),
@@ -990,7 +998,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
                 Net {
                     name: "GND".into(),
@@ -1000,7 +1008,7 @@ mod tests {
                     },
                     class: NetClass::default(),
                     constraints: vec![],
-            layout: vec![],
+                    layout: vec![],
                 },
             ],
             connections: vec![
@@ -1020,6 +1028,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
         };
         let (comps, _, _, _) = synthesise_decoupling(&board, DEFAULT_CAP_FOOTPRINT);
         assert_eq!(comps.len(), 2);

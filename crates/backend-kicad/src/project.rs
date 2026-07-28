@@ -1,5 +1,6 @@
 //! KiCad `.kicad_pro` project file emitter.
 
+use copperleaf::DesignRules;
 use serde_json::{Value, json};
 
 use crate::sexpr::Sexpr;
@@ -20,9 +21,14 @@ pub fn emit_fp_lib_table(lib_nick: &str) -> String {
     format!("{}\n", table)
 }
 
-/// Build a minimal `.kicad_pro` JSON document for a project named `name`.
-pub fn emit_project(name: &str) -> String {
-    let root: Value = json!({
+/// Build a `.kicad_pro` JSON document for a project named `name`.
+///
+/// When `rules` is provided, the board-level design rules (minimum clearances,
+/// track widths, etc.) are emitted into the project's `design_settings.rules`
+/// section.  This is the section validated by Quilter — the most critical value
+/// is `min_clearance`, which **must** be greater than zero.
+pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
+    let mut root: Value = json!({
         "board": {
             "3dviewports": [],
             "design_settings": {
@@ -153,12 +159,41 @@ pub fn emit_project(name: &str) -> String {
         "text_variables": {}
     });
 
+    // Inject board-level design rules into the project file.
+    // Without this, tools like Quilter see min_clearance=0 and reject the board.
+    if let Some(r) = rules {
+        if let Some(board) = root.get_mut("board") {
+            if let Some(design) = board.get_mut("design_settings") {
+                if let Some(obj) = design.as_object_mut() {
+                    obj.insert("rules".to_string(), json!({
+                        "max_error": 0.005,
+                        "min_clearance": r.min_clearance,
+                        "min_connection": r.min_connection,
+                        "min_copper_edge_clearance": r.min_copper_edge_clearance,
+                        "min_groove_width": 0.0,
+                        "min_hole_clearance": r.min_hole_clearance,
+                        "min_hole_to_hole": r.min_hole_to_hole,
+                        "min_microvia_diameter": r.min_microvia_diameter,
+                        "min_microvia_drill": r.min_microvia_drill,
+                        "min_resolved_spokes": 2,
+                        "min_silk_clearance": r.min_silk_clearance,
+                        "min_text_height": r.min_text_height,
+                        "min_text_thickness": r.min_text_thickness,
+                        "min_through_hole_diameter": r.min_through_hole_diameter,
+                        "min_track_width": r.min_track_width,
+                        "min_via_annular_width": r.min_via_annular_width,
+                        "min_via_diameter": r.min_via_diameter,
+                        "solder_mask_to_copper_clearance": r.solder_mask_to_copper_clearance,
+                        "use_height_for_length_calcs": true
+                    }));
+                }
+            }
+        }
+    }
+
     serde_json::to_string_pretty(&root).unwrap_or_else(|_| "{}".into()) + "\n"
 }
 
-/// Build a `sym-lib-table` S-expression file that registers project-specific
-/// symbol libraries.  This is the standard KiCad mechanism alongside (or
-/// instead of) the `pinned_symbol_libs` in the `.kicad_pro` file.
 pub fn emit_sym_lib_table(lib_nicks: &[String]) -> String {
     let mut entries = Vec::new();
     for nick in lib_nicks {
@@ -184,7 +219,7 @@ mod tests {
 
     #[test]
     fn project_is_valid_json() {
-        let s = emit_project("example");
+        let s = emit_project("example", None);
         let v: Value = serde_json::from_str(&s).expect("must be valid JSON");
         assert_eq!(v["meta"]["filename"], "example");
         assert_eq!(v["meta"]["version"], 3);
@@ -199,7 +234,7 @@ mod tests {
 
     #[test]
     fn project_libraries_are_empty_by_default() {
-        let s = emit_project("example");
+        let s = emit_project("example", None);
         let v: Value = serde_json::from_str(&s).expect("must be valid JSON");
         assert!(
             v["libraries"]["pinned_symbol_libs"]

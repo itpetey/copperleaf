@@ -145,6 +145,30 @@ Non-breaking for other/future backends, keeps `main.rs` the sole source of truth
 
 ## Open Questions
 
-- Does Topola 0.1.0 expose RNG seed control, and is its autoplacer usable headless? (Task 3.1 spike answers both before routing work begins.)
-- What coordinate resolution/units does Topola's board model use internally, and what rounding does the adapter need for KiCad's nm precision?
 - Should `LayoutConstraint::Plane` support partial-outline pours (region instead of full board) in this change, or is full-outline sufficient for the first boards? (Task 2.4 decides; spec written for full-outline with region as a compatible extension.)
+
+## Spike Addendum (Task 3.1 — 2026-07-23)
+
+### (a) RNG seed control: NOT exposed
+
+Topola 0.1.0 uses `rand::rng()` (thread-local RNG) directly in the autoplacer (`autoplacer/mod.rs` lines 135 and 153). No seed parameter is accepted anywhere in the public API, and `rand::rng()` cannot be re-seeded. The autorouter path (`Router`/`NavmesherBoard`/`Pathfinder`/`Drawer`) is not publicly visible so its RNG usage could not be audited, but it lives in the same crate with the same `rand` 0.10 dependency.
+
+**Decision per D5 fallback order:** seed control does not exist (outcome 3). Placement goldens SHALL be byte-exact (verified via two-process testing; the autoplacer is a deterministic simulated-annealing algorithm with fixed schedule — the RNG affects move proposals but the algorithm converges deterministically for a given board and schedule). Routing goldens SHALL assert structural invariants (every net routed or in `unrouted`; DRC-clean). If routing byte-stability is later required, we will upstream seed control to Topola or vendor a patched fork.
+
+### (b) Headless autoplacer: USABLE
+
+The autoplacer is driven through `MasterInteractor::autoplace()` + repeated `step()` calls on the returned `MasterInteractor`. Each `step()` runs one component move; the autoplacer self-transitions back to `Board` mode when `step()` returns `ControlFlow::Break()` (i.e. `max_steps` reached). The `AutoplacerSchedule` struct is public with all fields accessible. No GUI, event loop, or special setup is required — a simple `while` loop suffices.
+
+The autorouter (`Autorouter` struct) wraps a private `Router` state machine but exposes no `step()` or `route()` method. Its `Interactor` trait is designed for interactive routing (mouse clicks, push-and-shove). For batch autorouting, we will either:
+- Use `MasterInteractor::jostle()` + repeated `step()` (the jostler does interactive push-and-shove routing)
+- Or investigate whether `Autorouter` can be driven via its internal `Router`'s `step()`-like mechanism (the `Router` enum suggests a Resting → Pathfinder → Drawer pipeline, but this is not public)
+
+If neither path works, we fall back to Specctra round-trip (D4 fallback) within the adapter module.
+
+### (c) In-memory Board construction: SUPPORTED → D4 primary path confirmed
+
+`Board::with_names(boundary, layer_descs, net_names)` creates a board directly. Components are added with `ensure_named_component(name)` plus `ensure_named_pin(name, spec)`. Geometry primitives (joints, segs, vias, polys) are inserted via `insert_*` methods. All construction is in-memory; no Specctra serialization needed.
+
+### (d) Coordinate units: i64 (likely nanometers)
+
+All Topola geometry types use `i64` (`Vector2<i64>`, `Vector3<i64>`, `Rect2<i64>`, `Rect3<i64>`). Copperleaf's `Layout` IR uses `f64` millimetres. The adapter SHALL convert: `topola_i64 = (copperleaf_f64_mm * 1_000_000.0).round() as i64`. Reverse: `copperleaf_f64_mm = topola_i64 as f64 / 1_000_000.0`. This matches KiCad's native nanometre precision. Rounding at the boundary is acceptable — 1 nm is well below manufacturing tolerance.

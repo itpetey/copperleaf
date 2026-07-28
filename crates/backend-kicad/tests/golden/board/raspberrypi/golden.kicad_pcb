@@ -627,7 +627,7 @@
       (size 0.91 0.91)
       (layers F.Paste)
       (uuid "284c73c6-62c9-b762-02d6-8ba1cfc42a38"))
-    (model "U1.step"
+    (model "models/U1.step"
       (offset
         (xyz 0 0 0))
       (scale

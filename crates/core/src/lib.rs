@@ -15,6 +15,7 @@ pub use pin::{
     ThermalVia, auto_pad_pos, normalise_anchor, pad_extent, resolve_mech_pad, resolve_pad,
 };
 pub use stackup::{Dielectric, LayerRole, Stackup, StackupLayer};
+pub use design_rules::DesignRules;
 pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
@@ -26,6 +27,7 @@ pub mod helpers;
 pub mod layout;
 pub mod net;
 pub mod pin;
+pub mod design_rules;
 pub mod stackup;
 pub mod units;
 pub mod util;

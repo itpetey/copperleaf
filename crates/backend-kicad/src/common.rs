@@ -71,13 +71,7 @@ pub fn build_symbol_sexpr(props: &SymbolProps, layout: &crate::sym_layout::Symbo
         property_sym_node("ki_keywords", "copperleaf", (0.0, 0.0), true, false),
     ];
     if props.bypass {
-        children.push(property_sym_node(
-            "Bypass",
-            "yes",
-            (0.0, 0.0),
-            true,
-            false,
-        ));
+        children.push(property_sym_node("Bypass", "yes", (0.0, 0.0), true, false));
     }
     if let Some(filter) = props.fp_filter {
         children.push(property_sym_node(

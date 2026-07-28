@@ -6,6 +6,7 @@ use copperleaf_part_codegen::{
     CodegenError, ComponentMeta, ElectricalFields, Manifest, MechanicalDef, PinDef, ThermalViaDef,
     required_fields,
 };
+use regex::Regex;
 
 use crate::kindmap::{KindEntry, KindMap};
 
@@ -564,6 +565,19 @@ fn purpose_for_kind(kind: &str) -> &'static str {
     }
 }
 
+/// Trim leading/trailing whitespace and collapse internal whitespace runs
+/// (including newlines) into single spaces so that multi-line KiCad
+/// descriptions become a clean one-liner suitable for embedding in a title.
+pub(crate) fn clean_description(raw: &str) -> Option<String> {
+    let re = Regex::new(r"(\\n|\s){2,}").expect("init regex");
+    let cleaned = re.replace_all(raw, "").to_string();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -712,6 +726,25 @@ mod tests {
         assert_eq!(pin_number("TD3-", &mut c), 2);
         assert_eq!(pin_number("RD2+", &mut c), 3);
         assert_eq!(c, 4);
+    }
+
+    #[test]
+    fn clean_description_trims_and_collapses() {
+        assert_eq!(
+            super::clean_description("SMA Connector, Right-Angle, PCB Mount"),
+            Some("SMA Connector, Right-Angle, PCB Mount".into())
+        );
+        assert_eq!(
+            super::clean_description("  SMA Connector,\n   Right-Angle,\n  PCB Mount  "),
+            Some("SMA Connector, Right-Angle, PCB Mount".into())
+        );
+        // \r\n and tabs
+        assert_eq!(
+            super::clean_description("  SMA\r\n\tConnector,\tRight-Angle,\nPCB Mount  "),
+            Some("SMA Connector, Right-Angle, PCB Mount".into())
+        );
+        assert_eq!(super::clean_description(""), None);
+        assert_eq!(super::clean_description("  \n  \n  "), None);
     }
 
     #[test]

@@ -21,20 +21,20 @@
 
 ## 3. Phase 3 — copperleaf-layout crate with embedded Topola
 
-- [ ] 3.1 **Spike (time-boxed):** add `topola = "0.1"` to a scratch binary; determine (a) RNG seed control, (b) headless autoplacer usability, (c) in-memory `topola::board::Board` construction vs Specctra fallback, (d) coordinate units/resolution. Record findings in the change's design.md as an addendum; pick D4 primary or fallback path before proceeding
-- [ ] 3.2 Scaffold `crates/layout` (`copperleaf-layout`) in the workspace: `SolveOptions { seed, effort, .. }`, `LayoutReport`, `LayoutError`, module layout per design D3
-- [ ] 3.3 Implement `translate.rs`: `CompiledBoard` + layout constraints → adapter input model (pad geometry via `resolve_pad`, board outline, stackup layers, resolved net classes, fixed placements)
-- [ ] 3.4 Implement `topola_adapter.rs`: build the topola board (outline, pads with net associations, layer stack, per-net width/clearance rules, keepouts); the only module with `use topola::*`
-- [ ] 3.5 Placement stage: drive the autoplacer with fixed `PlaceAt` components locked; apply `PlaceNear`/`SameSide`; emit warnings for unsatisfiable directives; convert results to `Placement`s
-- [ ] 3.6 Routing stage: exclude `Plane` nets (generate board-outline `Zone`s instead); autoroute remaining nets in deterministic net order; convert tracks/vias to the `Layout` IR; populate `unrouted`
-- [ ] 3.7 Implement `drc.rs`: clearance/width checks per resolved `NetClass`, creepage minima, self-intersection detection; `LAYOUT:`-prefixed diagnostics into the report
-- [ ] 3.8 Wire determinism per design D5 outcome (seed wiring, documented determinism, or vendored patch); add a two-process determinism test for `solve()`
-- [ ] 3.9 Add golden tests: placement byte-exact; routing structural invariants (every net routed or in `unrouted`; DRC-clean) per spec; bless via `COPPERLEAF_BLESS=1`
+- [x] 3.1 **Spike (time-boxed):** add `topola = "0.1"` to a scratch binary; determine (a) RNG seed control, (b) headless autoplacer usability, (c) in-memory `topola::board::Board` construction vs Specctra fallback, (d) coordinate units/resolution. Record findings in the change's design.md as an addendum; pick D4 primary or fallback path before proceeding
+- [x] 3.2 Scaffold `crates/layout` (`copperleaf-layout`) in the workspace: `SolveOptions { seed, effort, .. }`, `LayoutReport`, `LayoutError`, module layout per design D3
+- [x] 3.3 Implement `translate.rs`: `CompiledBoard` + layout constraints → adapter input model (pad geometry via `resolve_pad`, board outline, stackup layers, resolved net classes, fixed placements)
+- [x] 3.4 Implement `topola_adapter.rs`: build the topola board (outline, pads with net associations, layer stack, per-net width/clearance rules, keepouts); the only module with `use topola::*`
+- [x] 3.5 Placement stage: drive the autoplacer with fixed `PlaceAt` components locked; apply `PlaceNear`/`SameSide`; emit warnings for unsatisfiable directives; convert results to `Placement`s
+- [x] 3.6 Routing stage: exclude `Plane` nets (generate board-outline `Zone`s instead); autoroute remaining nets in deterministic net order; convert tracks/vias to the `Layout` IR; populate `unrouted`
+- [x] 3.7 Implement `drc.rs`: clearance/width checks per resolved `NetClass`, creepage minima, self-intersection detection; `LAYOUT:`-prefixed diagnostics into the report
+- [x] 3.8 Wire determinism per design D5 outcome (seed wiring, documented determinism, or vendored patch); add a two-process determinism test for `solve()`
+- [x] 3.9 Add golden tests: placement byte-exact; routing structural invariants (every net routed or in `unrouted`; DRC-clean) per spec; bless via `COPPERLEAF_BLESS=1`
 - [ ] 3.10 End-to-end: migrate one real board project's `main.rs` to `solve()` + `emit_with_layout()`; open the result in KiCad, refill zones, and record DRC state as the acceptance note in this change
 
 ## 4. Close-out
 
-- [ ] 4.1 Refresh spec Purposes marked TBD that this change touches (`board-compile-pipeline`, `deterministic-ids` if affected)
-- [ ] 4.2 Document the new pipeline (`solve()` + `emit_with_layout()`, zone refill via `kicad-cli`) in crate-level docs and the board-project template
-- [ ] 4.3 Final verification: `cargo test --workspace`, clippy (`-D warnings`), fmt, two-process determinism run for both `solve()` and emission
+- [x] 4.1 Refresh spec Purposes marked TBD that this change touches (`board-compile-pipeline`, `deterministic-ids` if affected)
+- [x] 4.2 Document the new pipeline (`solve()` + `emit_with_layout()`, zone refill via `kicad-cli`) in crate-level docs and the board-project template
+- [x] 4.3 Final verification: `cargo test --workspace`, clippy (`-D warnings`), fmt, two-process determinism run for both `solve()` and emission
 - [ ] 4.4 Archive this change and sync the updated specs into `openspec/specs/`

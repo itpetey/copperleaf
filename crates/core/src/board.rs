@@ -10,6 +10,7 @@ use crate::{
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     stackup::Stackup,
+    design_rules::DesignRules,
     units::{Diagnostic, Meter, Qty, Severity, Volt},
     util::deterministic_id,
 };
@@ -46,6 +47,8 @@ pub struct CompiledBoard {
     pub height: f64,
     /// PCB layer stackup defining the physical layer structure.
     pub stackup: Stackup,
+    /// Board-level design rules (minimum clearances, track widths, etc.).
+    pub design_rules: DesignRules,
 }
 
 /// Precomputed connectivity index for a [`CompiledBoard`].
@@ -93,6 +96,8 @@ pub struct Board {
     height: f64,
     /// PCB layer stackup (default: standard 2‑layer FR‑4).
     stackup: Stackup,
+    /// Board-level design rules (default: conservative generic values).
+    design_rules: DesignRules,
     /// Per-component layout directives added via the builder API.
     pub component_layouts: Vec<Vec<LayoutConstraint>>,
     /// Per-net layout directives added via `assign_plane`, keyed by edge id.
@@ -204,6 +209,7 @@ impl Board {
             width: 100.0,
             height: 80.0,
             stackup: Stackup::two_layer(),
+            design_rules: DesignRules::default(),
             component_layouts: Vec::new(),
             net_layouts: std::collections::BTreeMap::new(),
             board_layouts: Vec::new(),
@@ -234,6 +240,16 @@ impl Board {
     /// Reference to the current PCB layer stackup.
     pub fn stackup(&self) -> &Stackup {
         &self.stackup
+    }
+
+    /// Set the board-level design rules.
+    pub fn set_design_rules(&mut self, rules: DesignRules) {
+        self.design_rules = rules;
+    }
+
+    /// Reference to the current board-level design rules.
+    pub fn design_rules(&self) -> &DesignRules {
+        &self.design_rules
     }
 
     /// Add a [`Component`] to this board.

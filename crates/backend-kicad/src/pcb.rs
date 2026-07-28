@@ -114,11 +114,8 @@ pub fn emit_pcb_with_layout(
     // Placements: from layout if available, otherwise auto-place.
     if let Some(layout) = layout {
         // Build a lookup from component index to placement.
-        let placement_by_component: HashMap<usize, &copperleaf::Placement> = layout
-            .placements
-            .iter()
-            .map(|p| (p.component, p))
-            .collect();
+        let placement_by_component: HashMap<usize, &copperleaf::Placement> =
+            layout.placements.iter().map(|p| (p.component, p)).collect();
 
         for (idx, comp) in board.components.iter().enumerate() {
             let placement = placement_by_component.get(&idx);
@@ -300,7 +297,12 @@ fn footprint_node(
 
     // Outlines (fab, silk, courtyard, pin-1 marker).
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed), comp.meta.fab_extent) {
+        for node in fp_geom::outline_sexprs(
+            ext,
+            fp_geom::pin1_pos(&pads),
+            Some(&seed),
+            comp.meta.fab_extent,
+        ) {
             children.push(node);
         }
     }
@@ -320,13 +322,12 @@ fn footprint_node(
     }
 
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
-    // Use just the filename so it resolves relative to the project directory
-    // (the file is copied alongside the project output during emit()).
+    // The .step files live in a models/ subdirectory next to the project.
     let model_path_for_pcb = match comp.meta.model_3d {
         Some(ref path) => Path::new(path)
             .file_name()
-            .map(|s| s.to_str().unwrap().to_owned()),
-        None if comp.meta.model_3d_data.is_some() => Some(format!("{}.step", comp.refdes)),
+            .map(|s| format!("models/{}", s.to_str().unwrap())),
+        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
         None => None,
     };
     children.push(fp_geom::model_sexpr(
@@ -507,14 +508,33 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     let mut entries: Vec<Sexpr> = vec![Sexpr::atom("stackup")];
 
     // Top mask/silk (always present).
-    entries.push(stackup_layer("F.SilkS", "Top Silk Screen", None, None, None, None, None));
-    entries.push(stackup_layer("F.Mask", "Top Solder Mask", None, None, None, None, None));
+    entries.push(stackup_layer(
+        "F.SilkS",
+        "Top Silk Screen",
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
+    entries.push(stackup_layer(
+        "F.Mask",
+        "Top Solder Mask",
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
 
     let mut dielectric_counter = 1u32;
 
     for (i, layer) in stackup.layers.iter().enumerate() {
         match layer {
-            StackupLayer::Copper { thickness_mm, role: _ } => {
+            StackupLayer::Copper {
+                thickness_mm,
+                role: _,
+            } => {
                 let name = copper_layer_name(i / 2, stackup.copper_layer_count());
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
@@ -527,7 +547,11 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
                     None,
                 ));
             }
-            StackupLayer::Dielectric { kind, thickness_mm, dielectric } => {
+            StackupLayer::Dielectric {
+                kind,
+                thickness_mm,
+                dielectric,
+            } => {
                 let thickness_str = format_float(*thickness_mm, 3);
                 let dk_str = format_float(dielectric.epsilon_r, 3);
                 let df_str = format_float(dielectric.loss_tangent, 3);
@@ -546,8 +570,24 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     }
 
     // Bottom mask/silk (always present).
-    entries.push(stackup_layer("B.Mask", "Bottom Solder Mask", None, None, None, None, None));
-    entries.push(stackup_layer("B.SilkS", "Bottom Silk Screen", None, None, None, None, None));
+    entries.push(stackup_layer(
+        "B.Mask",
+        "Bottom Solder Mask",
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
+    entries.push(stackup_layer(
+        "B.SilkS",
+        "Bottom Silk Screen",
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
 
     Sexpr::list(entries)
 }
@@ -627,10 +667,15 @@ fn footprint_node_with_placement(
     };
 
     let (at_x, at_y, rotation, layer) = if let Some(p) = placement {
-        (p.at.0, p.at.1, p.rotation, match p.side {
-            BoardSide::Front => "F.Cu",
-            BoardSide::Back => "B.Cu",
-        })
+        (
+            p.at.0,
+            p.at.1,
+            p.rotation,
+            match p.side {
+                BoardSide::Front => "F.Cu",
+                BoardSide::Back => "B.Cu",
+            },
+        )
     } else {
         // Fallback: auto-place position.  This path is not normally hit when a
         // layout is supplied but keeps the function type-safe for the general case.
@@ -671,7 +716,12 @@ fn footprint_node_with_placement(
     ];
 
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), Some(&seed), comp.meta.fab_extent) {
+        for node in fp_geom::outline_sexprs(
+            ext,
+            fp_geom::pin1_pos(&pads),
+            Some(&seed),
+            comp.meta.fab_extent,
+        ) {
             children.push(node);
         }
     }
@@ -692,8 +742,8 @@ fn footprint_node_with_placement(
     let model_path_for_pcb = match comp.meta.model_3d {
         Some(ref path) => Path::new(path)
             .file_name()
-            .map(|s| s.to_str().unwrap().to_owned()),
-        None if comp.meta.model_3d_data.is_some() => Some(format!("{}.step", comp.refdes)),
+            .map(|s| format!("models/{}", s.to_str().unwrap())),
+        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
         None => None,
     };
     children.push(fp_geom::model_sexpr(
@@ -745,10 +795,7 @@ fn emit_tracks(
                     Sexpr::atom(format_grid_float(w[1].0)),
                     Sexpr::atom(format_grid_float(w[1].1)),
                 ]),
-                Sexpr::list([
-                    Sexpr::atom("width"),
-                    Sexpr::atom(format_grid_float(width)),
-                ]),
+                Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
                 Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
                 Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
                 Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
@@ -785,14 +832,8 @@ fn emit_vias(
                 Sexpr::atom(format_grid_float(via.at.0)),
                 Sexpr::atom(format_grid_float(via.at.1)),
             ]),
-            Sexpr::list([
-                Sexpr::atom("size"),
-                Sexpr::atom(format_grid_float(diam)),
-            ]),
-            Sexpr::list([
-                Sexpr::atom("drill"),
-                Sexpr::atom(format_grid_float(drill)),
-            ]),
+            Sexpr::list([Sexpr::atom("size"), Sexpr::atom(format_grid_float(diam))]),
+            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_grid_float(drill))]),
             Sexpr::list([
                 Sexpr::atom("layers"),
                 Sexpr::str(&layer_start),
@@ -815,10 +856,7 @@ fn emit_zones(
         let Some(&net_code) = net_to_code.get(&zone.net.0) else {
             continue;
         };
-        let zone_uuid = deterministic_id(&format!(
-            "pcb:zone:{}:{}",
-            zone.net.0, zone.layer
-        ));
+        let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
         let layer = copper_layer_name(zone.layer, board.stackup.copper_layer_count());
         let net_name = &board.nets[zone.net.0].name;
 
@@ -886,7 +924,7 @@ mod tests {
                         .gnd(),
                 ],
                 constraints: vec![],
-            layout: vec![],
+                layout: vec![],
                 mechanical: vec![],
             }],
             nets: vec![Net {
@@ -897,7 +935,7 @@ mod tests {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
-            layout: vec![],
+                layout: vec![],
             }],
             connections: vec![Connection {
                 component: 0,
@@ -909,6 +947,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
         }
     }
 
@@ -983,7 +1022,11 @@ mod tests {
         let layout = test_layout();
         let out = emit_pcb_with_layout(&board, "test", Some(&layout));
         // Placement at (10, 40) with rotation 90°.
-        assert!(out.contains("(at 10 40 90)"), "missing rotated placement: {}", out);
+        assert!(
+            out.contains("(at 10 40 90)"),
+            "missing rotated placement: {}",
+            out
+        );
         // Front-side component should be on F.Cu.
         assert!(out.contains("(layer \"F.Cu\")"), "{}", out);
     }
@@ -1025,7 +1068,10 @@ mod tests {
         let board = test_board();
         let out1 = emit_pcb(&board, "test");
         let out2 = emit_pcb_with_layout(&board, "test", None);
-        assert_eq!(out1, out2, "no-layout emit_with_layout must match emit_pcb byte-for-byte");
+        assert_eq!(
+            out1, out2,
+            "no-layout emit_with_layout must match emit_pcb byte-for-byte"
+        );
     }
 
     #[test]

@@ -604,7 +604,7 @@
       (layers F.Cu F.Mask F.Paste)
       (solder_mask_margin 0.102)
       (uuid "d7ce7bab-862c-607c-6135-fc6cae945a2e"))
-    (model "L1.step"
+    (model "models/L1.step"
       (offset
         (xyz 0 0 0))
       (scale
@@ -736,7 +736,7 @@
       (layers F.Cu F.Mask F.Paste)
       (solder_mask_margin 0.102)
       (uuid "42eff916-1989-82dd-9532-d15bf09958ab"))
-    (model "L2.step"
+    (model "models/L2.step"
       (offset
         (xyz 0 0 0))
       (scale

@@ -1,0 +1,10 @@
+[package]
+name = "copperleaf-layout"
+version.workspace = true
+edition.workspace = true
+description = "Layout solving with a deterministic force-directed autoplacer"
+license.workspace = true
+
+[dependencies]
+copperleaf.workspace = true
+thiserror.workspace = true

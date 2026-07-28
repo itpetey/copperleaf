@@ -149,7 +149,7 @@ fn is_nc_pin(pin: &Pin) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::{DesignRules,
         board::{BoardView, CompiledComponent, Connection},
         net::{Net, NetClass, NetIdx},
         pin::Pin,
@@ -173,7 +173,7 @@ mod tests {
                 constraints: vec![],
                 layout: vec![],
             }],
-        connections: vec![Connection {
+            connections: vec![Connection {
                 component: 0,
                 pin: "VDD".into(),
                 net: NetIdx(0),
@@ -183,6 +183,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: crate::stackup::Stackup::two_layer(),
+            design_rules: DesignRules::default(),
         };
         let view = BoardView::new(&board);
         let diags = erc_overvoltage(&view);
@@ -204,7 +205,7 @@ mod tests {
                 constraints: vec![],
                 layout: vec![],
             }],
-        connections: vec![Connection {
+            connections: vec![Connection {
                 component: 0,
                 pin: "NC".into(),
                 net: NetIdx(0),
@@ -214,6 +215,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: crate::stackup::Stackup::two_layer(),
+            design_rules: DesignRules::default(),
         };
         let view = BoardView::new(&board);
         let diags = erc_nc_pin_connected(&view);
@@ -235,6 +237,7 @@ mod tests {
             width: 100.0,
             height: 80.0,
             stackup: crate::stackup::Stackup::two_layer(),
+            design_rules: DesignRules::default(),
         };
         let view = BoardView::new(&board);
         let diags = erc_floating_inputs(&view);

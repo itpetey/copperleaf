@@ -304,7 +304,7 @@
       (drill 0.2)
       (layers *.Cu *.Mask)
       (uuid "28537cc6-62cf-e55b-02eb-14a1cfd5bc0d"))
-    (model "U1.step"
+    (model "models/U1.step"
       (offset
         (xyz 0 0 0))
       (scale

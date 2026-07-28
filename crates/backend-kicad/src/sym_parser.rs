@@ -21,6 +21,7 @@ pub struct SymbolDef {
     pub extends: Option<String>,
     pub footprint: Option<String>,
     pub datasheet: Option<String>,
+    pub description: Option<String>,
     pub raw: Sexpr,
 }
 
@@ -134,6 +135,7 @@ fn collect_pins_and_properties(
     pins: &mut Vec<PinDef>,
     footprint: &mut Option<String>,
     datasheet: &mut Option<String>,
+    description: &mut Option<String>,
 ) {
     for node in nodes {
         if let Some(pin) = parse_pin_node(node) {
@@ -152,12 +154,18 @@ fn collect_pins_and_properties(
             *datasheet = Some(ds);
             continue;
         }
+        if description.is_none()
+            && let Some(desc) = parse_property_value(node, "Description")
+        {
+            *description = Some(desc);
+            continue;
+        }
         if let Sexpr::List(children) = node
             && let Some(Sexpr::Atom(head)) = children.first()
             && head == "symbol"
             && children.len() > 2
         {
-            collect_pins_and_properties(&children[2..], pins, footprint, datasheet);
+            collect_pins_and_properties(&children[2..], pins, footprint, datasheet, description);
         }
     }
 }
@@ -334,7 +342,8 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
     let mut pins = Vec::new();
     let mut footprint = None;
     let mut datasheet = None;
-    collect_pins_and_properties(&children[2..], &mut pins, &mut footprint, &mut datasheet);
+    let mut description = None;
+    collect_pins_and_properties(&children[2..], &mut pins, &mut footprint, &mut datasheet, &mut description);
 
     Some(SymbolDef {
         lib_id,
@@ -342,6 +351,7 @@ fn parse_symbol_node(node: &Sexpr) -> Option<SymbolDef> {
         extends,
         footprint,
         datasheet,
+        description,
         raw: node.clone(),
     })
 }

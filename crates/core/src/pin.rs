@@ -1217,7 +1217,10 @@ mod tests {
                 0,
             ),
             resolve_pad(
-                &Pin::build("2").pos(-18.985, 0.0).pad_type("thru_hole").dio(),
+                &Pin::build("2")
+                    .pos(-18.985, 0.0)
+                    .pad_type("thru_hole")
+                    .dio(),
                 1,
             ),
         ];

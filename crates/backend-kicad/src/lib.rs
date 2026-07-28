@@ -16,6 +16,7 @@ pub use fp_parser::{
     parse_footprint_model, parse_footprint_model_lib,
 };
 pub use lib_emitter::{emit_footprint_lib, emit_symbol_lib};
+pub use pcb_parser::{ParsedPcb, RawPlacement, RawSegment, RawVia, RawZone, parse_pcb};
 pub use project::{emit_fp_lib_table, emit_sym_lib_table};
 pub use sexpr::{ParseError, Sexpr, kv, parse};
 pub use sym_emitter::emit_symbol;
@@ -28,6 +29,7 @@ pub mod fp_emitter;
 pub mod fp_geom;
 pub mod fp_parser;
 pub mod lib_emitter;
+pub mod pcb_parser;
 pub mod netlist;
 pub mod pcb;
 pub mod project;
@@ -65,7 +67,7 @@ impl Backend for KiCad {
         let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
 
-        let pro = project::emit_project(&self.project_name);
+        let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
         fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
 
         let sch = schematic::emit_schematic(board);
@@ -77,9 +79,11 @@ impl Backend for KiCad {
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
 
-        // Write 3D model files from embedded base64 data.
+        // Write 3D model files from embedded base64 data into models/ subdir.
+        let models_dir = out.join("models");
         for comp in &board.components {
             if let Some(ref data) = comp.meta.model_3d_data {
+                fs::create_dir_all(&models_dir)?;
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(data)
                     .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
@@ -91,8 +95,7 @@ impl Backend for KiCad {
                     .and_then(|p| Path::new(p).file_name())
                     .and_then(|s| s.to_str())
                     .unwrap_or(&fallback);
-                let dst = out.join(filename);
-                fs::write(&dst, &bytes)?;
+                fs::write(models_dir.join(filename), &bytes)?;
             }
         }
 
@@ -108,7 +111,7 @@ impl Backend for KiCad {
         let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
 
-        let pro = project::emit_project(&self.project_name);
+        let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
         fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
 
         let sch = schematic::emit_schematic(board);
@@ -120,9 +123,11 @@ impl Backend for KiCad {
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
 
-        // Write 3D models.
+        // Write 3D model files into models/ subdir.
+        let models_dir = out.join("models");
         for comp in &board.components {
             if let Some(ref data) = comp.meta.model_3d_data {
+                fs::create_dir_all(&models_dir)?;
                 let bytes = base64::engine::general_purpose::STANDARD
                     .decode(data)
                     .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
@@ -134,12 +139,37 @@ impl Backend for KiCad {
                     .and_then(|p| Path::new(p).file_name())
                     .and_then(|s| s.to_str())
                     .unwrap_or(&fallback);
-                let dst = out.join(filename);
-                fs::write(&dst, &bytes)?;
+                fs::write(models_dir.join(filename), &bytes)?;
             }
         }
 
         Ok(())
+    }
+}
+
+impl KiCad {
+    /// Update an existing PCB file with a new [`CompiledBoard`], preserving
+    /// all physical layout (placements, tracks, vias, zones).
+    ///
+    /// Reads the existing `.kicad_pcb` from `output_dir` (derived from the
+    /// configured project name), parses layout data, remaps nets by name to
+    /// the new board, and regenerates all output files.
+    ///
+    /// Copper elements referencing deleted nets are silently dropped. New
+    /// components without an existing placement are placed at `(0, 0)` on the
+    /// front side.
+    pub fn emit_update(
+        &self,
+        output_dir: impl AsRef<Path>,
+        board: &CompiledBoard,
+    ) -> Result<(), BackendError> {
+        let out = output_dir.as_ref();
+        let pcb_path = out.join(format!("{}.kicad_pcb", self.project_name));
+        let pcb_source = fs::read_to_string(&pcb_path)?;
+        let parsed = pcb_parser::parse_pcb(&pcb_source)
+            .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
+        let layout = parsed.to_layout(board);
+        self.emit_with_layout(output_dir, board, &layout)
     }
 }
 

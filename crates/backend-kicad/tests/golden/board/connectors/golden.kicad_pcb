@@ -328,7 +328,7 @@
       (drill 3.3)
       (layers *.Cu *.Mask)
       (uuid "7ce51086-627e-984e-1440-d7380b96cc5c"))
-    (model "J1.step"
+    (model "models/J1.step"
       (offset
         (xyz 0 0 0))
       (scale
@@ -475,7 +475,7 @@
       (solder_mask_margin 0.102)
       (uuid "b6cc2781-5c35-47fd-7dae-cea29d81768b")
       (net 1 "NET_J2_GND1"))
-    (model "J2.step"
+    (model "models/J2.step"
       (offset
         (xyz 0 0 0))
       (scale
@@ -619,7 +619,7 @@
       (layers F.Cu F.Mask F.Paste)
       (solder_mask_margin 0.102)
       (uuid "c164aa8a-ed8f-7e3f-241f-3a7e585ada51"))
-    (model "J3.step"
+    (model "models/J3.step"
       (offset
         (xyz 0 -4.5 0))
       (scale
@@ -841,7 +841,7 @@
       (layers F.Cu F.Mask F.Paste)
       (solder_mask_margin 0.102)
       (uuid "0ce781fa-2b5d-5992-7622-71cceea1c9d8"))
-    (model "J4.step"
+    (model "models/J4.step"
       (offset
         (xyz 0 -4.5 0))
       (scale

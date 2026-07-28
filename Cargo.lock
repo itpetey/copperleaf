@@ -203,6 +203,7 @@ dependencies = [
  "copperleaf-backend-kicad",
  "copperleaf-part-codegen",
  "pdf-extract",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
@@ -216,6 +217,14 @@ version = "0.1.0"
 dependencies = [
  "copperleaf",
  "copperleaf-parts-passives",
+]
+
+[[package]]
+name = "copperleaf-layout"
+version = "0.1.0"
+dependencies = [
+ "copperleaf",
+ "thiserror",
 ]
 
 [[package]]
@@ -651,6 +660,31 @@ name = "rangemap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "973443cf09a9c8656b574a866ab68dfa19f0867d0340648c7d2f6a71b8a8ea68"
+
+[[package]]
+name = "regex"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
+dependencies = [
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fcfdb36bda0c880c5931cdc7a2bcdc8ba4556847b9d912bca70bc94708711ad"
+dependencies = [
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rustix"

@@ -55,7 +55,7 @@ pub fn emit_footprint_to(
         .unwrap_or(&manifest.component.name);
 
     // Determine the model path for the S-expression.  If we have embedded data
-    // and an output directory, write the file and use just the filename.
+    // and an output directory, write the file into models/ and use that path.
     let model_path_for_sexpr = if let (Some(dir), Some(data)) =
         (output_dir, manifest.component.model_3d_data.as_deref())
     {
@@ -72,12 +72,17 @@ pub fn emit_footprint_to(
             .and_then(|p| std::path::Path::new(p).file_name())
             .and_then(|s| s.to_str())
             .unwrap_or(&default_name);
-        let out_path = dir.join(filename);
+        let models_dir = dir.join("models");
+        std::fs::create_dir_all(&models_dir).map_err(|source| EmitError::ModelWrite {
+            path: models_dir.clone(),
+            source,
+        })?;
+        let out_path = models_dir.join(filename);
         std::fs::write(&out_path, &bytes).map_err(|source| EmitError::ModelWrite {
             path: out_path.clone(),
             source,
         })?;
-        Some(filename.to_string())
+        Some(format!("models/{}", filename))
     } else {
         manifest.component.model_3d.clone()
     };
@@ -130,7 +135,12 @@ pub fn emit_footprint_to(
 
     // Outlines (fab, silk, courtyard, pin-1 marker).
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(ext, fp_geom::pin1_pos(&pads), None, manifest.component.fab_extent) {
+        for node in fp_geom::outline_sexprs(
+            ext,
+            fp_geom::pin1_pos(&pads),
+            None,
+            manifest.component.fab_extent,
+        ) {
             children.push(node);
         }
     }

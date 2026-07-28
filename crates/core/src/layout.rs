@@ -21,12 +21,7 @@ pub enum BoardSide {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Region {
     /// Axis-aligned rectangle in millimetres, `(x1, y1)` to `(x2, y2)`.
-    Rect {
-        x1: f64,
-        y1: f64,
-        x2: f64,
-        y2: f64,
-    },
+    Rect { x1: f64, y1: f64, x2: f64, y2: f64 },
     /// Circle in millimetres, centre `(cx, cy)` with radius `r`.
     Circle { cx: f64, cy: f64, r: f64 },
 }
@@ -62,10 +57,7 @@ pub enum LayoutConstraint {
         clearance: Qty<Meter>,
     },
     /// Minimum creepage distance for a given working voltage.
-    Creepage {
-        min: Qty<Meter>,
-        voltage: Qty<Volt>,
-    },
+    Creepage { min: Qty<Meter>, voltage: Qty<Volt> },
     /// Fixed placement — position (mm, mm), rotation (degrees), board side.
     PlaceAt {
         pos: (f64, f64),
@@ -78,19 +70,12 @@ pub enum LayoutConstraint {
         max_radius: Qty<Meter>,
     },
     /// Keep this component on the same board side as others in the group.
-    SameSide {
-        group: String,
-    },
+    SameSide { group: String },
     /// Exclude a region from placement and routing on the given layers.
-    Keepout {
-        region: Region,
-        layers: LayerSet,
-    },
+    Keepout { region: Region, layers: LayerSet },
     /// Dedicate a copper layer as a plane / pour (net-level only).  The
     /// net is excluded from routing and emitted as a board-outline zone.
-    Plane {
-        layer: usize,
-    },
+    Plane { layer: usize },
 }
 
 // ---------------------------------------------------------------------------

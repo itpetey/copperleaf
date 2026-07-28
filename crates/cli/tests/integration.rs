@@ -6,6 +6,15 @@ fn copperleaf() -> Command {
     cmd
 }
 
+/// Scaffold a minimal workspace `Cargo.toml` so that `--crate` works.
+fn setup_workspace(dir: &std::path::Path) {
+    std::fs::write(
+        dir.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    )
+    .unwrap();
+}
+
 /// A footprint with 4 pads + 9 paste-only apertures (like a QFN exposed pad stencil).
 fn footprint_with_paste() -> &'static str {
     r#"(footprint "QFN_PASTE"
@@ -29,33 +38,38 @@ fn footprint_with_paste() -> &'static str {
 #[test]
 fn generate_footprint_round_trip_preserves_pad_numbers() {
     let dir = tempfile::tempdir().unwrap();
-    let fp = dir.path().join("input.kicad_mod");
+    setup_workspace(dir.path());
+    let fp = dir.path().join("test.kicad_mod");
     std::fs::write(&fp, footprint_with_paste()).unwrap();
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
 
-    // Create TOML from symbol + footprint.
+    // Create TOML from symbol + footprint using --crate.
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--footprint")
+        .arg(&fp)
         .status()
         .unwrap();
+
+    let out = dir.path().join("parts/testvendor/test.toml");
 
     // Verify the TOML has `number` fields.
     let toml_content = std::fs::read_to_string(&out).unwrap();
@@ -71,6 +85,7 @@ fn generate_footprint_round_trip_preserves_pad_numbers() {
     // Generate a footprint from the TOML.
     let gen_fp = dir.path().join("output.kicad_mod");
     let status = copperleaf()
+        .current_dir(dir.path())
         .arg("generate")
         .arg("footprint")
         .arg(&out)
@@ -113,6 +128,7 @@ fn generate_footprint_round_trip_preserves_pad_numbers() {
 #[test]
 fn generate_footprint_thermal_vias_not_as_electrical_pads() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     // Footprint with 2 signal pads + 1 exposed pad + 2 thermal vias (thru_hole inside exposed pad).
     std::fs::write(
         dir.path().join("test.kicad_mod"),
@@ -137,27 +153,31 @@ fn generate_footprint_thermal_vias_not_as_electrical_pads() {
     )
     .unwrap();
 
-    let out = dir.path().join("test.toml");
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(dir.path().join("test.kicad_sym"))
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(dir.path().join("test.kicad_mod"))
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--footprint")
+        .arg(dir.path().join("test.kicad_mod"))
         .status()
         .unwrap();
+
+    let out = dir.path().join("parts/testvendor/test.toml");
 
     // The TOML should have the thermal vias captured in `[[mechanical]]`.
     let toml_content = std::fs::read_to_string(&out).unwrap();
@@ -169,6 +189,7 @@ fn generate_footprint_thermal_vias_not_as_electrical_pads() {
     // Generate and re-parse.
     let gen_fp = dir.path().join("output.kicad_mod");
     copperleaf()
+        .current_dir(dir.path())
         .arg("generate")
         .arg("footprint")
         .arg(&out)
@@ -193,7 +214,6 @@ fn generate_footprint_thermal_vias_not_as_electrical_pads() {
 }
 
 /// Minimal embedded RP2354A symbol derived from `MCU_RaspberryPi.kicad_sym`.
-/// Synthesised so the test does not depend on a temporary external file.
 fn minimal_rp2354a_symbol_lib() -> &'static str {
     r#"(kicad_symbol_lib
   (symbol "RP2350A"
@@ -467,33 +487,37 @@ fn new_symbol_with_crate_scaffolds_vendor_crate() {
 #[test]
 fn new_then_update_footprint_preserves_logical_fields() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
     let fp = dir.path().join("test.kicad_mod");
     std::fs::write(&fp, sample_footprint()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--footprint")
+        .arg(&fp)
         .status()
         .unwrap();
 
+    let out = dir.path().join("parts/testvendor/test.toml");
     let toml = std::fs::read_to_string(&out).unwrap();
     assert!(toml.contains("kind = \"pwr\""));
     assert!(toml.contains("name = \"VDD\""));
@@ -540,18 +564,19 @@ fn two_pin_symbol_lib() -> &'static str {
 #[test]
 fn update_footprint_pad_count_mismatch_warns() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
@@ -559,12 +584,14 @@ fn update_footprint_pad_count_mismatch_warns() {
     std::fs::write(&two_pad_fp, two_pad_footprint()).unwrap();
 
     let output = copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&two_pad_fp)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--footprint")
+        .arg(&two_pad_fp)
         .output()
         .unwrap();
 
@@ -577,22 +604,23 @@ fn update_footprint_pad_count_mismatch_warns() {
 #[test]
 fn update_footprint_paste_only_pads_not_counted() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
-    // 4 numbered pads + 9 unnamed paste-only pads (like KiCad QFN exposed pad stencil apertures)
+    // 4 numbered pads + 9 unnamed paste-only pads
     let fp_with_paste = dir.path().join("paste.kicad_mod");
     std::fs::write(
         &fp_with_paste,
@@ -615,18 +643,19 @@ fn update_footprint_paste_only_pads_not_counted() {
     .unwrap();
 
     let output = copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp_with_paste)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--footprint")
+        .arg(&fp_with_paste)
         .output()
         .unwrap();
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // 9 unnamed paste pads should be excluded, leaving 4 electrical pads = 4 TOML pins
     assert!(
         !stderr.contains("CLI:PAD_COUNT_MISMATCH"),
         "Should not warn when unnamed paste-only pads are present: {stderr}"
@@ -636,54 +665,57 @@ fn update_footprint_paste_only_pads_not_counted() {
 #[test]
 fn update_footprint_wrong_lib_id_fails() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
     let fp = dir.path().join("test.kicad_mod");
     std::fs::write(&fp, sample_footprint()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
     let output = copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--footprint")
-        .arg(&fp)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("WRONG")
+        .arg("--footprint")
+        .arg(&fp)
         .output()
         .unwrap();
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:LIB_ID_MISMATCH"));
-    assert!(stderr.contains("Part TOML has lib_id 'TEST', but source contains 'WRONG'"));
+    assert!(stderr.contains("CLI:PART_NOT_FOUND"));
 }
 
 #[test]
 fn update_symbol_pin_count_mismatch_warns() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
@@ -691,12 +723,14 @@ fn update_symbol_pin_count_mismatch_warns() {
     std::fs::write(&two_pin_sym, two_pin_symbol_lib()).unwrap();
 
     let output = copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--symbol")
-        .arg(&two_pin_sym)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("TEST")
+        .arg("--symbol")
+        .arg(&two_pin_sym)
         .output()
         .unwrap();
 
@@ -709,18 +743,19 @@ fn update_symbol_pin_count_mismatch_warns() {
 #[test]
 fn update_symbol_wrong_lib_id_fails() {
     let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
     let sym = dir.path().join("test.kicad_sym");
     std::fs::write(&sym, sample_symbol_lib()).unwrap();
-    let out = dir.path().join("test.toml");
 
     copperleaf()
+        .current_dir(dir.path())
         .arg("new")
         .arg("--symbol")
         .arg(&sym)
         .arg("--lib-id")
         .arg("TEST")
-        .arg("--out")
-        .arg(&out)
+        .arg("--crate")
+        .arg("testvendor")
         .status()
         .unwrap();
 
@@ -728,19 +763,20 @@ fn update_symbol_wrong_lib_id_fails() {
     std::fs::write(&wrong_sym, wrong_symbol_lib()).unwrap();
 
     let output = copperleaf()
+        .current_dir(dir.path())
         .arg("update")
-        .arg(&out)
-        .arg("--symbol")
-        .arg(&wrong_sym)
+        .arg("--crate")
+        .arg("testvendor")
         .arg("--lib-id")
         .arg("WRONG")
+        .arg("--symbol")
+        .arg(&wrong_sym)
         .output()
         .unwrap();
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI:LIB_ID_MISMATCH"));
-    assert!(stderr.contains("Part TOML has lib_id 'TEST', but source contains 'WRONG'"));
+    assert!(stderr.contains("CLI:PART_NOT_FOUND"));
 }
 
 fn wrong_symbol_lib() -> &'static str {
@@ -751,4 +787,283 @@ fn wrong_symbol_lib() -> &'static str {
     (pin input line (at 5.08 0 180) (length 2.54) (name "D0") (number "3"))
   )
 )"#
+}
+
+// ── --dir tests ──────────────────────────────────────────────────────
+
+#[test]
+fn new_dir_discovers_symbol_and_footprint() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("name = \"VDD\""));
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+    assert!(toml.contains("rotation = 90.0"));
+}
+
+#[test]
+fn update_dir_discovers_and_merges() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    // Create from symbol only first.
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+
+    copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+
+    // Now put footprint in a directory and update via --dir.
+    let update_dir = dir.path().join("update_src");
+    std::fs::create_dir(&update_dir).unwrap();
+    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("update")
+        .arg("--crate")
+        .arg("testvendor")
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--dir")
+        .arg(&update_dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+    assert!(toml.contains("rotation = 90.0"));
+}
+
+#[test]
+fn new_dir_empty_directory_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let empty = dir.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+
+    let output = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&empty)
+        .arg("--crate")
+        .arg("testvendor")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:NO_SOURCE"));
+}
+
+#[test]
+fn new_dir_symbol_only_works() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("kind = \"pwr\""));
+    assert!(toml.contains("name = \"VDD\""));
+}
+
+#[test]
+fn new_dir_footprint_only_works() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+}
+
+// ── --dir auto-detection tests (--lib-id omitted) ───────────────────
+
+#[test]
+fn new_dir_auto_detects_lib_id_from_single_symbol() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+
+    // No --lib-id — auto-detect "TEST" from the single-symbol file.
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
+}
+
+#[test]
+fn new_dir_auto_detects_lib_id_from_footprint_name() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    // The footprint name inside the file is "TEST".
+    std::fs::write(&src.join("whatever.kicad_mod"), sample_footprint()).unwrap();
+
+    // No --lib-id — auto-detect "TEST" from the footprint S-expression.
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("lib_id = \"TEST\""));
+}
+
+#[test]
+fn update_dir_auto_detects_lib_id() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    // Create from symbol only.
+    let sym = dir.path().join("test.kicad_sym");
+    std::fs::write(&sym, sample_symbol_lib()).unwrap();
+
+    copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--symbol")
+        .arg(&sym)
+        .arg("--lib-id")
+        .arg("TEST")
+        .arg("--crate")
+        .arg("testvendor")
+        .status()
+        .unwrap();
+
+    // Update via --dir without --lib-id.
+    let update_dir = dir.path().join("update_src");
+    std::fs::create_dir(&update_dir).unwrap();
+    // Only need a footprint — the symbol auto-detects "TEST".
+    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+
+    let status = copperleaf()
+        .current_dir(dir.path())
+        .arg("update")
+        .arg("--crate")
+        .arg("testvendor")
+        .arg("--dir")
+        .arg(&update_dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = dir.path().join("parts/testvendor/test.toml");
+    let toml = std::fs::read_to_string(&out).unwrap();
+    assert!(toml.contains("pos = [-2.0, 1.0]"));
+}
+
+#[test]
+fn new_dir_multi_symbol_without_lib_id_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_workspace(dir.path());
+
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    std::fs::write(&src.join("multi.kicad_sym"), multi_symbol_lib()).unwrap();
+
+    let output = copperleaf()
+        .current_dir(dir.path())
+        .arg("new")
+        .arg("--dir")
+        .arg(&src)
+        .arg("--crate")
+        .arg("testvendor")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI:MISSING_LIB_ID"));
+    assert!(stderr.contains("Multiple symbols found"));
 }

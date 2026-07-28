@@ -6,7 +6,9 @@ Provide CLI commands for creating and updating part TOML manifests from KiCad sy
 ## Requirements
 
 ### Requirement: CLI exposes new and update commands
-The `copperleaf-cli` binary SHALL provide two commands: `new` (create a part TOML from a source) and `update` (merge source data into an existing part TOML). Each command SHALL accept exactly one source selector: `--symbol <FILE> --lib-id <ID>`, `--footprint <FILE> --lib-id <ID>`, or `--datasheet <FILE>`. The binary SHALL use `clap` with `default-features = false`.
+The `copperleaf-cli` binary SHALL provide two commands: `new` (create a part TOML from a source) and `update` (merge source data into an existing part TOML). Each command SHALL accept exactly one source selector: `--symbol <FILE>`, `--footprint <FILE>`, `--dir <DIR>`, or `--datasheet <FILE>`. The binary SHALL use `clap` with `default-features = false`.
+
+`update` SHALL use `--crate <VENDOR>` and `--lib-id <ID>` to locate the part TOML at `parts/<vendor>/<toml_stem>.toml`, standardising with `new --crate`.
 
 #### Scenario: new --symbol creates a part from a KiCad symbol
 - **WHEN** `copperleaf new --symbol ic.kicad_sym --lib-id RP2354A --out rp2354a.toml` is run
@@ -16,6 +18,11 @@ The `copperleaf-cli` binary SHALL provide two commands: `new` (create a part TOM
 - **WHEN** `copperleaf new --footprint ic.kicad_mod --lib-id RP2354A --out rp2354a.toml` is run
 - **THEN** a TOML file is created at `rp2354a.toml` containing pad numbers, synthesised placeholder names, and physical fields extracted from the footprint
 
+#### Scenario: new --dir discovers symbol and footprint from a directory
+- **WHEN** `copperleaf new --dir ./part_files/ --lib-id RP2354A --crate raspberrypi` is run
+- **AND** `./part_files/` contains `rp2354a.kicad_sym` and `rp2354a.kicad_mod`
+- **THEN** a TOML file is created at `parts/raspberrypi/rp2354a.toml` containing both symbol-derived pin names/kinds and footprint-derived geometry
+
 #### Scenario: new --datasheet hard-fails
 - **WHEN** `copperleaf new --datasheet ic.pdf --out rp2354a.toml` is run
 - **THEN** the CLI prints a `CLI:DATASHEET_STUB` diagnostic with severity Error
@@ -23,17 +30,22 @@ The `copperleaf-cli` binary SHALL provide two commands: `new` (create a part TOM
 - **AND** no output file is written
 
 #### Scenario: update --symbol merges symbol data into existing TOML
-- **WHEN** `copperleaf update rp2354a.toml --symbol ic.kicad_sym --lib-id RP2354A` is run
-- **THEN** the TOML file is updated with names and kinds for pins missing them
+- **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --symbol ic.kicad_sym` is run
+- **THEN** the TOML at `parts/raspberrypi/rp2354a.toml` is updated with names and kinds for pins missing them
 - **AND** manually-authored voltages, bandwidths, `nc`, and notes are preserved
 
 #### Scenario: update --footprint merges physical data into existing TOML
-- **WHEN** `copperleaf update rp2354a.toml --footprint ic.kicad_mod --lib-id RP2354A` is run
-- **THEN** the TOML file is updated with `pos`, `rotation`, and `length` for pins matched by pad number
+- **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --footprint ic.kicad_mod` is run
+- **THEN** the TOML at `parts/raspberrypi/rp2354a.toml` is updated with `pos`, `rotation`, and `length` for pins matched by pad number
 - **AND** all logical fields (names, kinds, voltages, bandwidths, notes) are left untouched
 
+#### Scenario: update --dir discovers and merges both sources
+- **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --dir ./part_files/` is run
+- **AND** `./part_files/` contains a `.kicad_sym` and a `.kicad_mod` file
+- **THEN** both symbol and footprint data are merged into the existing TOML
+
 #### Scenario: update --datasheet hard-fails
-- **WHEN** `copperleaf update rp2354a.toml --datasheet ic.pdf` is run
+- **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --datasheet ic.pdf` is run
 - **THEN** the CLI prints a `CLI:DATASHEET_STUB` diagnostic with severity Error
 - **AND** exits with code 1
 
@@ -59,6 +71,28 @@ The `new --footprint` and `update --footprint` flows SHALL use `copperleaf_backe
 #### Scenario: Unmatched pad produces a warning
 - **WHEN** `update --footprint` encounters a pad number not present in the existing TOML
 - **THEN** a `CLI:UNMATCHED_PAD` warning is printed
+
+### Requirement: --dir discovers symbol and footprint files in a directory
+When `--dir <DIR>` is specified, the CLI SHALL scan the directory for `.kicad_sym` and `.kicad_mod` files (or a `.pretty` footprint library directory). If a symbol file is found it SHALL be processed first, seeding pin names and kinds. If a footprint file is found its pads SHALL be merged into the same manifest, providing geometry. If neither file type is found the CLI SHALL error with `CLI:NO_SOURCE`.
+
+#### Scenario: --dir with both files processes both
+- **WHEN** `new --dir ./src/ --lib-id TEST --crate myvendor` is run
+- **AND** `./src/` contains `test.kicad_sym` and `test.kicad_mod`
+- **THEN** the output TOML contains pin names/kinds from the symbol AND geometry from the footprint
+
+#### Scenario: --dir with only symbol processes symbol
+- **WHEN** `new --dir ./src/ --lib-id TEST --crate myvendor` is run
+- **AND** `./src/` contains only a `.kicad_sym` file
+- **THEN** the output TOML contains pin names and kinds from the symbol
+
+#### Scenario: --dir with only footprint processes footprint
+- **WHEN** `new --dir ./src/ --lib-id TEST --crate myvendor` is run
+- **AND** `./src/` contains only a `.kicad_mod` file
+- **THEN** the output TOML contains synthesised pin names and pad geometry
+
+#### Scenario: --dir with no KiCad files errors
+- **WHEN** `new --dir ./empty/` is run and `./empty/` contains no `.kicad_sym` or `.kicad_mod` files
+- **THEN** the CLI prints a `CLI:NO_SOURCE` diagnostic and exits with code 1
 
 ### Requirement: Kind-map maps KiCad pin types to Copperleaf kinds
 The CLI SHALL apply a built-in heuristic mapping from KiCad `pin_type` strings to Copperleaf `kind` values. Power pins (`power_in`, `power_out`) SHALL be mapped to `pwr` / `pwr_fixed` with `# TODO` placeholder comments for voltages. Unrecognised pin types SHALL fall back to `--default-kind` and emit a `CLI:UNKNOWN_PIN_TYPE` warning. A `--kind-map <FILE>` option SHALL load a TOML file with `[by_type]` and `[by_name]` tables that override the built-in map, with `[by_name]` taking precedence.
@@ -97,14 +131,24 @@ The `update` command SHALL merge source data into an existing TOML by matching o
 - **AND** a `CLI:NEW_PIN` warning is printed
 
 ### Requirement: Vendor crate scaffolding via --crate flag
-The `new` command SHALL accept a `--crate <VENDOR>` flag that creates a `parts/<vendor>/` directory with `Cargo.toml` (package `copperleaf-parts-<vendor>`, `[lib] path = "lib.rs"`, workspace deps) and `lib.rs` (module doc + `use copperleaf_part_macro::build_component;`), and appends `"parts/<vendor>"` to the root `Cargo.toml` `[workspace].members`.
+Both `new` and `update` SHALL accept a `--crate <VENDOR>` flag. For `new`, it controls output location: `parts/<vendor>/<toml_stem>.toml` and scaffolds a vendor parts crate. For `update`, `--crate` and `--lib-id` together locate the existing part TOML at `parts/<vendor>/<toml_stem>.toml`.
+
+The scaffolding SHALL create a `parts/<vendor>/` directory with `Cargo.toml` (package `copperleaf-parts-<vendor>`, `[lib] path = "lib.rs"`, workspace deps) and `lib.rs` (module doc + `use copperleaf_part_macro::build_component;`), and appends `"parts/<vendor>"` to the root `Cargo.toml` `[workspace].members`.
 
 #### Scenario: --crate creates vendor parts crate
-- **WHEN** `copperleaf new --symbol ic.kicad_sym --lib-id W5500 --crate wiznet --out w5500.toml` is run
+- **WHEN** `copperleaf new --symbol ic.kicad_sym --lib-id W5500 --crate wiznet` is run
 - **THEN** `parts/wiznet/Cargo.toml` exists with package name `copperleaf-parts-wiznet`
 - **AND** `parts/wiznet/lib.rs` exists with `build_component` import
 - **AND** the root `Cargo.toml` `[workspace].members` includes `"parts/wiznet"`
 - **AND** `w5500.toml` is written to `parts/wiznet/w5500.toml`
+
+#### Scenario: update --crate locates the part TOML
+- **WHEN** `copperleaf update --crate wiznet --lib-id W5500 --footprint w5500.kicad_mod` is run
+- **THEN** the TOML at `parts/wiznet/w5500.toml` is read and updated
+
+#### Scenario: update with non-existent part errors
+- **WHEN** `copperleaf update --crate wiznet --lib-id NOPART` is run and no TOML exists
+- **THEN** the CLI prints a `CLI:PART_NOT_FOUND` diagnostic and exits with code 1
 
 ### Requirement: CLI uses Diagnostic for output and conventional exit codes
 All user-facing output SHALL use `copperleaf::Diagnostic { code, severity, message, entities, hint }` with `Severity` variants and `NAMESPACE:RULE` codes. The CLI SHALL introduce the `CLI:` namespace. Exit code SHALL be 0 on success and 1 on any error. Warnings SHALL NOT cause non-zero exit unless a future `--strict` flag is added.

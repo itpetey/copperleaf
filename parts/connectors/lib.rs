@@ -1,5 +1,11 @@
 //! Connector vendor components
 
+pub mod test_pad;
+pub mod thru_hole;
+
+pub use test_pad::TestPad;
+pub use thru_hole::ThruHoleHeader;
+
 use copperleaf_part_macro::build_component;
 
 build_component!("arjm11d7_502_ab_ew2.toml");
@@ -12,3 +18,4 @@ build_component!("s2b_ph_sm4_tb_lf__sn_.toml");
 
 build_component!("con_sma_edge_s.toml");
 build_component!("bh123a.toml");
+build_component!("consma002_l.toml");

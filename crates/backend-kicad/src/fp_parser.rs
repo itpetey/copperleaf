@@ -232,11 +232,7 @@ fn parse_fab_line(node: &Sexpr) -> Option<((f64, f64), (f64, f64))> {
         }
     }
 
-    if is_fab {
-        Some((start?, end?))
-    } else {
-        None
-    }
+    if is_fab { Some((start?, end?)) } else { None }
 }
 
 fn extract_pads(sexpr: &Sexpr) -> Vec<PadDef> {

@@ -5,6 +5,7 @@ members = [
   "crates/cli",
   "crates/compile",
   "crates/core",
+  "crates/layout",
   "crates/part-codegen",
   "crates/part-macro",
   "parts/connectors",
@@ -31,6 +32,7 @@ copperleaf-backend-kicad = {
   default-features = false
 }
 copperleaf-compile = { path = "crates/compile", default-features = false }
+copperleaf-layout = { path = "crates/layout", default-features = false }
 copperleaf-part-codegen = {
   path = "crates/part-codegen",
   default-features = false
@@ -39,6 +41,7 @@ copperleaf-part-macro = { path = "crates/part-macro", default-features = false }
 mustache2 = { version = "1.0", default-features = false }
 pdf-extract = { version = "0.12", default-features = false }
 proc-macro2 = { version = "1.0", default-features = false }
+regex = { version = "1.13", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false }
 syn = { version = "3.0", default-features = false }
