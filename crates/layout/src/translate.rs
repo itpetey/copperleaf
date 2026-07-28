@@ -1,8 +1,8 @@
 //! Translate [`CompiledBoard`] + layout constraints into the adapter input
-//! model.  All types here are copperleaf types — no Topola dependency.
-//!
-//! The fields on the adapter types are consumed by [`super::topola_adapter`];
-//! dead-code warnings are suppressed at the module level.
+//! model.
+
+// Note: The unused code here will be required when we implement routing
+#![allow(dead_code)]
 
 use copperleaf::{
     CompiledBoard, LayoutConstraint, Net, NetClass, NetIdx,
