@@ -839,11 +839,15 @@ fn module_name(path: &Path) -> Result<String, CodegenError> {
         .file_stem()
         .and_then(|s| s.to_str())
         .ok_or_else(|| CodegenError::InvalidFileName(path.display().to_string()))?;
-    if stem.is_empty() || !stem.chars().next().unwrap().is_ascii_alphabetic() {
+    if stem.is_empty() {
         return Err(CodegenError::InvalidFileName(stem.to_string()));
     }
     if !stem.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(CodegenError::InvalidFileName(stem.to_string()));
+    }
+    // Stems starting with a digit need a prefix to be valid Rust identifiers.
+    if !stem.chars().next().unwrap().is_ascii_alphabetic() {
+        return Ok(format!("comp_{}", stem));
     }
     Ok(stem.to_string())
 }
@@ -911,7 +915,12 @@ fn render_component(
     manifest: &Manifest,
     renderer: &mut MustacheRenderer,
 ) -> Result<String, CodegenError> {
-    let struct_name = &manifest.component.name;
+    let raw_name = &manifest.component.name;
+    let struct_name = if raw_name.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("Comp{}", raw_name)
+    } else {
+        raw_name.clone()
+    };
     let title = &manifest.component.title;
 
     let mut seen_names: HashSet<&str> = HashSet::new();
