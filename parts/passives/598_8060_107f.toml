@@ -7,7 +7,7 @@ model_3d_data = "SVNPLTEwMzAzLTIxOw0KSEVBREVSOw0KRklMRV9ERVNDUklQVElPTiAoKCAnU1R
 [[pin]]
 num = 1
 number = "C"
-name = "~"
+name = "C"
 purpose = "I/O"
 notes = ""
 kind = "dio"
@@ -25,7 +25,7 @@ layers = "F.Cu F.Mask F.Paste"
 [[pin]]
 num = 2
 number = "A"
-name = "~"
+name = "A"
 purpose = "I/O"
 notes = ""
 kind = "dio"
