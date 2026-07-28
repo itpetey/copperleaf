@@ -117,7 +117,7 @@
     (end -1.9 -3.7)
     (layer F.SilkS)
     (width 0.12))
-  (model "CON-SMA-EDGE-S.step"
+  (model "models/CON-SMA-EDGE-S.step"
     (offset
       (xyz 0 0 0))
     (scale

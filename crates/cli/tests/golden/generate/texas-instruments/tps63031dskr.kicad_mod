@@ -177,7 +177,7 @@
     (end -1.77 -1.39)
     (layer F.SilkS)
     (width 0.12))
-  (model "TPS63031DSKR.step"
+  (model "models/TPS63031DSKR.step"
     (offset
       (xyz 0 0 0))
     (scale

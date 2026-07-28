@@ -282,7 +282,7 @@
     (end -5.45 -5.05)
     (layer F.SilkS)
     (width 0.12))
-  (model "MM8108-MF15457.step"
+  (model "models/MM8108-MF15457.step"
     (offset
       (xyz -5 4.5 0))
     (scale

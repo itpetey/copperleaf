@@ -102,7 +102,7 @@
     (end -3.55 -3.65)
     (layer F.SilkS)
     (width 0.12))
-  (model "B82472P6152M000.step"
+  (model "models/B82472P6152M000.step"
     (offset
       (xyz 0 0 0))
     (scale

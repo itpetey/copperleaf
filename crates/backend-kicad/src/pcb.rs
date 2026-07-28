@@ -231,18 +231,6 @@ fn board_outline(width: f64, height: f64) -> Vec<Sexpr> {
         .collect()
 }
 
-/// Return the KiCad layer name for the n-th copper layer from top.
-/// 0 → "F.Cu", last → "B.Cu", inner → "In{idx}.Cu".
-fn copper_layer_name(idx: usize, total: usize) -> String {
-    if idx == 0 {
-        "F.Cu".to_owned()
-    } else if idx + 1 == total {
-        "B.Cu".to_owned()
-    } else {
-        format!("In{}.Cu", idx)
-    }
-}
-
 fn emit_tracks(
     layout: &Layout,
     net_to_code: &HashMap<usize, usize>,
@@ -253,7 +241,7 @@ fn emit_tracks(
         let Some(&net_code) = net_to_code.get(&track.net.0) else {
             continue;
         };
-        let layer = copper_layer_name(track.layer, board.stackup.copper_layer_count());
+        let layer = board.stackup.nth_copper(track.layer).name();
         let width = track.width.as_base() * 1000.0; // m → mm
         let path: Vec<(f64, f64)> = track.path.clone();
 
@@ -294,7 +282,6 @@ fn emit_vias(
     board: &CompiledBoard,
 ) -> Vec<Sexpr> {
     let mut nodes = Vec::new();
-    let num_copper = board.stackup.copper_layer_count();
     for via in &layout.vias {
         let Some(&net_code) = net_to_code.get(&via.net.0) else {
             continue;
@@ -305,8 +292,8 @@ fn emit_vias(
         ));
         let diam = via.diameter.as_base() * 1000.0;
         let drill = via.drill.as_base() * 1000.0;
-        let layer_start = copper_layer_name(via.layers.0, num_copper);
-        let layer_end = copper_layer_name(via.layers.1, num_copper);
+        let layer_start = board.stackup.nth_copper(via.layers.0).name();
+        let layer_end = board.stackup.nth_copper(via.layers.1).name();
 
         nodes.push(Sexpr::list([
             Sexpr::atom("via"),
@@ -340,7 +327,7 @@ fn emit_zones(
             continue;
         };
         let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
-        let layer = copper_layer_name(zone.layer, board.stackup.copper_layer_count());
+        let layer = board.stackup.nth_copper(zone.layer).name();
         let net_name = &board.nets[zone.net.0].name;
 
         let mut poly_pts: Vec<Sexpr> = zone
@@ -822,13 +809,13 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
 
     let mut dielectric_counter = 1u32;
 
-    for (i, layer) in stackup.layers.iter().enumerate() {
+    for layer in &stackup.layers {
         match layer {
             StackupLayer::Copper {
+                name,
                 thickness_mm,
                 role: _,
             } => {
-                let name = copper_layer_name(i / 2, stackup.copper_layer_count());
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
                     &name,

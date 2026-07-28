@@ -176,7 +176,7 @@
     (end -6.3 -3.74)
     (layer F.SilkS)
     (width 0.12))
-  (model "2340901-1.step"
+  (model "models/2340901-1.step"
     (offset
       (xyz 0 -4.5 0))
     (scale

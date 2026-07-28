@@ -109,7 +109,7 @@
     (end -21.4 -8.89)
     (layer F.SilkS)
     (width 0.12))
-  (model "BH123A.step"
+  (model "models/BH123A.step"
     (offset
       (xyz 0 0 0))
     (scale

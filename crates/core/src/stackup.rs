@@ -32,6 +32,8 @@ pub struct Dielectric {
 pub enum StackupLayer {
     /// A copper layer (signal, power plane, or mixed).
     Copper {
+        /// Display name.
+        name: String,
         /// Copper thickness in millimetres (e.g. `0.035` for 1 oz/ft²).
         thickness_mm: f64,
         /// Role of this layer.
@@ -80,8 +82,12 @@ impl Dielectric {
 
 impl StackupLayer {
     /// Convenience constructor for a copper layer.
-    pub fn copper(thickness_mm: f64, role: LayerRole) -> Self {
-        Self::Copper { thickness_mm, role }
+    pub fn copper(name: &str, thickness_mm: f64, role: LayerRole) -> Self {
+        Self::Copper {
+            name: format!("{name}.Cu"),
+            thickness_mm,
+            role,
+        }
     }
 
     /// Convenience constructor for a dielectric layer.
@@ -90,6 +96,13 @@ impl StackupLayer {
             kind: kind.to_owned(),
             thickness_mm,
             dielectric: material,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Copper { name, .. } => name,
+            Self::Dielectric { kind, .. } => kind,
         }
     }
 }
@@ -101,9 +114,9 @@ impl Stackup {
     pub fn two_layer() -> Self {
         Self {
             layers: vec![
-                StackupLayer::copper(0.035, LayerRole::Signal),
+                StackupLayer::copper("F", 0.035, LayerRole::Signal),
                 StackupLayer::dielectric("core", 1.53, Dielectric::fr4()),
-                StackupLayer::copper(0.035, LayerRole::Signal),
+                StackupLayer::copper("B", 0.035, LayerRole::Signal),
             ],
         }
     }
@@ -115,13 +128,13 @@ impl Stackup {
     pub fn four_layer() -> Self {
         Self {
             layers: vec![
-                StackupLayer::copper(0.035, LayerRole::Signal),
+                StackupLayer::copper("F", 0.035, LayerRole::Signal),
                 StackupLayer::dielectric("prepreg", 0.2, Dielectric::fr4()),
-                StackupLayer::copper(0.035, LayerRole::Plane),
+                StackupLayer::copper("Gnd", 0.035, LayerRole::Plane),
                 StackupLayer::dielectric("core", 1.13, Dielectric::fr4()),
-                StackupLayer::copper(0.035, LayerRole::Plane),
+                StackupLayer::copper("Pwr", 0.035, LayerRole::Plane),
                 StackupLayer::dielectric("prepreg", 0.2, Dielectric::fr4()),
-                StackupLayer::copper(0.035, LayerRole::Signal),
+                StackupLayer::copper("B", 0.035, LayerRole::Signal),
             ],
         }
     }
@@ -143,6 +156,16 @@ impl Stackup {
             .iter()
             .filter(|l| matches!(l, StackupLayer::Copper { .. }))
             .count()
+    }
+
+    /// Returns the nth copper layer, where i=1 is the *second* copper layer.
+    ///
+    /// # Panics
+    ///
+    /// This method panics when `i` is out of bounds.
+    pub fn nth_copper(&self, i: usize) -> &StackupLayer {
+        let i = i * 2;
+        &self.layers[i]
     }
 }
 

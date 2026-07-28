@@ -366,8 +366,8 @@ pub(crate) fn check_extension(
 /// (including newlines) into single spaces so that multi-line KiCad
 /// descriptions become a clean one-liner suitable for embedding in a title.
 pub(crate) fn clean_description(raw: &str) -> Option<String> {
-    let re = Regex::new(r"(\\n|\s){2,}").expect("init regex");
-    let cleaned = re.replace_all(raw, "").to_string();
+    let re = Regex::new(r"(\\n|\s)+").expect("init regex");
+    let cleaned = re.replace_all(raw, " ").trim().to_string();
     if cleaned.is_empty() {
         None
     } else {
@@ -735,7 +735,7 @@ mod tests {
             Some("SMA Connector, Right-Angle, PCB Mount".into())
         );
         assert_eq!(
-            super::clean_description("  SMA Connector,\n   Right-Angle,\n  PCB Mount  "),
+            super::clean_description("\\n  SMA Connector,\n   Right-Angle,\n  PCB Mount  "),
             Some("SMA Connector, Right-Angle, PCB Mount".into())
         );
         // \r\n and tabs

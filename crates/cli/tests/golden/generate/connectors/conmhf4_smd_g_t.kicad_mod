@@ -112,7 +112,7 @@
     (end -1.4 -1.5)
     (layer F.SilkS)
     (width 0.12))
-  (model "CONMHF4-SMD-G-T.step"
+  (model "models/CONMHF4-SMD-G-T.step"
     (offset
       (xyz 0 0 0))
     (scale

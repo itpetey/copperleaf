@@ -198,7 +198,7 @@
     (end -12.31 -3.52)
     (layer F.SilkS)
     (width 0.12))
-  (model "ARJM11D7-502-AB-EW2.step"
+  (model "models/ARJM11D7-502-AB-EW2.step"
     (offset
       (xyz 0 0 0))
     (scale
