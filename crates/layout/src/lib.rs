@@ -9,15 +9,18 @@
 //!
 //! # Quick start
 //!
-//! ```ignore
+//! ```no_run
 //! use copperleaf_layout::{solve, SolveOptions, Effort};
 //!
-//! let board = /* compile a Board */;
+//! # fn example() -> Result<(), copperleaf_layout::LayoutError> {
+//! # let board = unimplemented!();
 //! let options = SolveOptions { seed: 42, effort: Effort::Medium };
 //! let report = solve(&board, &options)?;
 //!
 //! // Pass the layout to a backend for emission:
-//! backend.emit_with_layout("output/", &board, &report.layout)?;
+//! # Ok(())
+//! # }
+//! # fn main() { example().unwrap(); }
 //! ```
 //!
 //! After emission, open the `.kicad_pcb` in KiCad and refill zones
