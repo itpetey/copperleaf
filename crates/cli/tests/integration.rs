@@ -271,7 +271,7 @@ fn new_dir_auto_detects_lib_id_from_footprint_name() {
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
     // The footprint name inside the file is "TEST".
-    std::fs::write(&src.join("whatever.kicad_mod"), sample_footprint()).unwrap();
+    std::fs::write(src.join("whatever.kicad_mod"), sample_footprint()).unwrap();
 
     // No --lib-id — auto-detect "TEST" from the footprint S-expression.
     let status = copperleaf()
@@ -297,7 +297,7 @@ fn new_dir_auto_detects_lib_id_from_single_symbol() {
 
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+    std::fs::write(src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
 
     // No --lib-id — auto-detect "TEST" from the single-symbol file.
     let status = copperleaf()
@@ -323,8 +323,8 @@ fn new_dir_discovers_symbol_and_footprint() {
 
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
-    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+    std::fs::write(src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+    std::fs::write(src.join("test.kicad_mod"), sample_footprint()).unwrap();
 
     let status = copperleaf()
         .current_dir(dir.path())
@@ -377,7 +377,7 @@ fn new_dir_footprint_only_works() {
 
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_mod"), sample_footprint()).unwrap();
+    std::fs::write(src.join("test.kicad_mod"), sample_footprint()).unwrap();
 
     let status = copperleaf()
         .current_dir(dir.path())
@@ -404,7 +404,7 @@ fn new_dir_multi_symbol_without_lib_id_fails() {
 
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("multi.kicad_sym"), multi_symbol_lib()).unwrap();
+    std::fs::write(src.join("multi.kicad_sym"), multi_symbol_lib()).unwrap();
 
     let output = copperleaf()
         .current_dir(dir.path())
@@ -429,7 +429,7 @@ fn new_dir_symbol_only_works() {
 
     let src = dir.path().join("src");
     std::fs::create_dir(&src).unwrap();
-    std::fs::write(&src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
+    std::fs::write(src.join("test.kicad_sym"), sample_symbol_lib()).unwrap();
 
     let status = copperleaf()
         .current_dir(dir.path())
@@ -769,7 +769,7 @@ fn update_dir_auto_detects_lib_id() {
     let update_dir = dir.path().join("update_src");
     std::fs::create_dir(&update_dir).unwrap();
     // Only need a footprint — the symbol auto-detects "TEST".
-    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+    std::fs::write(update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
 
     let status = copperleaf()
         .current_dir(dir.path())
@@ -811,7 +811,7 @@ fn update_dir_discovers_and_merges() {
     // Now put footprint in a directory and update via --dir.
     let update_dir = dir.path().join("update_src");
     std::fs::create_dir(&update_dir).unwrap();
-    std::fs::write(&update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
+    std::fs::write(update_dir.join("test.kicad_mod"), sample_footprint()).unwrap();
 
     let status = copperleaf()
         .current_dir(dir.path())
