@@ -163,33 +163,34 @@ pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
     // Without this, tools like Quilter see min_clearance=0 and reject the board.
     if let Some(r) = rules
         && let Some(board) = root.get_mut("board")
-            && let Some(design) = board.get_mut("design_settings")
-                && let Some(obj) = design.as_object_mut() {
-                    obj.insert(
-                        "rules".to_string(),
-                        json!({
-                            "max_error": 0.005,
-                            "min_clearance": r.min_clearance,
-                            "min_connection": r.min_connection,
-                            "min_copper_edge_clearance": r.min_copper_edge_clearance,
-                            "min_groove_width": 0.0,
-                            "min_hole_clearance": r.min_hole_clearance,
-                            "min_hole_to_hole": r.min_hole_to_hole,
-                            "min_microvia_diameter": r.min_microvia_diameter,
-                            "min_microvia_drill": r.min_microvia_drill,
-                            "min_resolved_spokes": 2,
-                            "min_silk_clearance": r.min_silk_clearance,
-                            "min_text_height": r.min_text_height,
-                            "min_text_thickness": r.min_text_thickness,
-                            "min_through_hole_diameter": r.min_through_hole_diameter,
-                            "min_track_width": r.min_track_width,
-                            "min_via_annular_width": r.min_via_annular_width,
-                            "min_via_diameter": r.min_via_diameter,
-                            "solder_mask_to_copper_clearance": r.solder_mask_to_copper_clearance,
-                            "use_height_for_length_calcs": true
-                        }),
-                    );
-                }
+        && let Some(design) = board.get_mut("design_settings")
+        && let Some(obj) = design.as_object_mut()
+    {
+        obj.insert(
+            "rules".to_string(),
+            json!({
+                "max_error": 0.005,
+                "min_clearance": r.min_clearance,
+                "min_connection": r.min_connection,
+                "min_copper_edge_clearance": r.min_copper_edge_clearance,
+                "min_groove_width": 0.0,
+                "min_hole_clearance": r.min_hole_clearance,
+                "min_hole_to_hole": r.min_hole_to_hole,
+                "min_microvia_diameter": r.min_microvia_diameter,
+                "min_microvia_drill": r.min_microvia_drill,
+                "min_resolved_spokes": 2,
+                "min_silk_clearance": r.min_silk_clearance,
+                "min_text_height": r.min_text_height,
+                "min_text_thickness": r.min_text_thickness,
+                "min_through_hole_diameter": r.min_through_hole_diameter,
+                "min_track_width": r.min_track_width,
+                "min_via_annular_width": r.min_via_annular_width,
+                "min_via_diameter": r.min_via_diameter,
+                "solder_mask_to_copper_clearance": r.solder_mask_to_copper_clearance,
+                "use_height_for_length_calcs": true
+            }),
+        );
+    }
 
     serde_json::to_string_pretty(&root).unwrap_or_else(|_| "{}".into()) + "\n"
 }

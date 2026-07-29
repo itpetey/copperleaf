@@ -825,13 +825,14 @@ pub fn normalise_anchor(pads: &mut [Pad], fab_extent: Option<(f64, f64, f64, f64
             }
         }
     } else if fab_extent.is_none()
-        && let Some(anchor) = pads.first().map(|p| p.pos) {
-            // Through-hole: first pad (the first electrical pin) at the origin.
-            for p in pads.iter_mut() {
-                p.pos.0 -= anchor.0;
-                p.pos.1 -= anchor.1;
-            }
+        && let Some(anchor) = pads.first().map(|p| p.pos)
+    {
+        // Through-hole: first pad (the first electrical pin) at the origin.
+        for p in pads.iter_mut() {
+            p.pos.0 -= anchor.0;
+            p.pos.1 -= anchor.1;
         }
+    }
     // When fab_extent is Some, pad positions are already defined relative to
     // an explicit body outline; no anchor translation is needed.
 }

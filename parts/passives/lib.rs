@@ -293,6 +293,10 @@ build_component!("b82472p6152m000.toml");
 
 build_component!("b82472p6222m000.toml");
 
+build_component!("598_8010_107f.toml");
+
+build_component!("598_8060_107f.toml");
+
 /// Add a pull-down resistor from `pin` to the given ground pin.
 pub fn pulldown(
     board: &mut Board,
@@ -489,5 +493,3 @@ mod tests {
         assert!(matches!(c.pins()[1].role(), Role::DigitalIO));
     }
 }
-build_component!("598_8010_107f.toml");
-build_component!("598_8060_107f.toml");

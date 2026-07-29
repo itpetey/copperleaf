@@ -405,10 +405,9 @@ fn parse_segment(parts: &[Sexpr]) -> Option<RawSegment> {
                     layer = Some(props[1].as_string());
                 }
             }
-            "net"
-                if props.len() >= 2 => {
-                    net_code = props[1].as_string().parse().ok();
-                }
+            "net" if props.len() >= 2 => {
+                net_code = props[1].as_string().parse().ok();
+            }
             _ => {}
         }
     }
@@ -466,10 +465,9 @@ fn parse_via_node(parts: &[Sexpr]) -> Option<RawVia> {
                     layer_end = Some(props[2].as_string());
                 }
             }
-            "net"
-                if props.len() >= 2 => {
-                    net_code = props[1].as_string().parse().ok();
-                }
+            "net" if props.len() >= 2 => {
+                net_code = props[1].as_string().parse().ok();
+            }
             _ => {}
         }
     }
@@ -776,18 +774,13 @@ mod tests {
         }
 
         // Re-emit with the preserved graphics and verify they appear.
-        let out = crate::pcb::emit_pcb_with_layout(
-            &board,
-            "test",
-            Some(&layout),
-            Some(&parsed.graphics),
-        );
+        let out =
+            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&parsed.graphics));
         let re_parsed = parse_pcb(&out).unwrap();
         assert_eq!(re_parsed.graphics.len(), 4);
 
         // When preserved_graphics is None, we should still get the default outline.
-        let out_no_preserve =
-            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out_no_preserve = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
         let re_parsed_no = parse_pcb(&out_no_preserve).unwrap();
         assert_eq!(re_parsed_no.graphics.len(), 4);
     }
@@ -804,31 +797,21 @@ mod tests {
 
         // Manually craft a board outline at a non-origin position (simulating
         // a user having moved the outline in KiCad).
-        let custom_outline: Vec<Sexpr> = vec![
+        let custom_outline: Vec<Sexpr> = vec![Sexpr::list([
+            Sexpr::atom("gr_line"),
+            Sexpr::list([Sexpr::atom("start"), Sexpr::atom("100"), Sexpr::atom("50")]),
+            Sexpr::list([Sexpr::atom("end"), Sexpr::atom("150"), Sexpr::atom("50")]),
             Sexpr::list([
-                Sexpr::atom("gr_line"),
-                Sexpr::list([
-                    Sexpr::atom("start"),
-                    Sexpr::atom("100"),
-                    Sexpr::atom("50"),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("end"),
-                    Sexpr::atom("150"),
-                    Sexpr::atom("50"),
-                ]),
-                Sexpr::list([
-                    Sexpr::atom("stroke"),
-                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.05")]),
-                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
-                ]),
-                Sexpr::list([Sexpr::atom("layer"), Sexpr::str("Edge.Cuts")]),
-                Sexpr::list([
-                    Sexpr::atom("uuid"),
-                    Sexpr::str("00000000-0000-0000-0000-000000000001"),
-                ]),
+                Sexpr::atom("stroke"),
+                Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.05")]),
+                Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
             ]),
-        ];
+            Sexpr::list([Sexpr::atom("layer"), Sexpr::str("Edge.Cuts")]),
+            Sexpr::list([
+                Sexpr::atom("uuid"),
+                Sexpr::str("00000000-0000-0000-0000-000000000001"),
+            ]),
+        ])];
 
         let out =
             crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&custom_outline));

@@ -233,9 +233,10 @@ fn parse_fab_line(node: &Sexpr) -> Option<FabSegment> {
             }
             "layer" => {
                 if let Some(layer) = parts.get(1)
-                    && layer.as_string() == "F.Fab" {
-                        is_fab = true;
-                    }
+                    && layer.as_string() == "F.Fab"
+                {
+                    is_fab = true;
+                }
             }
             _ => {}
         }

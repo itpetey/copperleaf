@@ -333,17 +333,19 @@ fn build_nets_and_connections(
             if let Some(edge_ids) = pin_to_edge.get(&key) {
                 for &edge_id in edge_ids {
                     if seen_edge_ids.insert(edge_id)
-                        && let Some(dirs) = net_layouts.get(&edge_id) {
-                            net_layout.extend(dirs.iter().cloned());
-                        }
+                        && let Some(dirs) = net_layouts.get(&edge_id)
+                    {
+                        net_layout.extend(dirs.iter().cloned());
+                    }
                 }
             }
             // Single-pin net edges.
             if let Some(&edge_id) = single_pin_net_edges.get(&key)
                 && seen_edge_ids.insert(edge_id)
-                    && let Some(dirs) = net_layouts.get(&edge_id) {
-                        net_layout.extend(dirs.iter().cloned());
-                    }
+                && let Some(dirs) = net_layouts.get(&edge_id)
+            {
+                net_layout.extend(dirs.iter().cloned());
+            }
         }
 
         // Resolve LayoutConstraint::NetClass directives into the net's class.
