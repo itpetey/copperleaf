@@ -828,7 +828,6 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
         match layer {
             StackupLayer::Copper {
                 thickness_mm,
-                role: _,
                 ..
             } => {
                 let name = normalised_layer_name(idx, layer_t);
