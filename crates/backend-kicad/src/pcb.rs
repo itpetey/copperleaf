@@ -826,10 +826,7 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     let layer_t = stackup.layers.len();
     for (idx, layer) in stackup.layers.iter().enumerate() {
         match layer {
-            StackupLayer::Copper {
-                thickness_mm,
-                ..
-            } => {
+            StackupLayer::Copper { thickness_mm, .. } => {
                 let name = normalised_layer_name(idx, layer_t);
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
