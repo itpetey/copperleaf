@@ -63,6 +63,11 @@ pub struct ParsedPcb {
     pub vias: Vec<RawVia>,
     /// Copper zones / pours.
     pub zones: Vec<RawZone>,
+    /// Top-level graphic elements (`gr_line`, `gr_arc`, `gr_circle`,
+    /// `gr_rect`) preserved as raw S-expressions.  These are re-emitted
+    /// verbatim during an update so that manual board-outline adjustments
+    /// and other board-level graphics survive schema changes.
+    pub graphics: Vec<crate::sexpr::Sexpr>,
 }
 
 impl ParsedPcb {
@@ -226,6 +231,11 @@ pub fn parse_pcb(input: &str) -> Result<ParsedPcb, ParseError> {
                 if let Some(zone) = parse_zone_node(parts) {
                     parsed.zones.push(zone);
                 }
+            }
+            tag @ ("gr_line" | "gr_arc" | "gr_circle" | "gr_rect") => {
+                // Preserve the raw s-expr so it can be re-emitted verbatim.
+                parsed.graphics.push(Sexpr::List(parts.to_vec()));
+                let _ = tag;
             }
             _ => {}
         }
@@ -627,7 +637,7 @@ mod tests {
             }],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout));
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
 
         let parsed = parse_pcb(&pcb_str).expect("parse emitted PCB with layout");
 
@@ -682,7 +692,7 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout));
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a modified board with no nets (simulating net deletion).
@@ -711,7 +721,7 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout));
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a board where the net is renamed but the name matches.
@@ -733,6 +743,105 @@ mod tests {
         // Net should still be found by name → tracks preserved.
         assert_eq!(layout2.tracks.len(), 1);
         assert_eq!(layout2.tracks[0].net, NetIdx(0));
+    }
+
+    #[test]
+    fn parse_preserves_board_outline_graphics() {
+        let board = two_layer_board();
+        let layout = Layout {
+            placements: vec![],
+            tracks: vec![],
+            vias: vec![],
+            zones: vec![],
+        };
+
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+
+        // First, verify the default emit produces 4 gr_line elements (board outline).
+        let parsed = parse_pcb(&pcb_str).unwrap();
+        assert_eq!(
+            parsed.graphics.len(),
+            4,
+            "default emit should produce 4 gr_line board-outline elements"
+        );
+
+        // All graphic elements should be gr_line nodes.
+        for g in &parsed.graphics {
+            match g {
+                Sexpr::List(parts) => {
+                    assert_eq!(parts[0].as_string(), "gr_line");
+                }
+                _ => panic!("expected List"),
+            }
+        }
+
+        // Re-emit with the preserved graphics and verify they appear.
+        let out = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            Some(&parsed.graphics),
+        );
+        let re_parsed = parse_pcb(&out).unwrap();
+        assert_eq!(re_parsed.graphics.len(), 4);
+
+        // When preserved_graphics is None, we should still get the default outline.
+        let out_no_preserve =
+            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let re_parsed_no = parse_pcb(&out_no_preserve).unwrap();
+        assert_eq!(re_parsed_no.graphics.len(), 4);
+    }
+
+    #[test]
+    fn custom_board_outline_survives_round_trip() {
+        let board = two_layer_board();
+        let layout = Layout {
+            placements: vec![],
+            tracks: vec![],
+            vias: vec![],
+            zones: vec![],
+        };
+
+        // Manually craft a board outline at a non-origin position (simulating
+        // a user having moved the outline in KiCad).
+        let custom_outline: Vec<Sexpr> = vec![
+            Sexpr::list([
+                Sexpr::atom("gr_line"),
+                Sexpr::list([
+                    Sexpr::atom("start"),
+                    Sexpr::atom("100"),
+                    Sexpr::atom("50"),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("end"),
+                    Sexpr::atom("150"),
+                    Sexpr::atom("50"),
+                ]),
+                Sexpr::list([
+                    Sexpr::atom("stroke"),
+                    Sexpr::list([Sexpr::atom("width"), Sexpr::atom("0.05")]),
+                    Sexpr::list([Sexpr::atom("type"), Sexpr::atom("solid")]),
+                ]),
+                Sexpr::list([Sexpr::atom("layer"), Sexpr::str("Edge.Cuts")]),
+                Sexpr::list([
+                    Sexpr::atom("uuid"),
+                    Sexpr::str("00000000-0000-0000-0000-000000000001"),
+                ]),
+            ]),
+        ];
+
+        let out =
+            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&custom_outline));
+        let parsed = parse_pcb(&out).unwrap();
+
+        // Should have exactly the 1 custom gr_line, not the default 4.
+        assert_eq!(parsed.graphics.len(), 1);
+        match &parsed.graphics[0] {
+            Sexpr::List(parts) => {
+                assert_eq!(parts[0].as_string(), "gr_line");
+            }
+            _ => panic!("expected List"),
+        }
     }
 
     #[test]

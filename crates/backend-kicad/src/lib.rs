@@ -62,7 +62,9 @@ impl KiCad {
 
 impl KiCad {
     /// Update an existing PCB file with a new [`CompiledBoard`], preserving
-    /// all physical layout (placements, tracks, vias, zones).
+    /// all physical layout (placements, tracks, vias, zones) **and** all
+    /// top-level graphic elements (`gr_line`, `gr_arc`, `gr_circle`,
+    /// `gr_rect`).
     ///
     /// Reads the existing `.kicad_pcb` from `output_dir` (derived from the
     /// configured project name), parses layout data, remaps nets by name to
@@ -82,7 +84,62 @@ impl KiCad {
         let parsed = pcb_parser::parse_pcb(&pcb_source)
             .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
         let layout = parsed.to_layout(board);
-        self.emit_with_layout(output_dir, board, &layout)
+        self.emit_with_graphics(output_dir, board, &layout, &parsed.graphics)
+    }
+
+    /// Emit board files with a layout **and** preserved board-level graphics.
+    ///
+    /// When `graphics` is non-empty those S-expression nodes replace the
+    /// generated board outline so that manual edits to the board shape
+    /// survive a schema update.
+    fn emit_with_graphics(
+        &self,
+        output_dir: impl AsRef<Path>,
+        board: &CompiledBoard,
+        layout: &Layout,
+        graphics: &[crate::sexpr::Sexpr],
+    ) -> Result<(), BackendError> {
+        let out = output_dir.as_ref().to_owned();
+        fs::create_dir_all(&out)?;
+
+        let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
+        fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
+
+        let sch = schematic::emit_schematic(board);
+        fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
+
+        let preserved = if graphics.is_empty() {
+            None
+        } else {
+            Some(graphics)
+        };
+        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout), preserved);
+        fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
+
+        let net = netlist::emit_netlist(board);
+        fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+
+        // Write 3D model files into models/ subdir.
+        let models_dir = out.join("models");
+        for comp in &board.components {
+            if let Some(ref data) = comp.meta.model_3d_data {
+                fs::create_dir_all(&models_dir)?;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(data)
+                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
+                let fallback = format!("{}.step", comp.refdes);
+                let filename = comp
+                    .meta
+                    .model_3d
+                    .as_deref()
+                    .and_then(|p| Path::new(p).file_name())
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&fallback);
+                fs::write(models_dir.join(filename), &bytes)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -143,7 +200,7 @@ impl Backend for KiCad {
         let sch = schematic::emit_schematic(board);
         fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
 
-        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout));
+        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout), None);
         fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
 
         let net = netlist::emit_netlist(board);

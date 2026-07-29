@@ -72,10 +72,15 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
 /// the layout instead of auto-placement, and tracks, vias, and zones are
 /// emitted as copper elements.  When `None`, behaviour is identical to
 /// [`emit_pcb`].
+///
+/// If `preserved_graphics` is provided, those raw S-expression nodes replace
+/// the generated board outline — used by [`crate::KiCad::emit_update`] so that
+/// manual board-outline adjustments survive schema changes.
 pub fn emit_pcb_with_layout(
     board: &CompiledBoard,
     project_name: &str,
     layout: Option<&Layout>,
+    preserved_graphics: Option<&[Sexpr]>,
 ) -> String {
     let net_codes = build_net_codes(board);
     let net_to_code: HashMap<usize, usize> = net_codes
@@ -109,7 +114,12 @@ pub fn emit_pcb_with_layout(
     }
 
     children.extend(net_class_nodes(board, &net_codes));
-    children.extend(board_outline(board.width, board.height));
+
+    if let Some(graphics) = preserved_graphics {
+        children.extend(graphics.iter().cloned());
+    } else {
+        children.extend(board_outline(board.width, board.height));
+    }
 
     // Placements: from layout if available, otherwise auto-place.
     if let Some(layout) = layout {
@@ -1005,7 +1015,7 @@ mod tests {
     fn emit_with_layout_includes_placement_rotation() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
         // Placement at (10, 40) with rotation 90°.
         assert!(
             out.contains("(at 10 40 90)"),
@@ -1020,7 +1030,7 @@ mod tests {
     fn emit_with_layout_includes_segments() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
         assert!(out.contains("(segment"), "missing segment: {}", out);
         assert!(out.contains("(start 5 5)"), "{}", out);
         assert!(out.contains("(end 15 5)"), "{}", out);
@@ -1031,7 +1041,7 @@ mod tests {
     fn emit_with_layout_includes_vias() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
         assert!(out.contains("(via"), "missing via: {}", out);
         assert!(out.contains("(at 15 5)"), "{}", out);
         assert!(out.contains("(size 0.8)"), "{}", out);
@@ -1042,7 +1052,7 @@ mod tests {
     fn emit_with_layout_includes_zones() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout));
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
         assert!(out.contains("(zone"), "missing zone: {}", out);
         assert!(out.contains("(layer \"B.Cu\")"), "{}", out);
         assert!(out.contains("(polygon"), "{}", out);
@@ -1052,7 +1062,7 @@ mod tests {
     fn emit_without_layout_is_byte_identical_to_emit_pcb() {
         let board = test_board();
         let out1 = emit_pcb(&board, "test");
-        let out2 = emit_pcb_with_layout(&board, "test", None);
+        let out2 = emit_pcb_with_layout(&board, "test", None, None);
         assert_eq!(
             out1, out2,
             "no-layout emit_with_layout must match emit_pcb byte-for-byte"
@@ -1068,7 +1078,7 @@ mod tests {
             vias: vec![],
             zones: vec![],
         };
-        let out = emit_pcb_with_layout(&board, "test", Some(&empty));
+        let out = emit_pcb_with_layout(&board, "test", Some(&empty), None);
         // No copper elements emitted (no segments, vias, or zones).
         assert!(!out.contains("(segment"));
         assert!(!out.contains("(zone"));
