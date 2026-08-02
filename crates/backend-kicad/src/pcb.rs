@@ -314,8 +314,8 @@ fn build_net_remap(
     let name_to_new: HashMap<&str, (usize, &str)> = board
         .nets
         .iter()
-        .enumerate()
-        .filter_map(|(_idx, net)| {
+        
+        .filter_map(|net| {
             let (_, code) = net_codes.iter().find(|(name, _)| *name == net.name)?;
             Some((net.name.as_str(), (*code, net.name.as_str())))
         })
