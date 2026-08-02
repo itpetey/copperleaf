@@ -60,6 +60,18 @@ pub struct LandPattern {
     pub pitch: f64,
 }
 
+impl LandPattern {
+    /// Edge-to-edge gap between the two pads in mm.
+    ///
+    /// Computed as `pitch − pad_w`.  For the smallest packages (e.g. 0201 /
+    /// 0603 metric) this falls below the typical 0.2mm board-level copper
+    /// clearance, which is correct per IPC‑7351 and must be accounted for
+    /// in the design‑rule checks.
+    pub fn pad_gap(&self) -> f64 {
+        self.pitch - self.pad_w
+    }
+}
+
 impl Package {
     /// Look up a footprint code by its imperial or metric name.
     ///
@@ -87,81 +99,81 @@ impl Package {
                 metric: "0603",
                 body_x: 0.6,
                 body_y: 0.3,
-                pad_w: 0.27,
-                pad_h: 0.32,
-                pitch: 0.32,
+                pad_w: 0.46,
+                pad_h: 0.40,
+                pitch: 0.64,
             },
             Self::M1005 => LandPattern {
                 imperial: "0402",
                 metric: "1005",
                 body_x: 1.0,
                 body_y: 0.5,
-                pad_w: 0.5,
-                pad_h: 0.65,
-                pitch: 0.5,
+                pad_w: 0.54,
+                pad_h: 0.64,
+                pitch: 1.02,
             },
             Self::M1608 => LandPattern {
                 imperial: "0603",
                 metric: "1608",
                 body_x: 1.6,
                 body_y: 0.8,
-                pad_w: 0.8,
-                pad_h: 0.9,
-                pitch: 1.0,
+                pad_w: 0.80,
+                pad_h: 0.95,
+                pitch: 1.65,
             },
             Self::M2012 => LandPattern {
                 imperial: "0805",
                 metric: "2012",
                 body_x: 2.0,
                 body_y: 1.25,
-                pad_w: 1.0,
-                pad_h: 1.2,
-                pitch: 1.3,
+                pad_w: 1.025,
+                pad_h: 1.40,
+                pitch: 1.825,
             },
             Self::M3216 => LandPattern {
                 imperial: "1206",
                 metric: "3216",
                 body_x: 3.2,
                 body_y: 1.6,
-                pad_w: 1.5,
-                pad_h: 1.6,
-                pitch: 2.0,
+                pad_w: 1.125,
+                pad_h: 1.75,
+                pitch: 2.925,
             },
             Self::M3225 => LandPattern {
                 imperial: "1210",
                 metric: "3225",
                 body_x: 3.2,
                 body_y: 2.5,
-                pad_w: 1.5,
-                pad_h: 2.5,
-                pitch: 2.0,
+                pad_w: 1.125,
+                pad_h: 2.65,
+                pitch: 2.925,
             },
             Self::M4532 => LandPattern {
                 imperial: "1812",
                 metric: "4532",
                 body_x: 4.5,
                 body_y: 3.2,
-                pad_w: 1.8,
-                pad_h: 3.2,
-                pitch: 2.8,
+                pad_w: 1.125,
+                pad_h: 3.40,
+                pitch: 4.275,
             },
             Self::M5025 => LandPattern {
                 imperial: "2010",
                 metric: "5025",
                 body_x: 5.0,
                 body_y: 2.5,
-                pad_w: 1.6,
-                pad_h: 2.5,
-                pitch: 3.2,
+                pad_w: 1.225,
+                pad_h: 2.65,
+                pitch: 4.625,
             },
             Self::M6332 => LandPattern {
                 imperial: "2512",
                 metric: "6332",
                 body_x: 6.3,
                 body_y: 3.2,
-                pad_w: 2.3,
-                pad_h: 3.2,
-                pitch: 3.8,
+                pad_w: 1.225,
+                pad_h: 3.35,
+                pitch: 5.925,
             },
         }
     }

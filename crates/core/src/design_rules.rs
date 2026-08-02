@@ -37,6 +37,15 @@
 pub struct DesignRules {
     /// Minimum clearance between any two copper features (mm).
     pub min_clearance: f64,
+    /// Minimum edge-to-edge clearance between pads within the same
+    /// footprint (mm).  When `0.0`, falls back to [`min_clearance`].
+    ///
+    /// This can be set smaller than `min_clearance` to accommodate
+    /// fine-pitch footprints like 0201 (0603 metric) whose IPC‑7351
+    /// pad gap is only 0.18mm.
+    ///
+    /// [`min_clearance`]: DesignRules::min_clearance
+    pub min_pad_to_pad_clearance: f64,
     /// Minimum connection width (mm).
     pub min_connection: f64,
     /// Minimum clearance from copper to board edge (mm).
@@ -77,6 +86,7 @@ impl DesignRules {
     pub fn jlcpcb_2layer() -> Self {
         Self {
             min_clearance: 0.127,
+            min_pad_to_pad_clearance: 0.0,
             min_connection: 0.127,
             min_copper_edge_clearance: 0.3,
             min_hole_clearance: 0.254,
@@ -101,6 +111,7 @@ impl DesignRules {
     pub fn jlcpcb_4layer() -> Self {
         Self {
             min_clearance: 0.09,
+            min_pad_to_pad_clearance: 0.0,
             min_connection: 0.09,
             min_copper_edge_clearance: 0.3,
             min_hole_clearance: 0.254,
@@ -133,6 +144,7 @@ impl Default for DesignRules {
     fn default() -> Self {
         Self {
             min_clearance: 0.2,
+            min_pad_to_pad_clearance: 0.0,
             min_connection: 0.0,
             min_copper_edge_clearance: 0.5,
             min_hole_clearance: 0.25,

@@ -8,7 +8,7 @@
 //! from ERC diagnostics in the report.
 
 use copperleaf::{
-    CompiledBoard, Layout, LayoutConstraint,
+    CompiledBoard, Layout, LayoutConstraint, Pad,
     units::{Diagnostic, Meter, Qty, Severity},
 };
 
@@ -21,12 +21,132 @@ const MAX_DIAGNOSTICS: usize = 50;
 pub fn check(layout: &Layout, board: &CompiledBoard) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
+    check_pad_clearances(board, &mut diagnostics);
     check_track_widths(layout, board, &mut diagnostics);
     check_track_clearances(layout, board, &mut diagnostics);
     check_zone_min_width(layout, board, &mut diagnostics);
     check_self_intersections(layout, &mut diagnostics);
 
     diagnostics
+}
+
+/// Verify edge-to-edge clearance between pads within each footprint.
+///
+/// Uses [`DesignRules::min_pad_to_pad_clearance`] when set (non-zero),
+/// otherwise falls back to [`DesignRules::min_clearance`].  This allows
+/// fine-pitch footprints (e.g. 0201 with 0.18mm pad gap) to pass DRC
+/// even when the board-level copper clearance is 0.2mm.
+fn check_pad_clearances(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    let rules = &board.design_rules;
+    let required = if rules.min_pad_to_pad_clearance > 0.0 {
+        rules.min_pad_to_pad_clearance
+    } else {
+        rules.min_clearance
+    };
+
+    for comp in &board.components {
+        if diagnostics.len() >= MAX_DIAGNOSTICS {
+            break;
+        }
+
+        // Collect copper pads belonging to this component.
+        let pads: Vec<&Pad> = comp
+            .pins
+            .iter()
+            .filter_map(|p| p.pad())
+            .filter(|pad| {
+                pad.layers
+                    .as_ref()
+                    .map(|l| l.contains("F.Cu") || l.contains("B.Cu"))
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        for i in 0..pads.len() {
+            for j in (i + 1)..pads.len() {
+                if diagnostics.len() >= MAX_DIAGNOSTICS {
+                    break;
+                }
+                let gap = pad_to_pad_gap(pads[i], pads[j]);
+                if gap < required {
+                    diagnostics.push(Diagnostic {
+                        code: "LAYOUT:PAD_CLEARANCE_VIOLATION".into(),
+                        severity: Severity::Warning,
+                        message: format!(
+                            "pad-to-pad clearance on '{}' is {:.3}mm, \
+                             minimum required is {:.3}mm",
+                            comp.refdes, gap, required,
+                        ),
+                        entities: vec![comp.refdes.clone()],
+                        hint: Some(
+                            "set min_pad_to_pad_clearance for fine-pitch footprints \
+                             (e.g. 0.18mm for 0201)"
+                                .into(),
+                        ),
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Compute the minimum edge-to-edge gap between two axis-aligned
+/// rectangular pads.  Returns the gap in millimetres, or 0.0 if the
+/// pads overlap.
+fn pad_to_pad_gap(a: &Pad, b: &Pad) -> f64 {
+    // Half-extents.
+    let (a_hw, a_hh) = (a.width / 2.0, a.height / 2.0);
+    let (b_hw, b_hh) = (b.width / 2.0, b.height / 2.0);
+
+    // Extents on each axis.
+    let a_x1 = a.pos.0 - a_hw;
+    let a_x2 = a.pos.0 + a_hw;
+    let a_y1 = a.pos.1 - a_hh;
+    let a_y2 = a.pos.1 + a_hh;
+
+    let b_x1 = b.pos.0 - b_hw;
+    let b_x2 = b.pos.0 + b_hw;
+    let b_y1 = b.pos.1 - b_hh;
+    let b_y2 = b.pos.1 + b_hh;
+
+    let x_overlap = a_x1 < b_x2 && b_x1 < a_x2;
+    let y_overlap = a_y1 < b_y2 && b_y1 < a_y2;
+
+    if x_overlap && y_overlap {
+        // Pads overlap.
+        return 0.0;
+    }
+
+    if x_overlap {
+        // Overlap in X: gap is the Y separation.
+        return if a_y2 <= b_y1 {
+            b_y1 - a_y2
+        } else {
+            a_y1 - b_y2
+        };
+    }
+
+    if y_overlap {
+        // Overlap in Y: gap is the X separation.
+        return if a_x2 <= b_x1 {
+            b_x1 - a_x2
+        } else {
+            a_x1 - b_x2
+        };
+    }
+
+    // No overlap on either axis: Euclidean distance between closest corners.
+    let dx = if a_x2 <= b_x1 {
+        b_x1 - a_x2
+    } else {
+        a_x1 - b_x2
+    };
+    let dy = if a_y2 <= b_y1 {
+        b_y1 - a_y2
+    } else {
+        a_y1 - b_y2
+    };
+    (dx * dx + dy * dy).sqrt()
 }
 
 /// Detect tracks that self-intersect (should not happen with a topological

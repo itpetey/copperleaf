@@ -51,7 +51,7 @@
   (net 1 "NET_U1_PGND")
   (net_class "Default" ""
     (clearance 0.2)
-    (trace_width 0.25)
+    (trace_width 0.2)
     (via_dia 0.8)
     (via_drill 0.4)
     (uvia_dia 0.3)

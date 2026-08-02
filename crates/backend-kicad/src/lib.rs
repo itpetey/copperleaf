@@ -162,25 +162,8 @@ impl Backend for KiCad {
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
 
-        // Write 3D model files from embedded base64 data into models/ subdir.
-        let models_dir = out.join("models");
-        for comp in &board.components {
-            if let Some(ref data) = comp.meta.model_3d_data {
-                fs::create_dir_all(&models_dir)?;
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(data)
-                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
-                let fallback = format!("{}.step", comp.refdes);
-                let filename = comp
-                    .meta
-                    .model_3d
-                    .as_deref()
-                    .and_then(|p| Path::new(p).file_name())
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&fallback);
-                fs::write(models_dir.join(filename), &bytes)?;
-            }
-        }
+        emit_local_footprints(&out, board)?;
+        emit_3d_models(&out, board)?;
 
         Ok(())
     }
@@ -206,28 +189,66 @@ impl Backend for KiCad {
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
 
-        // Write 3D model files into models/ subdir.
-        let models_dir = out.join("models");
-        for comp in &board.components {
-            if let Some(ref data) = comp.meta.model_3d_data {
-                fs::create_dir_all(&models_dir)?;
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(data)
-                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
-                let fallback = format!("{}.step", comp.refdes);
-                let filename = comp
-                    .meta
-                    .model_3d
-                    .as_deref()
-                    .and_then(|p| Path::new(p).file_name())
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&fallback);
-                fs::write(models_dir.join(filename), &bytes)?;
-            }
-        }
+        emit_local_footprints(&out, board)?;
+        emit_3d_models(&out, board)?;
 
         Ok(())
     }
+}
+
+/// Emit `.kicad_mod` files for components that reference the project-local
+/// `copperleaf` footprint library and write the accompanying `fp-lib-table`.
+fn emit_local_footprints(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
+    use std::collections::BTreeSet;
+
+    let mut emitted: BTreeSet<String> = BTreeSet::new();
+    let mut has_any = false;
+
+    for comp in &board.components {
+        let fp_ref = common::footprint_ref(comp);
+        // Only emit for the `copperleaf:` library prefix — KiCad system
+        // libraries (containing `/`) are resolved by KiCad itself.
+        let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") else {
+            continue;
+        };
+        has_any = true;
+        if emitted.insert(fp_name.to_string()) {
+            let content = lib_emitter::emit_footprint_lib(comp, fp_name);
+            let footprints_dir = out.join("footprints");
+            fs::create_dir_all(&footprints_dir)?;
+            fs::write(footprints_dir.join(format!("{}.kicad_mod", fp_name)), content)?;
+        }
+    }
+
+    if has_any {
+        let fp_lib_table = project::emit_fp_lib_table("copperleaf");
+        fs::write(out.join("fp-lib-table"), fp_lib_table)?;
+    }
+
+    Ok(())
+}
+
+/// Write 3D model files from embedded base64 data into the `models/` subdir.
+fn emit_3d_models(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
+    let models_dir = out.join("models");
+    for comp in &board.components {
+        if let Some(ref data) = comp.meta.model_3d_data {
+            fs::create_dir_all(&models_dir)?;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(data)
+                .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
+            let fallback = format!("{}.step", comp.refdes);
+            let filename = comp
+                .meta
+                .model_3d
+                .as_deref()
+                .and_then(|p| Path::new(p).file_name())
+                .and_then(|s| s.to_str())
+                .unwrap_or(&fallback);
+            fs::write(models_dir.join(filename), &bytes)?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -277,8 +298,10 @@ mod tests {
         assert!(names.contains(&"test.kicad_sch".to_string()));
         assert!(names.contains(&"test.kicad_pcb".to_string()));
         assert!(names.contains(&"test.net".to_string()));
-        // No symbols/ or footprints/ directories — geometry is embedded inline.
+        // The test part has no explicit footprint, so the backend falls
+        // back to `copperleaf:U1`, emits the footprint under footprints/,
+        // and writes fp-lib-table.
         assert!(!names.contains(&"symbols".to_string()));
-        assert!(!names.contains(&"footprints".to_string()));
+        assert!(names.contains(&"footprints".to_string()));
     }
 }

@@ -192,6 +192,21 @@ pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
         );
     }
 
+    // Sync the Default net-class clearance with the board-level design rules.
+    // KiCad enforces the net-class clearance for DRC, so a hardcoded 0.2 mm
+    // would false-flag fine-pitch footprints (e.g. 0201 with 0.18 mm pad gap)
+    // even when the board's design rules permit a tighter clearance.
+    if let Some(r) = rules
+        && let Some(net_settings) = root.get_mut("net_settings")
+        && let Some(classes) = net_settings.get_mut("classes")
+        && let Some(arr) = classes.as_array_mut()
+        && let Some(default_class) = arr.first_mut()
+        && let Some(obj) = default_class.as_object_mut()
+    {
+        obj.insert("clearance".to_string(), json!(r.min_clearance));
+        obj.insert("track_width".to_string(), json!(r.min_track_width));
+    }
+
     serde_json::to_string_pretty(&root).unwrap_or_else(|_| "{}".into()) + "\n"
 }
 

@@ -175,7 +175,8 @@ fn valid_board_compiles_and_emits() {
         .collect();
     assert!(names.contains(&"test.kicad_sch".to_string()));
     assert!(names.contains(&"test.net".to_string()));
-    // No symbols/ or footprints/ — geometry is embedded inline.
+    // The test component has no explicit footprint, so the backend falls
+    // back to `copperleaf:COMP_REFDES` and emits local footprints.
     assert!(!names.contains(&"symbols".to_string()));
-    assert!(!names.contains(&"footprints".to_string()));
+    assert!(names.contains(&"footprints".to_string()));
 }

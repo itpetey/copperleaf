@@ -735,7 +735,17 @@ fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<
         }
     }
 
-    let mut nodes = vec![net_class_node("Default", "", "0.2", "0.25", &default_nets)];
+    let rules = &board.design_rules;
+    let clearance = fmt_mm(rules.min_clearance / 1000.0);
+    let track_width = fmt_mm(rules.min_track_width / 1000.0);
+
+    let mut nodes = vec![net_class_node(
+        "Default",
+        "",
+        &clearance,
+        &track_width,
+        &default_nets,
+    )];
     for ((width, clearance), nets) in groups {
         let name = format!("Power_{}mm_{}mm", width, clearance);
         nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
