@@ -71,8 +71,7 @@ impl KiCad {
     /// the new board, and regenerates all output files.
     ///
     /// Copper elements referencing deleted nets are silently dropped. New
-    /// components without an existing placement are placed at `(0, 0)` on the
-    /// front side.
+    /// components without an existing placement are auto-placed.
     pub fn emit_update(
         &self,
         output_dir: impl AsRef<Path>,
@@ -84,7 +83,14 @@ impl KiCad {
         let parsed = pcb_parser::parse_pcb(&pcb_source)
             .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
         let layout = parsed.to_layout(board);
-        self.emit_with_graphics(output_dir, board, &layout, &parsed.graphics)
+        self.emit_with_graphics(
+            output_dir,
+            board,
+            &layout,
+            &parsed.graphics,
+            &parsed.footprints,
+            &parsed.net_names,
+        )
     }
 
     /// Emit board files with a layout **and** preserved board-level graphics.
@@ -98,6 +104,8 @@ impl KiCad {
         board: &CompiledBoard,
         layout: &Layout,
         graphics: &[crate::sexpr::Sexpr],
+        preserved_footprints: &[crate::sexpr::Sexpr],
+        old_net_names: &std::collections::HashMap<usize, String>,
     ) -> Result<(), BackendError> {
         let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
@@ -113,7 +121,19 @@ impl KiCad {
         } else {
             Some(graphics)
         };
-        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout), preserved);
+        let preserved_fps = if preserved_footprints.is_empty() {
+            None
+        } else {
+            Some(preserved_footprints)
+        };
+        let pcb = pcb::emit_pcb_with_layout(
+            board,
+            &self.project_name,
+            Some(layout),
+            preserved,
+            preserved_fps,
+            old_net_names,
+        );
         fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
 
         let net = netlist::emit_netlist(board);
@@ -183,7 +203,14 @@ impl Backend for KiCad {
         let sch = schematic::emit_schematic(board);
         fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
 
-        let pcb = pcb::emit_pcb_with_layout(board, &self.project_name, Some(layout), None);
+        let pcb = pcb::emit_pcb_with_layout(
+            board,
+            &self.project_name,
+            Some(layout),
+            None,
+            None,
+            &std::collections::HashMap::new(),
+        );
         fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
 
         let net = netlist::emit_netlist(board);

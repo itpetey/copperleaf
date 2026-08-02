@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use copperleaf::{BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Stackup, StackupLayer};
+use copperleaf::{BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Placement, Stackup, StackupLayer};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
@@ -76,11 +76,19 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
 /// If `preserved_graphics` is provided, those raw S-expression nodes replace
 /// the generated board outline — used by [`crate::KiCad::emit_update`] so that
 /// manual board-outline adjustments survive schema changes.
+///
+/// If `preserved_footprints` and `old_net_names` are provided, footprint
+/// S-expressions from the original PCB are re-emitted verbatim with only
+/// the net references in pads remapped to the new board.  This preserves
+/// footprint-level details (3D models, stroke formatting, external library
+/// references, etc.) that copperleaf's emitter does not produce.
 pub fn emit_pcb_with_layout(
     board: &CompiledBoard,
     project_name: &str,
     layout: Option<&Layout>,
     preserved_graphics: Option<&[Sexpr]>,
+    preserved_footprints: Option<&[Sexpr]>,
+    old_net_names: &HashMap<usize, String>,
 ) -> String {
     let net_codes = build_net_codes(board);
     let net_to_code: HashMap<usize, usize> = net_codes
@@ -127,17 +135,63 @@ pub fn emit_pcb_with_layout(
         let placement_by_component: HashMap<usize, &copperleaf::Placement> =
             layout.placements.iter().map(|p| (p.component, p)).collect();
 
+        // Auto-place positions as fallback for new components without an
+        // existing placement.
+        let fallback_positions = auto_place(board, board.width);
+        let fallback_placements: Vec<Placement> = fallback_positions
+            .iter()
+            .enumerate()
+            .map(|(idx, &at)| Placement {
+                component: idx,
+                at,
+                rotation: 0.0,
+                side: BoardSide::Front,
+            })
+            .collect();
+
+        // If preserved footprints are available, build net-remapping
+        // tables and a refdes→footprint lookup.
+        let (old_name_to_new, old_code_to_new, refdes_to_fp) =
+            if let Some(fps) = preserved_footprints {
+                let (on, oc) =
+                    build_net_remap(old_net_names, board, &net_codes);
+                let r2f: HashMap<String, &Sexpr> = fps
+                    .iter()
+                    .filter_map(|fp| footprint_refdes(fp).map(|r| (r, fp)))
+                    .collect();
+                (Some(on), Some(oc), Some(r2f))
+            } else {
+                (None, None, None)
+            };
+
         for (idx, comp) in board.components.iter().enumerate() {
-            let placement = placement_by_component.get(&idx);
-            children.push(footprint_node_with_placement(
-                idx,
-                comp,
-                placement.copied(),
-                &pin_to_net,
-                &net_to_code,
-                board,
-                project_name,
-            ));
+            // Use a preserved footprint when available; remap its pad nets.
+            if let Some(fp) = refdes_to_fp
+                .as_ref()
+                .and_then(|r2f| r2f.get(comp.refdes.as_str()))
+            {
+                let mut fp_clone = (*fp).clone();
+                remap_footprint_nets(
+                    &mut fp_clone,
+                    old_name_to_new.as_ref().unwrap(),
+                    old_code_to_new.as_ref().unwrap(),
+                );
+                children.push(fp_clone);
+            } else {
+                let placement = placement_by_component
+                    .get(&idx)
+                    .copied()
+                    .or_else(|| Some(&fallback_placements[idx]));
+                children.push(footprint_node_with_placement(
+                    idx,
+                    comp,
+                    placement,
+                    &pin_to_net,
+                    &net_to_code,
+                    board,
+                    project_name,
+                ));
+            }
         }
 
         // Emit copper: tracks, vias, zones.
@@ -370,7 +424,10 @@ fn emit_zones(
             Sexpr::list([Sexpr::atom("net_name"), Sexpr::str(net_name)]),
             Sexpr::list([Sexpr::atom("layer"), Sexpr::str(layer)]),
             Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&zone_uuid)]),
-            Sexpr::list(std::iter::once(Sexpr::atom("polygon")).chain(poly_pts)),
+            Sexpr::list([
+                Sexpr::atom("polygon"),
+                Sexpr::list(std::iter::once(Sexpr::atom("pts")).chain(poly_pts)),
+            ]),
         ]));
     }
     nodes
@@ -409,8 +466,8 @@ fn footprint_node(
         Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom(format_grid_float(at.0)),
-            Sexpr::atom(format_grid_float(at.1)),
+            Sexpr::atom(format_float(at.0, 6)),
+            Sexpr::atom(format_float(at.1, 6)),
             Sexpr::atom("0"),
         ]),
         // Properties (KiCad 9+ stores Reference/Value as properties).
@@ -536,8 +593,8 @@ fn footprint_node_with_placement(
         Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&fp_uuid)]),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom(format_grid_float(at_x)),
-            Sexpr::atom(format_grid_float(at_y)),
+            Sexpr::atom(format_float(at_x, 6)),
+            Sexpr::atom(format_float(at_y, 6)),
             Sexpr::atom(format_grid_float(rotation)),
         ]),
         footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
@@ -894,6 +951,143 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     Sexpr::list(entries)
 }
 
+// ---------------------------------------------------------------------------
+// Footprint preservation helpers (used by emit_update)
+// ---------------------------------------------------------------------------
+
+/// Build old→new net remapping tables from the parsed old PCB's net name
+/// table and the new compiled board.
+///
+/// Returns:
+/// - `old_name_to_new`: old net *name* → (new KiCad code, new net name)
+/// - `old_code_to_new`: old net *code* → (new KiCad code, new net name)
+fn build_net_remap(
+    old_net_names: &HashMap<usize, String>,
+    board: &CompiledBoard,
+    net_codes: &[(String, usize)],
+) -> (
+    HashMap<String, (usize, String)>,
+    HashMap<usize, (usize, String)>,
+) {
+    // New net name → (new KiCad code, new net name).
+    let name_to_new: HashMap<&str, (usize, &str)> = board
+        .nets
+        .iter()
+        .enumerate()
+        .filter_map(|(_idx, net)| {
+            let (_, code) = net_codes
+                .iter()
+                .find(|(name, _)| *name == net.name)?;
+            Some((net.name.as_str(), (*code, net.name.as_str())))
+        })
+        .collect();
+
+    let mut name_map: HashMap<String, (usize, String)> = HashMap::new();
+    let mut code_map: HashMap<usize, (usize, String)> = HashMap::new();
+
+    // Populate from old net code → name → new code mapping.
+    for (&old_code, old_name) in old_net_names {
+        if let Some(&(new_code, new_name)) = name_to_new.get(old_name.as_str()) {
+            let entry = (new_code, new_name.to_string());
+            name_map.entry(old_name.clone()).or_insert_with(|| entry.clone());
+            code_map.insert(old_code, entry);
+        }
+    }
+
+    // Also populate name_map from every net name in the new board, so that
+    // old PCBs that reference nets by name (without top-level net-code
+    // declarations) still get their pad nets remapped.
+    for (&name, &(code, new_name)) in &name_to_new {
+        name_map
+            .entry(name.to_string())
+            .or_insert_with(|| (code, new_name.to_string()));
+    }
+
+    (name_map, code_map)
+}
+
+/// Extract the reference designator from a footprint S-expression.
+fn footprint_refdes(fp: &Sexpr) -> Option<String> {
+    let Sexpr::List(parts) = fp else {
+        return None;
+    };
+    for child in &parts[1..] {
+        let Sexpr::List(props) = child else {
+            continue;
+        };
+        if props.len() >= 3
+            && props[0].as_string() == "property"
+            && props[1].as_string() == "Reference"
+        {
+            return Some(props[2].as_string());
+        }
+    }
+    None
+}
+
+/// Walk a footprint S-expression and update `(net ...)` references inside
+/// pads to use the new board's net codes and names.
+fn remap_footprint_nets(
+    fp: &mut Sexpr,
+    old_name_to_new: &HashMap<String, (usize, String)>,
+    old_code_to_new: &HashMap<usize, (usize, String)>,
+) {
+    let Sexpr::List(fp_parts) = fp else {
+        return;
+    };
+    for child in fp_parts.iter_mut() {
+        let Sexpr::List(props) = child else {
+            continue;
+        };
+        if props.is_empty() {
+            continue;
+        }
+        // Look for (pad ...) nodes.
+        if props[0].as_string() != "pad" {
+            continue;
+        }
+        // Within a pad, find and update the (net ...) node.
+        for prop in props.iter_mut() {
+            let Sexpr::List(net_props) = prop else {
+                continue;
+            };
+            if net_props.is_empty() || net_props[0].as_string() != "net" {
+                continue;
+            }
+            if net_props.len() < 2 {
+                continue;
+            }
+            remap_net_node(net_props, old_name_to_new, old_code_to_new);
+        }
+    }
+}
+
+/// Update a single `(net ...)` node inside a pad.
+fn remap_net_node(
+    props: &mut Vec<Sexpr>,
+    old_name_to_new: &HashMap<String, (usize, String)>,
+    old_code_to_new: &HashMap<usize, (usize, String)>,
+) {
+    let s = props[1].as_string();
+    // Try numeric code first: (net 1) or (net 1 "NAME")
+    if let Ok(old_code) = s.parse::<usize>() {
+        if let Some(&(new_code, ref new_name)) = old_code_to_new.get(&old_code) {
+            *props = vec![
+                Sexpr::atom("net"),
+                Sexpr::atom(new_code.to_string()),
+                Sexpr::str(new_name),
+            ];
+        }
+    } else if let Some(&(new_code, ref new_name)) = old_name_to_new.get(&s) {
+        // Try string name: (net "NAME")
+        *props = vec![
+            Sexpr::atom("net"),
+            Sexpr::atom(new_code.to_string()),
+            Sexpr::str(new_name),
+        ];
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1021,7 +1215,7 @@ mod tests {
     fn emit_with_layout_includes_placement_rotation() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         // Placement at (10, 40) with rotation 90°.
         assert!(
             out.contains("(at 10 40 90)"),
@@ -1036,7 +1230,7 @@ mod tests {
     fn emit_with_layout_includes_segments() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         assert!(out.contains("(segment"), "missing segment: {}", out);
         assert!(out.contains("(start 5 5)"), "{}", out);
         assert!(out.contains("(end 15 5)"), "{}", out);
@@ -1047,7 +1241,7 @@ mod tests {
     fn emit_with_layout_includes_vias() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         assert!(out.contains("(via"), "missing via: {}", out);
         assert!(out.contains("(at 15 5)"), "{}", out);
         assert!(out.contains("(size 0.8)"), "{}", out);
@@ -1058,7 +1252,7 @@ mod tests {
     fn emit_with_layout_includes_zones() {
         let board = test_board();
         let layout = test_layout();
-        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         assert!(out.contains("(zone"), "missing zone: {}", out);
         assert!(out.contains("(layer \"B.Cu\")"), "{}", out);
         assert!(out.contains("(polygon"), "{}", out);
@@ -1068,7 +1262,7 @@ mod tests {
     fn emit_without_layout_is_byte_identical_to_emit_pcb() {
         let board = test_board();
         let out1 = emit_pcb(&board, "test");
-        let out2 = emit_pcb_with_layout(&board, "test", None, None);
+        let out2 = emit_pcb_with_layout(&board, "test", None, None, None, &HashMap::new());
         assert_eq!(
             out1, out2,
             "no-layout emit_with_layout must match emit_pcb byte-for-byte"
@@ -1084,7 +1278,7 @@ mod tests {
             vias: vec![],
             zones: vec![],
         };
-        let out = emit_pcb_with_layout(&board, "test", Some(&empty), None);
+        let out = emit_pcb_with_layout(&board, "test", Some(&empty), None, None, &HashMap::new());
         // No copper elements emitted (no segments, vias, or zones).
         assert!(!out.contains("(segment"));
         assert!(!out.contains("(zone"));

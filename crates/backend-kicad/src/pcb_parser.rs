@@ -12,6 +12,15 @@ use copperleaf::{BoardSide, CompiledBoard, Layout, NetIdx, Placement, Track, Uni
 
 use crate::sexpr::{self, ParseError, Sexpr};
 
+/// A net reference that may be either a numeric code (`(net 1)`) as used
+/// by copperleaf-generated files, or a string name (`(net "V3V3")`) as
+/// used by KiCad pcbnew-generated files.
+#[derive(Clone, Debug)]
+pub enum NetRef {
+    Code(usize),
+    Name(String),
+}
+
 /// Raw placement extracted from a footprint node.
 #[derive(Clone, Debug)]
 pub struct RawPlacement {
@@ -24,7 +33,7 @@ pub struct RawPlacement {
 /// Raw track segment from a `(segment ...)` node.
 #[derive(Clone, Debug)]
 pub struct RawSegment {
-    pub net_code: usize,
+    pub net_ref: NetRef,
     pub layer: String,
     pub width_mm: f64,
     pub start: (f64, f64),
@@ -34,7 +43,7 @@ pub struct RawSegment {
 /// Raw via from a `(via ...)` node.
 #[derive(Clone, Debug)]
 pub struct RawVia {
-    pub net_code: usize,
+    pub net_ref: NetRef,
     pub at: (f64, f64),
     pub diameter_mm: f64,
     pub drill_mm: f64,
@@ -45,7 +54,7 @@ pub struct RawVia {
 /// Raw zone from a `(zone ...)` node.
 #[derive(Clone, Debug)]
 pub struct RawZone {
-    pub net_code: usize,
+    pub net_ref: NetRef,
     pub layer: String,
     pub outline: Vec<(f64, f64)>,
 }
@@ -57,6 +66,10 @@ pub struct ParsedPcb {
     pub net_names: HashMap<usize, String>,
     /// Refdes → raw placement data.
     pub placements: HashMap<String, RawPlacement>,
+    /// Raw footprint S-expression nodes, preserved for verbatim re-emission
+    /// during an update so that footprint details (3D models, graphics, etc.)
+    /// survive schema changes.
+    pub footprints: Vec<crate::sexpr::Sexpr>,
     /// Track segments (one per straight-line segment in the PCB).
     pub tracks: Vec<RawSegment>,
     /// Vias.
@@ -68,6 +81,19 @@ pub struct ParsedPcb {
     /// verbatim during an update so that manual board-outline adjustments
     /// and other board-level graphics survive schema changes.
     pub graphics: Vec<crate::sexpr::Sexpr>,
+}
+
+/// Resolve a [`NetRef`] to a [`NetIdx`] using the code→idx and name→idx maps.
+/// Returns `None` if the referenced net doesn't exist in the new board.
+fn resolve_net_ref(
+    net_ref: &NetRef,
+    code_to_idx: &HashMap<usize, NetIdx>,
+    name_to_idx: &HashMap<&str, NetIdx>,
+) -> Option<NetIdx> {
+    match net_ref {
+        NetRef::Code(code) => code_to_idx.get(code).copied(),
+        NetRef::Name(name) => name_to_idx.get(name.as_str()).copied(),
+    }
 }
 
 impl ParsedPcb {
@@ -125,7 +151,7 @@ impl ParsedPcb {
             .tracks
             .iter()
             .filter_map(|raw| {
-                let net = *code_to_idx.get(&raw.net_code)?;
+                let net = resolve_net_ref(&raw.net_ref, &code_to_idx, &name_to_idx)?;
                 let layer = layer_name_to_index(&raw.layer, copper_count)?;
                 Some(Track {
                     net,
@@ -140,7 +166,7 @@ impl ParsedPcb {
             .vias
             .iter()
             .filter_map(|raw| {
-                let net = *code_to_idx.get(&raw.net_code)?;
+                let net = resolve_net_ref(&raw.net_ref, &code_to_idx, &name_to_idx)?;
                 let start = layer_name_to_index(&raw.layer_start, copper_count)?;
                 let end = layer_name_to_index(&raw.layer_end, copper_count)?;
                 let layers = if start <= end {
@@ -162,7 +188,7 @@ impl ParsedPcb {
             .zones
             .iter()
             .filter_map(|raw| {
-                let net = *code_to_idx.get(&raw.net_code)?;
+                let net = resolve_net_ref(&raw.net_ref, &code_to_idx, &name_to_idx)?;
                 let layer = layer_name_to_index(&raw.layer, copper_count)?;
                 Some(Zone {
                     net,
@@ -216,6 +242,11 @@ pub fn parse_pcb(input: &str) -> Result<ParsedPcb, ParseError> {
                 if let Some((refdes, placement)) = parse_footprint(parts) {
                     parsed.placements.insert(refdes, placement);
                 }
+                // Preserve the raw footprint node for verbatim re-emission
+                // during update, so that footprint details (3D models,
+                // stroke formatting, external library references, etc.)
+                // survive schema changes.
+                parsed.footprints.push(Sexpr::List(parts.to_vec()));
             }
             "segment" => {
                 if let Some(seg) = parse_segment(parts) {
@@ -328,13 +359,39 @@ fn parse_net(parts: &[Sexpr]) -> Option<(usize, String)> {
     Some((code, name))
 }
 
-/// Parse a `(polygon (xy X Y) (xy X Y) ...)` list.
+/// Parse a net reference from the second element of a `(net ...)` node.
+/// Handles both numeric codes (`(net 1)`) and string names (`(net "V3V3")`).
+fn parse_net_ref(atom: &Sexpr) -> Option<NetRef> {
+    let s = atom.as_string();
+    // Try numeric first (copperleaf format).
+    if let Ok(code) = s.parse::<usize>() {
+        return Some(NetRef::Code(code));
+    }
+    // Otherwise treat as a string name (KiCad pcbnew format).
+    Some(NetRef::Name(s))
+}
+
+/// Parse a `(polygon (xy X Y) (xy X Y) ...)` or
+/// `(polygon (pts (xy X Y) (xy X Y) ...))` list.
 ///
 /// If the last point duplicates the first (closing the polygon), it is
 /// stripped so the outline matches the [`Zone`] representation.
 fn parse_polygon(props: &[Sexpr]) -> Vec<(f64, f64)> {
+    // KiCad pcbnew wraps points in a (pts ...) sublist:
+    //   (polygon (pts (xy X Y) (xy X Y) ...))
+    // Copperleaf emits them directly:
+    //   (polygon (xy X Y) (xy X Y) ...)
+    let children: &[Sexpr] = if props.len() > 1 {
+        match &props[1] {
+            Sexpr::List(pts) if !pts.is_empty() && pts[0].as_string() == "pts" => &pts[1..],
+            _ => &props[1..],
+        }
+    } else {
+        &props[1..]
+    };
+
     let mut pts = Vec::new();
-    for child in &props[1..] {
+    for child in children {
         let Sexpr::List(parts) = child else {
             continue;
         };
@@ -367,7 +424,7 @@ fn parse_segment(parts: &[Sexpr]) -> Option<RawSegment> {
     let mut end: Option<(f64, f64)> = None;
     let mut width_mm: Option<f64> = None;
     let mut layer: Option<String> = None;
-    let mut net_code: Option<usize> = None;
+    let mut net_ref: Option<NetRef> = None;
 
     for child in &parts[1..] {
         let Sexpr::List(props) = child else {
@@ -406,14 +463,14 @@ fn parse_segment(parts: &[Sexpr]) -> Option<RawSegment> {
                 }
             }
             "net" if props.len() >= 2 => {
-                net_code = props[1].as_string().parse().ok();
+                net_ref = parse_net_ref(&props[1]);
             }
             _ => {}
         }
     }
 
     Some(RawSegment {
-        net_code: net_code?,
+        net_ref: net_ref?,
         layer: layer?,
         width_mm: width_mm?,
         start: start?,
@@ -428,7 +485,7 @@ fn parse_via_node(parts: &[Sexpr]) -> Option<RawVia> {
     let mut drill_mm: Option<f64> = None;
     let mut layer_start: Option<String> = None;
     let mut layer_end: Option<String> = None;
-    let mut net_code: Option<usize> = None;
+    let mut net_ref: Option<NetRef> = None;
 
     for child in &parts[1..] {
         let Sexpr::List(props) = child else {
@@ -466,14 +523,14 @@ fn parse_via_node(parts: &[Sexpr]) -> Option<RawVia> {
                 }
             }
             "net" if props.len() >= 2 => {
-                net_code = props[1].as_string().parse().ok();
+                net_ref = parse_net_ref(&props[1]);
             }
             _ => {}
         }
     }
 
     Some(RawVia {
-        net_code: net_code?,
+        net_ref: net_ref?,
         at: at?,
         diameter_mm: diameter_mm?,
         drill_mm: drill_mm?,
@@ -484,7 +541,7 @@ fn parse_via_node(parts: &[Sexpr]) -> Option<RawVia> {
 
 /// Parse a `(zone ...)` node.
 fn parse_zone_node(parts: &[Sexpr]) -> Option<RawZone> {
-    let mut net_code: Option<usize> = None;
+    let mut net_ref: Option<NetRef> = None;
     let mut layer: Option<String> = None;
     let mut outline: Vec<(f64, f64)> = Vec::new();
 
@@ -502,7 +559,7 @@ fn parse_zone_node(parts: &[Sexpr]) -> Option<RawZone> {
         match key.as_str() {
             "net" => {
                 if props.len() >= 2 {
-                    net_code = props[1].as_string().parse().ok();
+                    net_ref = parse_net_ref(&props[1]);
                 }
             }
             "layer" => {
@@ -518,7 +575,7 @@ fn parse_zone_node(parts: &[Sexpr]) -> Option<RawZone> {
     }
 
     Some(RawZone {
-        net_code: net_code?,
+        net_ref: net_ref?,
         layer: layer?,
         outline,
     })
@@ -635,7 +692,7 @@ mod tests {
             }],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
 
         let parsed = parse_pcb(&pcb_str).expect("parse emitted PCB with layout");
 
@@ -650,19 +707,19 @@ mod tests {
 
         // One track segment
         assert_eq!(parsed.tracks.len(), 1);
-        assert_eq!(parsed.tracks[0].net_code, 1);
+        assert!(matches!(parsed.tracks[0].net_ref, NetRef::Code(1)));
         assert_eq!(parsed.tracks[0].layer, "F.Cu");
         assert!((parsed.tracks[0].width_mm - 0.25).abs() < 0.001);
 
         // One via
         assert_eq!(parsed.vias.len(), 1);
-        assert_eq!(parsed.vias[0].net_code, 1);
+        assert!(matches!(parsed.vias[0].net_ref, NetRef::Code(1)));
         assert!((parsed.vias[0].diameter_mm - 0.8).abs() < 0.001);
         assert!((parsed.vias[0].drill_mm - 0.4).abs() < 0.001);
 
         // One zone
         assert_eq!(parsed.zones.len(), 1);
-        assert_eq!(parsed.zones[0].net_code, 1);
+        assert!(matches!(parsed.zones[0].net_ref, NetRef::Code(1)));
         assert_eq!(parsed.zones[0].layer, "B.Cu");
         assert_eq!(parsed.zones[0].outline.len(), 4);
 
@@ -690,7 +747,7 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a modified board with no nets (simulating net deletion).
@@ -719,7 +776,7 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a board where the net is renamed but the name matches.
@@ -753,7 +810,7 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
 
         // First, verify the default emit produces 4 gr_line elements (board outline).
         let parsed = parse_pcb(&pcb_str).unwrap();
@@ -775,12 +832,12 @@ mod tests {
 
         // Re-emit with the preserved graphics and verify they appear.
         let out =
-            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&parsed.graphics));
+            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&parsed.graphics), None, &HashMap::new());
         let re_parsed = parse_pcb(&out).unwrap();
         assert_eq!(re_parsed.graphics.len(), 4);
 
         // When preserved_graphics is None, we should still get the default outline.
-        let out_no_preserve = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None);
+        let out_no_preserve = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
         let re_parsed_no = parse_pcb(&out_no_preserve).unwrap();
         assert_eq!(re_parsed_no.graphics.len(), 4);
     }
@@ -814,7 +871,7 @@ mod tests {
         ])];
 
         let out =
-            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&custom_outline));
+            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&custom_outline), None, &HashMap::new());
         let parsed = parse_pcb(&out).unwrap();
 
         // Should have exactly the 1 custom gr_line, not the default 4.

@@ -91,7 +91,7 @@
     (layer "F.Cu")
     (locked no)
     (uuid "2350c107-dc0a-9352-c65b-c8ff9a5b96a0")
-    (at 12.36 11.75 0)
+    (at 12.355 11.75 0)
     (property "Reference" "U1"
       (at 0 -2.77 0)
       (layer "F.SilkS")

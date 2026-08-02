@@ -9,11 +9,11 @@
 //!
 //! Convenience constructors mirror JLCPCB capabilities:
 //!
-//! | Profile               | Min track/clearance | Layers      |
-//! |-----------------------|---------------------|-------------|
-//! | [`jlcpcb_2layer`]     | 5 mil (0.127 mm)    | 2           |
-//! | [`jlcpcb_4layer`]     | 3.5 mil (0.09 mm)   | 4           |
-//! | [`jlcpcb_6layer`]     | 3.5 mil (0.09 mm)   | 6           |
+//! | Profile               | Min track/clearance | Via Ø / Drill |
+//! |-----------------------|---------------------|---------------|
+//! | [`jlcpcb_2layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
+//! | [`jlcpcb_4layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
+//! | [`jlcpcb_6layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
 //!
 //! [`jlcpcb_2layer`]: DesignRules::jlcpcb_2layer
 //! [`jlcpcb_4layer`]: DesignRules::jlcpcb_4layer
@@ -60,6 +60,8 @@ pub struct DesignRules {
     pub min_track_width: f64,
     /// Minimum via outer diameter (mm).
     pub min_via_diameter: f64,
+    /// Minimum via drill diameter (mm).
+    pub min_via_drill: f64,
     /// Minimum via annular ring width (mm).
     pub min_via_annular_width: f64,
     /// Minimum through-hole pad outer diameter (mm).
@@ -81,23 +83,25 @@ impl DesignRules {
 
     /// JLCPCB 2‑layer board (1 oz outer copper).
     ///
-    /// Based on [JLCPCB capabilities](https://jlcpcb.com/capabilities/pcb-capabilities).
-    /// Minimum track/clearance: 5 mil (0.127 mm).
+    /// Based on [JLCPCB capabilities](https://jlcpcb.com/capabilities/pcb-capabilities)
+    /// and values expected by Quilter.
+    /// Minimum track/clearance: 0.102 mm (4 mil).
     pub fn jlcpcb_2layer() -> Self {
         Self {
-            min_clearance: 0.127,
+            min_clearance: 0.102,
             min_pad_to_pad_clearance: 0.0,
-            min_connection: 0.127,
+            min_connection: 0.102,
             min_copper_edge_clearance: 0.3,
-            min_hole_clearance: 0.254,
+            min_hole_clearance: 0.25,
             min_hole_to_hole: 0.5,
             min_silk_clearance: 0.15,
-            min_track_width: 0.127,
-            min_via_diameter: 0.5,
-            min_via_annular_width: 0.075,
+            min_track_width: 0.102,
+            min_via_diameter: 0.25,
+            min_via_drill: 0.15,
+            min_via_annular_width: 0.05,
             min_through_hole_diameter: 0.3,
-            min_microvia_diameter: 0.45,
-            min_microvia_drill: 0.2,
+            min_microvia_diameter: 0.25,
+            min_microvia_drill: 0.15,
             solder_mask_to_copper_clearance: 0.05,
             min_text_height: 1.0,
             min_text_thickness: 0.15,
@@ -106,22 +110,22 @@ impl DesignRules {
 
     /// JLCPCB 4‑layer board (0.5 oz inner, 1 oz outer copper).
     ///
-    /// Minimum track/clearance: 3.5 mil (0.09 mm) on inner and outer layers.
-    /// Via hole minimum is relaxed to 0.2 mm (vs. 0.3 mm for 2‑layer).
+    /// Minimum track/clearance: 0.102 mm (4 mil) per Quilter.
     pub fn jlcpcb_4layer() -> Self {
         Self {
-            min_clearance: 0.09,
+            min_clearance: 0.102,
             min_pad_to_pad_clearance: 0.0,
-            min_connection: 0.09,
+            min_connection: 0.102,
             min_copper_edge_clearance: 0.3,
-            min_hole_clearance: 0.254,
+            min_hole_clearance: 0.25,
             min_hole_to_hole: 0.5,
             min_silk_clearance: 0.15,
-            min_track_width: 0.09,
-            min_via_diameter: 0.45,
-            min_via_annular_width: 0.075,
+            min_track_width: 0.102,
+            min_via_diameter: 0.25,
+            min_via_drill: 0.15,
+            min_via_annular_width: 0.05,
             min_through_hole_diameter: 0.2,
-            min_microvia_diameter: 0.45,
+            min_microvia_diameter: 0.25,
             min_microvia_drill: 0.15,
             solder_mask_to_copper_clearance: 0.05,
             min_text_height: 1.0,
@@ -152,6 +156,7 @@ impl Default for DesignRules {
             min_silk_clearance: 0.0,
             min_track_width: 0.2,
             min_via_diameter: 0.5,
+            min_via_drill: 0.2,
             min_via_annular_width: 0.1,
             min_through_hole_diameter: 0.3,
             min_microvia_diameter: 0.2,
@@ -177,17 +182,31 @@ mod tests {
     }
 
     #[test]
-    fn jlcpcb_2layer_min_clearance_is_5mil() {
+    fn jlcpcb_2layer_min_clearance_is_4mil() {
         let rules = DesignRules::jlcpcb_2layer();
-        assert!((rules.min_clearance - 0.127).abs() < 0.001);
-        assert!((rules.min_track_width - 0.127).abs() < 0.001);
+        assert!((rules.min_clearance - 0.102).abs() < 0.001);
+        assert!((rules.min_track_width - 0.102).abs() < 0.001);
     }
 
     #[test]
-    fn jlcpcb_4layer_min_clearance_is_3_5mil() {
+    fn jlcpcb_4layer_min_clearance_is_4mil() {
         let rules = DesignRules::jlcpcb_4layer();
-        assert!((rules.min_clearance - 0.09).abs() < 0.001);
-        assert!((rules.min_track_width - 0.09).abs() < 0.001);
+        assert!((rules.min_clearance - 0.102).abs() < 0.001);
+        assert!((rules.min_track_width - 0.102).abs() < 0.001);
+    }
+
+    #[test]
+    fn jlcpcb_via_values() {
+        for rules in [DesignRules::jlcpcb_2layer(), DesignRules::jlcpcb_4layer()] {
+            assert!(
+                (rules.min_via_diameter - 0.25).abs() < 0.01,
+                "via diameter should be 0.25 mm"
+            );
+            assert!(
+                (rules.min_via_drill - 0.15).abs() < 0.01,
+                "via drill should be 0.15 mm"
+            );
+        }
     }
 
     #[test]

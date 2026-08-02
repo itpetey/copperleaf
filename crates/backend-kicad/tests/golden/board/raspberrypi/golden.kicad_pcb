@@ -638,7 +638,7 @@
     (layer "F.Cu")
     (locked no)
     (uuid "23803507-dc32-c930-c698-d4ff9a8f5922")
-    (at 25.43 10.98 0)
+    (at 25.425 10.975 0)
     (property "Reference" "C1"
       (at 0 -2 0)
       (layer "F.SilkS")
@@ -770,7 +770,7 @@
     (layer "F.Cu")
     (locked no)
     (uuid "23803807-dc32-ce49-c698-d3ff9a8f576f")
-    (at 33.88 10.98 0)
+    (at 33.875 10.975 0)
     (property "Reference" "C2"
       (at 0 -2 0)
       (layer "F.SilkS")

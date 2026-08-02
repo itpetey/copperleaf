@@ -186,6 +186,7 @@ pub fn emit_project(name: &str, rules: Option<&DesignRules>) -> String {
                 "min_track_width": r.min_track_width,
                 "min_via_annular_width": r.min_via_annular_width,
                 "min_via_diameter": r.min_via_diameter,
+                "min_via_drill": r.min_via_drill,
                 "solder_mask_to_copper_clearance": r.solder_mask_to_copper_clearance,
                 "use_height_for_length_calcs": true
             }),
