@@ -90,65 +90,6 @@ fn check_pad_clearances(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>
     }
 }
 
-/// Compute the minimum edge-to-edge gap between two axis-aligned
-/// rectangular pads.  Returns the gap in millimetres, or 0.0 if the
-/// pads overlap.
-fn pad_to_pad_gap(a: &Pad, b: &Pad) -> f64 {
-    // Half-extents.
-    let (a_hw, a_hh) = (a.width / 2.0, a.height / 2.0);
-    let (b_hw, b_hh) = (b.width / 2.0, b.height / 2.0);
-
-    // Extents on each axis.
-    let a_x1 = a.pos.0 - a_hw;
-    let a_x2 = a.pos.0 + a_hw;
-    let a_y1 = a.pos.1 - a_hh;
-    let a_y2 = a.pos.1 + a_hh;
-
-    let b_x1 = b.pos.0 - b_hw;
-    let b_x2 = b.pos.0 + b_hw;
-    let b_y1 = b.pos.1 - b_hh;
-    let b_y2 = b.pos.1 + b_hh;
-
-    let x_overlap = a_x1 < b_x2 && b_x1 < a_x2;
-    let y_overlap = a_y1 < b_y2 && b_y1 < a_y2;
-
-    if x_overlap && y_overlap {
-        // Pads overlap.
-        return 0.0;
-    }
-
-    if x_overlap {
-        // Overlap in X: gap is the Y separation.
-        return if a_y2 <= b_y1 {
-            b_y1 - a_y2
-        } else {
-            a_y1 - b_y2
-        };
-    }
-
-    if y_overlap {
-        // Overlap in Y: gap is the X separation.
-        return if a_x2 <= b_x1 {
-            b_x1 - a_x2
-        } else {
-            a_x1 - b_x2
-        };
-    }
-
-    // No overlap on either axis: Euclidean distance between closest corners.
-    let dx = if a_x2 <= b_x1 {
-        b_x1 - a_x2
-    } else {
-        a_x1 - b_x2
-    };
-    let dy = if a_y2 <= b_y1 {
-        b_y1 - a_y2
-    } else {
-        a_y1 - b_y2
-    };
-    (dx * dx + dy * dy).sqrt()
-}
-
 /// Detect tracks that self-intersect (should not happen with a topological
 /// router, but we verify it independently).
 fn check_self_intersections(layout: &Layout, diagnostics: &mut Vec<Diagnostic>) {
@@ -333,6 +274,65 @@ fn has_self_intersection(path: &[(f64, f64)]) -> bool {
         }
     }
     false
+}
+
+/// Compute the minimum edge-to-edge gap between two axis-aligned
+/// rectangular pads.  Returns the gap in millimetres, or 0.0 if the
+/// pads overlap.
+fn pad_to_pad_gap(a: &Pad, b: &Pad) -> f64 {
+    // Half-extents.
+    let (a_hw, a_hh) = (a.width / 2.0, a.height / 2.0);
+    let (b_hw, b_hh) = (b.width / 2.0, b.height / 2.0);
+
+    // Extents on each axis.
+    let a_x1 = a.pos.0 - a_hw;
+    let a_x2 = a.pos.0 + a_hw;
+    let a_y1 = a.pos.1 - a_hh;
+    let a_y2 = a.pos.1 + a_hh;
+
+    let b_x1 = b.pos.0 - b_hw;
+    let b_x2 = b.pos.0 + b_hw;
+    let b_y1 = b.pos.1 - b_hh;
+    let b_y2 = b.pos.1 + b_hh;
+
+    let x_overlap = a_x1 < b_x2 && b_x1 < a_x2;
+    let y_overlap = a_y1 < b_y2 && b_y1 < a_y2;
+
+    if x_overlap && y_overlap {
+        // Pads overlap.
+        return 0.0;
+    }
+
+    if x_overlap {
+        // Overlap in X: gap is the Y separation.
+        return if a_y2 <= b_y1 {
+            b_y1 - a_y2
+        } else {
+            a_y1 - b_y2
+        };
+    }
+
+    if y_overlap {
+        // Overlap in Y: gap is the X separation.
+        return if a_x2 <= b_x1 {
+            b_x1 - a_x2
+        } else {
+            a_x1 - b_x2
+        };
+    }
+
+    // No overlap on either axis: Euclidean distance between closest corners.
+    let dx = if a_x2 <= b_x1 {
+        b_x1 - a_x2
+    } else {
+        a_x1 - b_x2
+    };
+    let dy = if a_y2 <= b_y1 {
+        b_y1 - a_y2
+    } else {
+        a_y1 - b_y2
+    };
+    (dx * dx + dy * dy).sqrt()
 }
 
 /// Check if a point lies within the bounding box of a segment (collinear case).

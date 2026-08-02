@@ -60,18 +60,6 @@ pub struct LandPattern {
     pub pitch: f64,
 }
 
-impl LandPattern {
-    /// Edge-to-edge gap between the two pads in mm.
-    ///
-    /// Computed as `pitch − pad_w`.  For the smallest packages (e.g. 0201 /
-    /// 0603 metric) this falls below the typical 0.2mm board-level copper
-    /// clearance, which is correct per IPC‑7351 and must be accounted for
-    /// in the design‑rule checks.
-    pub fn pad_gap(&self) -> f64 {
-        self.pitch - self.pad_w
-    }
-}
-
 impl Package {
     /// Look up a footprint code by its imperial or metric name.
     ///
@@ -206,6 +194,18 @@ impl Package {
             Self::M5025 => "Capacitor_SMD.3dshapes/C_2010_5025Metric",
             Self::M6332 => "Capacitor_SMD.3dshapes/C_2512_6332Metric",
         }
+    }
+}
+
+impl LandPattern {
+    /// Edge-to-edge gap between the two pads in mm.
+    ///
+    /// Computed as `pitch − pad_w`.  For the smallest packages (e.g. 0201 /
+    /// 0603 metric) this falls below the typical 0.2mm board-level copper
+    /// clearance, which is correct per IPC‑7351 and must be accounted for
+    /// in the design‑rule checks.
+    pub fn pad_gap(&self) -> f64 {
+        self.pitch - self.pad_w
     }
 }
 

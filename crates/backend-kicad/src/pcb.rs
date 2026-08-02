@@ -2,7 +2,9 @@
 
 use std::{collections::HashMap, path::Path};
 
-use copperleaf::{BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Placement, Stackup, StackupLayer};
+use copperleaf::{
+    BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Placement, Stackup, StackupLayer,
+};
 
 use crate::{
     common::{build_net_codes, fmt_mm, footprint_ref, format_float, format_grid_float},
@@ -153,8 +155,7 @@ pub fn emit_pcb_with_layout(
         // tables and a refdes→footprint lookup.
         let (old_name_to_new, old_code_to_new, refdes_to_fp) =
             if let Some(fps) = preserved_footprints {
-                let (on, oc) =
-                    build_net_remap(old_net_names, board, &net_codes);
+                let (on, oc) = build_net_remap(old_net_names, board, &net_codes);
                 let r2f: HashMap<String, &Sexpr> = fps
                     .iter()
                     .filter_map(|fp| footprint_refdes(fp).map(|r| (r, fp)))
@@ -293,6 +294,57 @@ fn board_outline(width: f64, height: f64) -> Vec<Sexpr> {
             ])
         })
         .collect()
+}
+
+/// Build old→new net remapping tables from the parsed old PCB's net name
+/// table and the new compiled board.
+///
+/// Returns:
+/// - `old_name_to_new`: old net *name* → (new KiCad code, new net name)
+/// - `old_code_to_new`: old net *code* → (new KiCad code, new net name)
+fn build_net_remap(
+    old_net_names: &HashMap<usize, String>,
+    board: &CompiledBoard,
+    net_codes: &[(String, usize)],
+) -> (
+    HashMap<String, (usize, String)>,
+    HashMap<usize, (usize, String)>,
+) {
+    // New net name → (new KiCad code, new net name).
+    let name_to_new: HashMap<&str, (usize, &str)> = board
+        .nets
+        .iter()
+        .enumerate()
+        .filter_map(|(_idx, net)| {
+            let (_, code) = net_codes.iter().find(|(name, _)| *name == net.name)?;
+            Some((net.name.as_str(), (*code, net.name.as_str())))
+        })
+        .collect();
+
+    let mut name_map: HashMap<String, (usize, String)> = HashMap::new();
+    let mut code_map: HashMap<usize, (usize, String)> = HashMap::new();
+
+    // Populate from old net code → name → new code mapping.
+    for (&old_code, old_name) in old_net_names {
+        if let Some(&(new_code, new_name)) = name_to_new.get(old_name.as_str()) {
+            let entry = (new_code, new_name.to_string());
+            name_map
+                .entry(old_name.clone())
+                .or_insert_with(|| entry.clone());
+            code_map.insert(old_code, entry);
+        }
+    }
+
+    // Also populate name_map from every net name in the new board, so that
+    // old PCBs that reference nets by name (without top-level net-code
+    // declarations) still get their pad nets remapped.
+    for (&name, &(code, new_name)) in &name_to_new {
+        name_map
+            .entry(name.to_string())
+            .or_insert_with(|| (code, new_name.to_string()));
+    }
+
+    (name_map, code_map)
 }
 
 fn emit_tracks(
@@ -690,6 +742,25 @@ fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Se
     Sexpr::list(prop)
 }
 
+/// Extract the reference designator from a footprint S-expression.
+fn footprint_refdes(fp: &Sexpr) -> Option<String> {
+    let Sexpr::List(parts) = fp else {
+        return None;
+    };
+    for child in &parts[1..] {
+        let Sexpr::List(props) = child else {
+            continue;
+        };
+        if props.len() >= 3
+            && props[0].as_string() == "property"
+            && props[1].as_string() == "Reference"
+        {
+            return Some(props[2].as_string());
+        }
+    }
+    None
+}
+
 fn general_node(stackup: &Stackup) -> Sexpr {
     let thickness = format_float(stackup.total_thickness_mm(), 1);
     Sexpr::list([
@@ -815,6 +886,69 @@ fn normalised_layer_name(idx: usize, total: usize) -> String {
         0 => "F.Cu".into(),
         i if i == total - 1 => "B.Cu".into(),
         i => format!("In{i}.Cu"),
+    }
+}
+
+/// Walk a footprint S-expression and update `(net ...)` references inside
+/// pads to use the new board's net codes and names.
+fn remap_footprint_nets(
+    fp: &mut Sexpr,
+    old_name_to_new: &HashMap<String, (usize, String)>,
+    old_code_to_new: &HashMap<usize, (usize, String)>,
+) {
+    let Sexpr::List(fp_parts) = fp else {
+        return;
+    };
+    for child in fp_parts.iter_mut() {
+        let Sexpr::List(props) = child else {
+            continue;
+        };
+        if props.is_empty() {
+            continue;
+        }
+        // Look for (pad ...) nodes.
+        if props[0].as_string() != "pad" {
+            continue;
+        }
+        // Within a pad, find and update the (net ...) node.
+        for prop in props.iter_mut() {
+            let Sexpr::List(net_props) = prop else {
+                continue;
+            };
+            if net_props.is_empty() || net_props[0].as_string() != "net" {
+                continue;
+            }
+            if net_props.len() < 2 {
+                continue;
+            }
+            remap_net_node(net_props, old_name_to_new, old_code_to_new);
+        }
+    }
+}
+
+/// Update a single `(net ...)` node inside a pad.
+fn remap_net_node(
+    props: &mut Vec<Sexpr>,
+    old_name_to_new: &HashMap<String, (usize, String)>,
+    old_code_to_new: &HashMap<usize, (usize, String)>,
+) {
+    let s = props[1].as_string();
+    // Try numeric code first: (net 1) or (net 1 "NAME")
+    if let Ok(old_code) = s.parse::<usize>() {
+        if let Some(&(new_code, ref new_name)) = old_code_to_new.get(&old_code) {
+            *props = vec![
+                Sexpr::atom("net"),
+                Sexpr::atom(new_code.to_string()),
+                Sexpr::str(new_name),
+            ];
+        }
+    } else if let Some(&(new_code, ref new_name)) = old_name_to_new.get(&s) {
+        // Try string name: (net "NAME")
+        *props = vec![
+            Sexpr::atom("net"),
+            Sexpr::atom(new_code.to_string()),
+            Sexpr::str(new_name),
+        ];
     }
 }
 
@@ -949,143 +1083,6 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     ));
 
     Sexpr::list(entries)
-}
-
-// ---------------------------------------------------------------------------
-// Footprint preservation helpers (used by emit_update)
-// ---------------------------------------------------------------------------
-
-/// Build old→new net remapping tables from the parsed old PCB's net name
-/// table and the new compiled board.
-///
-/// Returns:
-/// - `old_name_to_new`: old net *name* → (new KiCad code, new net name)
-/// - `old_code_to_new`: old net *code* → (new KiCad code, new net name)
-fn build_net_remap(
-    old_net_names: &HashMap<usize, String>,
-    board: &CompiledBoard,
-    net_codes: &[(String, usize)],
-) -> (
-    HashMap<String, (usize, String)>,
-    HashMap<usize, (usize, String)>,
-) {
-    // New net name → (new KiCad code, new net name).
-    let name_to_new: HashMap<&str, (usize, &str)> = board
-        .nets
-        .iter()
-        .enumerate()
-        .filter_map(|(_idx, net)| {
-            let (_, code) = net_codes
-                .iter()
-                .find(|(name, _)| *name == net.name)?;
-            Some((net.name.as_str(), (*code, net.name.as_str())))
-        })
-        .collect();
-
-    let mut name_map: HashMap<String, (usize, String)> = HashMap::new();
-    let mut code_map: HashMap<usize, (usize, String)> = HashMap::new();
-
-    // Populate from old net code → name → new code mapping.
-    for (&old_code, old_name) in old_net_names {
-        if let Some(&(new_code, new_name)) = name_to_new.get(old_name.as_str()) {
-            let entry = (new_code, new_name.to_string());
-            name_map.entry(old_name.clone()).or_insert_with(|| entry.clone());
-            code_map.insert(old_code, entry);
-        }
-    }
-
-    // Also populate name_map from every net name in the new board, so that
-    // old PCBs that reference nets by name (without top-level net-code
-    // declarations) still get their pad nets remapped.
-    for (&name, &(code, new_name)) in &name_to_new {
-        name_map
-            .entry(name.to_string())
-            .or_insert_with(|| (code, new_name.to_string()));
-    }
-
-    (name_map, code_map)
-}
-
-/// Extract the reference designator from a footprint S-expression.
-fn footprint_refdes(fp: &Sexpr) -> Option<String> {
-    let Sexpr::List(parts) = fp else {
-        return None;
-    };
-    for child in &parts[1..] {
-        let Sexpr::List(props) = child else {
-            continue;
-        };
-        if props.len() >= 3
-            && props[0].as_string() == "property"
-            && props[1].as_string() == "Reference"
-        {
-            return Some(props[2].as_string());
-        }
-    }
-    None
-}
-
-/// Walk a footprint S-expression and update `(net ...)` references inside
-/// pads to use the new board's net codes and names.
-fn remap_footprint_nets(
-    fp: &mut Sexpr,
-    old_name_to_new: &HashMap<String, (usize, String)>,
-    old_code_to_new: &HashMap<usize, (usize, String)>,
-) {
-    let Sexpr::List(fp_parts) = fp else {
-        return;
-    };
-    for child in fp_parts.iter_mut() {
-        let Sexpr::List(props) = child else {
-            continue;
-        };
-        if props.is_empty() {
-            continue;
-        }
-        // Look for (pad ...) nodes.
-        if props[0].as_string() != "pad" {
-            continue;
-        }
-        // Within a pad, find and update the (net ...) node.
-        for prop in props.iter_mut() {
-            let Sexpr::List(net_props) = prop else {
-                continue;
-            };
-            if net_props.is_empty() || net_props[0].as_string() != "net" {
-                continue;
-            }
-            if net_props.len() < 2 {
-                continue;
-            }
-            remap_net_node(net_props, old_name_to_new, old_code_to_new);
-        }
-    }
-}
-
-/// Update a single `(net ...)` node inside a pad.
-fn remap_net_node(
-    props: &mut Vec<Sexpr>,
-    old_name_to_new: &HashMap<String, (usize, String)>,
-    old_code_to_new: &HashMap<usize, (usize, String)>,
-) {
-    let s = props[1].as_string();
-    // Try numeric code first: (net 1) or (net 1 "NAME")
-    if let Ok(old_code) = s.parse::<usize>() {
-        if let Some(&(new_code, ref new_name)) = old_code_to_new.get(&old_code) {
-            *props = vec![
-                Sexpr::atom("net"),
-                Sexpr::atom(new_code.to_string()),
-                Sexpr::str(new_name),
-            ];
-        }
-    } else if let Some(&(new_code, ref new_name)) = old_name_to_new.get(&s) {
-        // Try string name: (net "NAME")
-        *props = vec![
-            Sexpr::atom("net"),
-            Sexpr::atom(new_code.to_string()),
-            Sexpr::str(new_name),
-        ];
-    }
 }
 
 #[cfg(test)]

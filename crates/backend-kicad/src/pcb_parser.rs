@@ -83,19 +83,6 @@ pub struct ParsedPcb {
     pub graphics: Vec<crate::sexpr::Sexpr>,
 }
 
-/// Resolve a [`NetRef`] to a [`NetIdx`] using the code→idx and name→idx maps.
-/// Returns `None` if the referenced net doesn't exist in the new board.
-fn resolve_net_ref(
-    net_ref: &NetRef,
-    code_to_idx: &HashMap<usize, NetIdx>,
-    name_to_idx: &HashMap<&str, NetIdx>,
-) -> Option<NetIdx> {
-    match net_ref {
-        NetRef::Code(code) => code_to_idx.get(code).copied(),
-        NetRef::Name(name) => name_to_idx.get(name.as_str()).copied(),
-    }
-}
-
 impl ParsedPcb {
     /// Convert this parsed PCB to a [`Layout`] suitable for
     /// [`emit_pcb_with_layout`](crate::pcb::emit_pcb_with_layout).
@@ -581,6 +568,19 @@ fn parse_zone_node(parts: &[Sexpr]) -> Option<RawZone> {
     })
 }
 
+/// Resolve a [`NetRef`] to a [`NetIdx`] using the code→idx and name→idx maps.
+/// Returns `None` if the referenced net doesn't exist in the new board.
+fn resolve_net_ref(
+    net_ref: &NetRef,
+    code_to_idx: &HashMap<usize, NetIdx>,
+    name_to_idx: &HashMap<&str, NetIdx>,
+) -> Option<NetIdx> {
+    match net_ref {
+        NetRef::Code(code) => code_to_idx.get(code).copied(),
+        NetRef::Name(name) => name_to_idx.get(name.as_str()).copied(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -692,7 +692,14 @@ mod tests {
             }],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let pcb_str = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            None,
+            None,
+            &HashMap::new(),
+        );
 
         let parsed = parse_pcb(&pcb_str).expect("parse emitted PCB with layout");
 
@@ -747,7 +754,14 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let pcb_str = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            None,
+            None,
+            &HashMap::new(),
+        );
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a modified board with no nets (simulating net deletion).
@@ -776,7 +790,14 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let pcb_str = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            None,
+            None,
+            &HashMap::new(),
+        );
         let parsed = parse_pcb(&pcb_str).unwrap();
 
         // Create a board where the net is renamed but the name matches.
@@ -810,7 +831,14 @@ mod tests {
             zones: vec![],
         };
 
-        let pcb_str = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let pcb_str = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            None,
+            None,
+            &HashMap::new(),
+        );
 
         // First, verify the default emit produces 4 gr_line elements (board outline).
         let parsed = parse_pcb(&pcb_str).unwrap();
@@ -831,13 +859,26 @@ mod tests {
         }
 
         // Re-emit with the preserved graphics and verify they appear.
-        let out =
-            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&parsed.graphics), None, &HashMap::new());
+        let out = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            Some(&parsed.graphics),
+            None,
+            &HashMap::new(),
+        );
         let re_parsed = parse_pcb(&out).unwrap();
         assert_eq!(re_parsed.graphics.len(), 4);
 
         // When preserved_graphics is None, we should still get the default outline.
-        let out_no_preserve = crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let out_no_preserve = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            None,
+            None,
+            &HashMap::new(),
+        );
         let re_parsed_no = parse_pcb(&out_no_preserve).unwrap();
         assert_eq!(re_parsed_no.graphics.len(), 4);
     }
@@ -870,8 +911,14 @@ mod tests {
             ]),
         ])];
 
-        let out =
-            crate::pcb::emit_pcb_with_layout(&board, "test", Some(&layout), Some(&custom_outline), None, &HashMap::new());
+        let out = crate::pcb::emit_pcb_with_layout(
+            &board,
+            "test",
+            Some(&layout),
+            Some(&custom_outline),
+            None,
+            &HashMap::new(),
+        );
         let parsed = parse_pcb(&out).unwrap();
 
         // Should have exactly the 1 custom gr_line, not the default 4.

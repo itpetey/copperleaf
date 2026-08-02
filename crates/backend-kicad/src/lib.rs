@@ -223,38 +223,6 @@ impl Backend for KiCad {
     }
 }
 
-/// Emit `.kicad_mod` files for components that reference the project-local
-/// `copperleaf` footprint library and write the accompanying `fp-lib-table`.
-fn emit_local_footprints(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
-    use std::collections::BTreeSet;
-
-    let mut emitted: BTreeSet<String> = BTreeSet::new();
-    let mut has_any = false;
-
-    for comp in &board.components {
-        let fp_ref = common::footprint_ref(comp);
-        // Only emit for the `copperleaf:` library prefix — KiCad system
-        // libraries (containing `/`) are resolved by KiCad itself.
-        let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") else {
-            continue;
-        };
-        has_any = true;
-        if emitted.insert(fp_name.to_string()) {
-            let content = lib_emitter::emit_footprint_lib(comp, fp_name);
-            let footprints_dir = out.join("footprints");
-            fs::create_dir_all(&footprints_dir)?;
-            fs::write(footprints_dir.join(format!("{}.kicad_mod", fp_name)), content)?;
-        }
-    }
-
-    if has_any {
-        let fp_lib_table = project::emit_fp_lib_table("copperleaf");
-        fs::write(out.join("fp-lib-table"), fp_lib_table)?;
-    }
-
-    Ok(())
-}
-
 /// Write 3D model files from embedded base64 data into the `models/` subdir.
 fn emit_3d_models(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
     let models_dir = out.join("models");
@@ -275,6 +243,41 @@ fn emit_3d_models(out: &Path, board: &CompiledBoard) -> Result<(), BackendError>
             fs::write(models_dir.join(filename), &bytes)?;
         }
     }
+    Ok(())
+}
+
+/// Emit `.kicad_mod` files for components that reference the project-local
+/// `copperleaf` footprint library and write the accompanying `fp-lib-table`.
+fn emit_local_footprints(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
+    use std::collections::BTreeSet;
+
+    let mut emitted: BTreeSet<String> = BTreeSet::new();
+    let mut has_any = false;
+
+    for comp in &board.components {
+        let fp_ref = common::footprint_ref(comp);
+        // Only emit for the `copperleaf:` library prefix — KiCad system
+        // libraries (containing `/`) are resolved by KiCad itself.
+        let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") else {
+            continue;
+        };
+        has_any = true;
+        if emitted.insert(fp_name.to_string()) {
+            let content = lib_emitter::emit_footprint_lib(comp, fp_name);
+            let footprints_dir = out.join("footprints");
+            fs::create_dir_all(&footprints_dir)?;
+            fs::write(
+                footprints_dir.join(format!("{}.kicad_mod", fp_name)),
+                content,
+            )?;
+        }
+    }
+
+    if has_any {
+        let fp_lib_table = project::emit_fp_lib_table("copperleaf");
+        fs::write(out.join("fp-lib-table"), fp_lib_table)?;
+    }
+
     Ok(())
 }
 
