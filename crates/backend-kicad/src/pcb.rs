@@ -12,6 +12,11 @@ use crate::{
     sexpr::{Sexpr, kv},
 };
 
+pub type NetRemapping = (
+    HashMap<String, (usize, String)>,
+    HashMap<usize, (usize, String)>,
+);
+
 /// Emit a KiCad S-expression PCB file for the given compiled board.
 pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
     let net_codes = build_net_codes(board);
@@ -306,10 +311,7 @@ fn build_net_remap(
     old_net_names: &HashMap<usize, String>,
     board: &CompiledBoard,
     net_codes: &[(String, usize)],
-) -> (
-    HashMap<String, (usize, String)>,
-    HashMap<usize, (usize, String)>,
-) {
+) -> NetRemapping {
     // New net name → (new KiCad code, new net name).
     let name_to_new: HashMap<&str, (usize, &str)> = board
         .nets
