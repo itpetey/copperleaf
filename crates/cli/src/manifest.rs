@@ -376,22 +376,31 @@ pub(crate) fn clean_description(raw: &str) -> Option<String> {
 }
 
 /// Read and base64-encode a 3D model file, storing it in the manifest, if a
-/// model path is set and data hasn't already been embedded.
+/// model path is set and data hasn't already been embedded, or the embedded
+/// data is no longer valid base64 (e.g. corrupted by an LLM round-trip).
 pub(crate) fn embed_model_data(manifest: &mut Manifest) {
     if let Some(ref model_path) = manifest.component.model_3d.clone()
-        && manifest.component.model_3d_data.is_none()
         && let Ok(bytes) = std::fs::read(model_path)
     {
         use base64::Engine;
-        manifest.component.model_3d_data =
-            Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+        let needs_embed = match &manifest.component.model_3d_data {
+            None => true,
+            Some(data) => base64::engine::general_purpose::STANDARD
+                .decode(data)
+                .is_err(),
+        };
+        if needs_embed {
+            manifest.component.model_3d_data =
+                Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+        }
     }
 }
 
-/// Look for a `.step` file in the same directory as the given path.
+/// Look for a STEP file (`.step` or `.stp`) in the same directory as the
+/// given path.
 ///
-/// If the path is a directory (`.pretty` library), searches for any `.step`
-/// file inside it.  Returns the first match, or `None`.
+/// If the path is a directory (`.pretty` library), searches for any STEP file
+/// inside it.  Returns the first match, or `None`.
 pub(crate) fn find_step_file_alongside(path: &str) -> Option<String> {
     let p = std::path::Path::new(path);
     let dir = if p.is_dir() {
@@ -402,7 +411,9 @@ pub(crate) fn find_step_file_alongside(path: &str) -> Option<String> {
     for entry in std::fs::read_dir(&dir).ok()? {
         let entry = entry.ok()?;
         let fp = entry.path();
-        if fp.extension().and_then(|s| s.to_str()) == Some("step") {
+        if let Some(ext) = fp.extension().and_then(|s| s.to_str())
+            && (ext.eq_ignore_ascii_case("step") || ext.eq_ignore_ascii_case("stp"))
+        {
             return fp.to_str().map(|s| s.to_string());
         }
     }

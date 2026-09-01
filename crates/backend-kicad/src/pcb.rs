@@ -1024,11 +1024,17 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
 
     let mut dielectric_counter = 1u32;
 
-    let layer_t = stackup.layers.len();
-    for (idx, layer) in stackup.layers.iter().enumerate() {
+    // Number copper layers by their copper ordinal (0 = F.Cu, 1 = In1.Cu, …)
+    // so inner layers line up with the `(layers …)` table, which uses the
+    // same numbering.  Using the raw position in `stackup.layers` would
+    // include dielectrics in the count (`In2.Cu`, `In4.Cu` for 4-layer).
+    let mut copper_counter = 0usize;
+    let copper_total = stackup.copper_layer_count();
+    for layer in stackup.layers.iter() {
         match layer {
             StackupLayer::Copper { thickness_mm, .. } => {
-                let name = normalised_layer_name(idx, layer_t);
+                let name = normalised_layer_name(copper_counter, copper_total);
+                copper_counter += 1;
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
                     &name,
@@ -1171,6 +1177,23 @@ mod tests {
         assert!(out.contains("(31 \"B.Cu\" signal)"), "{}", out);
         assert!(out.contains("(44 \"Edge.Cuts\" user)"), "{}", out);
         assert!(out.contains("(47 \"F.CrtYd\" user)"), "{}", out);
+    }
+
+    #[test]
+    fn four_layer_stackup_uses_copper_ordinals() {
+        let mut board = test_board();
+        board.stackup = copperleaf::Stackup::four_layer();
+        let out = emit_pcb(&board, "test");
+        // Inner coppers must be numbered by copper ordinal, matching the
+        // `(layers …)` table (In1.Cu, In2.Cu) — not by raw position in the
+        // layer list, which would produce In2.Cu/In4.Cu.
+        assert!(out.contains("(layer \"In1.Cu\""), "{}", out);
+        assert!(out.contains("(layer \"In2.Cu\""), "{}", out);
+        assert!(!out.contains("\"In4.Cu\""), "{}", out);
+        // Dielectrics keep their own sequential numbering.
+        assert!(out.contains("(layer \"dielectric 1\""), "{}", out);
+        assert!(out.contains("(layer \"dielectric 2\""), "{}", out);
+        assert!(out.contains("(layer \"dielectric 3\""), "{}", out);
     }
 
     // ------------------------------------------------------------------

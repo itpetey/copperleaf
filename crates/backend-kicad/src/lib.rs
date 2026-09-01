@@ -61,51 +61,15 @@ impl KiCad {
 }
 
 impl KiCad {
-    /// Update an existing PCB file with a new [`CompiledBoard`], preserving
-    /// all physical layout (placements, tracks, vias, zones) **and** all
-    /// top-level graphic elements (`gr_line`, `gr_arc`, `gr_circle`,
-    /// `gr_rect`).
+    /// Update schematic and project files from a new [`CompiledBoard`]
+    /// without touching the existing `.kicad_pcb`.
     ///
-    /// Reads the existing `.kicad_pcb` from `output_dir` (derived from the
-    /// configured project name), parses layout data, remaps nets by name to
-    /// the new board, and regenerates all output files.
-    ///
-    /// Copper elements referencing deleted nets are silently dropped. New
-    /// components without an existing placement are auto-placed.
+    /// Emits `.kicad_pro`, `.kicad_sch`, `.net`, and 3D model files.  The
+    /// PCB layout is left alone so that manual edits are not overwritten.
     pub fn emit_update(
         &self,
         output_dir: impl AsRef<Path>,
         board: &CompiledBoard,
-    ) -> Result<(), BackendError> {
-        let out = output_dir.as_ref();
-        let pcb_path = out.join(format!("{}.kicad_pcb", self.project_name));
-        let pcb_source = fs::read_to_string(&pcb_path)?;
-        let parsed = pcb_parser::parse_pcb(&pcb_source)
-            .map_err(|e| BackendError::EmitError(format!("parse existing PCB: {e}")))?;
-        let layout = parsed.to_layout(board);
-        self.emit_with_graphics(
-            output_dir,
-            board,
-            &layout,
-            &parsed.graphics,
-            &parsed.footprints,
-            &parsed.net_names,
-        )
-    }
-
-    /// Emit board files with a layout **and** preserved board-level graphics.
-    ///
-    /// When `graphics` is non-empty those S-expression nodes replace the
-    /// generated board outline so that manual edits to the board shape
-    /// survive a schema update.
-    fn emit_with_graphics(
-        &self,
-        output_dir: impl AsRef<Path>,
-        board: &CompiledBoard,
-        layout: &Layout,
-        graphics: &[crate::sexpr::Sexpr],
-        preserved_footprints: &[crate::sexpr::Sexpr],
-        old_net_names: &std::collections::HashMap<usize, String>,
     ) -> Result<(), BackendError> {
         let out = output_dir.as_ref().to_owned();
         fs::create_dir_all(&out)?;
@@ -116,48 +80,10 @@ impl KiCad {
         let sch = schematic::emit_schematic(board);
         fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
 
-        let preserved = if graphics.is_empty() {
-            None
-        } else {
-            Some(graphics)
-        };
-        let preserved_fps = if preserved_footprints.is_empty() {
-            None
-        } else {
-            Some(preserved_footprints)
-        };
-        let pcb = pcb::emit_pcb_with_layout(
-            board,
-            &self.project_name,
-            Some(layout),
-            preserved,
-            preserved_fps,
-            old_net_names,
-        );
-        fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
-
         let net = netlist::emit_netlist(board);
         fs::write(out.join(format!("{}.net", self.project_name)), net)?;
 
-        // Write 3D model files into models/ subdir.
-        let models_dir = out.join("models");
-        for comp in &board.components {
-            if let Some(ref data) = comp.meta.model_3d_data {
-                fs::create_dir_all(&models_dir)?;
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(data)
-                    .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
-                let fallback = format!("{}.step", comp.refdes);
-                let filename = comp
-                    .meta
-                    .model_3d
-                    .as_deref()
-                    .and_then(|p| Path::new(p).file_name())
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&fallback);
-                fs::write(models_dir.join(filename), &bytes)?;
-            }
-        }
+        emit_3d_models(&out, board)?;
 
         Ok(())
     }

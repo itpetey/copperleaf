@@ -199,7 +199,7 @@ width = 1.2
 height = 2.0
 pad_type = "smd"
 pad_shape = "rect"
-solder_mask_margin = 0.102
+solder_mask_margin = 0.0
 layers = "F.Cu F.Mask"
 thermal_vias = [
   { pos = [0.35, 0.0], drill = 0.2, size = 0.3 },

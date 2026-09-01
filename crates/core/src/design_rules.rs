@@ -9,15 +9,13 @@
 //!
 //! Convenience constructors mirror JLCPCB capabilities:
 //!
-//! | Profile               | Min track/clearance | Via Ø / Drill |
-//! |-----------------------|---------------------|---------------|
-//! | [`jlcpcb_2layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
-//! | [`jlcpcb_4layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
-//! | [`jlcpcb_6layer`]     | 0.102 mm (4 mil)    | 0.25 / 0.15   |
+//! | Profile            | Min track/clearance | Via Ø / Drill | Annular ring |
+//! |--------------------|---------------------|---------------|--------------|
+//! | [`jlcpcb_6mil`]    | 0.152 mm (6 mil)    | 0.60 / 0.30   | 0.150 mm     |
+//! | [`jlcpcb_4mil`]    | 0.102 mm (4 mil)    | 0.45 / 0.20   | 0.125 mm     |
 //!
-//! [`jlcpcb_2layer`]: DesignRules::jlcpcb_2layer
-//! [`jlcpcb_4layer`]: DesignRules::jlcpcb_4layer
-//! [`jlcpcb_6layer`]: DesignRules::jlcpcb_6layer
+//! [`jlcpcb_6mil`]: DesignRules::jlcpcb_6mil
+//! [`jlcpcb_4mil`]: DesignRules::jlcpcb_4mil
 
 /// Board-level design rules for manufacturing constraints.
 ///
@@ -29,8 +27,7 @@
 /// ```ignore
 /// use copperleaf::DesignRules;
 ///
-/// let rules = DesignRules::jlcpcb_2layer();
-/// assert!(rules.min_clearance > 0.0, "Quilter requires positive clearance");
+/// let rules = DesignRules::jlcpcb_6mil();
 /// board.set_design_rules(rules);
 /// ```
 #[derive(Clone, Debug)]
@@ -64,7 +61,12 @@ pub struct DesignRules {
     pub min_via_drill: f64,
     /// Minimum via annular ring width (mm).
     pub min_via_annular_width: f64,
-    /// Minimum through-hole pad outer diameter (mm).
+    /// Minimum through-hole drill (hole) diameter (mm).
+    ///
+    /// KiCad enforces this as a hole-size limit on all plated through
+    /// holes — both PTH pads *and* vias — so keep it at or below the
+    /// smallest drill used by any footprint on the board.  JLCPCB's
+    /// minimum drill is 0.30 mm (2-layer) / 0.20 mm (4+ layer).
     pub min_through_hole_diameter: f64,
     /// Minimum microvia outer diameter (mm).
     pub min_microvia_diameter: f64,
@@ -81,61 +83,63 @@ pub struct DesignRules {
 impl DesignRules {
     // --- Manufacturer profiles ---
 
-    /// JLCPCB 2‑layer board (1 oz outer copper).
+    /// JLCPCB 6 mil standard process.
     ///
-    /// Based on [JLCPCB capabilities](https://jlcpcb.com/capabilities/pcb-capabilities)
-    /// and values expected by Quilter.
+    /// Based on [JLCPCB capabilities](https://jlcpcb.com/capabilities/pcb-capabilities).
+    /// Suitable for all layer counts (2, 4, 6).
+    /// Minimum track/clearance: 0.152 mm (6 mil).
+    /// Minimum via: 0.60 mm pad / 0.30 mm drill.
+    /// Minimum through-hole drill: 0.20 mm (JLCPCB 4+ layer minimum;
+    /// 2-layer minimum is 0.30 mm).
+    pub fn jlcpcb_6mil() -> Self {
+        Self {
+            min_clearance: 0.152,
+            min_pad_to_pad_clearance: 0.0,
+            min_connection: 0.152,
+            min_copper_edge_clearance: 0.3,
+            min_hole_clearance: 0.25,
+            min_hole_to_hole: 0.5,
+            min_silk_clearance: 0.15,
+            min_track_width: 0.152,
+            min_via_diameter: 0.60,
+            min_via_drill: 0.30,
+            min_via_annular_width: 0.15,
+            min_through_hole_diameter: 0.20,
+            min_microvia_diameter: 0.45,
+            min_microvia_drill: 0.20,
+            solder_mask_to_copper_clearance: 0.05,
+            min_text_height: 1.0,
+            min_text_thickness: 0.15,
+        }
+    }
+
+    /// JLCPCB 4 mil advanced / JLC04161H-7628 process.
+    ///
+    /// Based on [JLCPCB capabilities](https://jlcpcb.com/capabilities/pcb-capabilities).
+    /// Suitable for all layer counts (2, 4, 6).
     /// Minimum track/clearance: 0.102 mm (4 mil).
-    pub fn jlcpcb_2layer() -> Self {
+    /// Minimum via: 0.45 mm pad / 0.20 mm drill.
+    /// Minimum through-hole drill: 0.20 mm (JLCPCB 4+ layer minimum).
+    pub fn jlcpcb_4mil() -> Self {
         Self {
             min_clearance: 0.102,
             min_pad_to_pad_clearance: 0.0,
             min_connection: 0.102,
-            min_copper_edge_clearance: 0.3,
-            min_hole_clearance: 0.25,
-            min_hole_to_hole: 0.5,
+            min_copper_edge_clearance: 0.25,
+            min_hole_clearance: 0.20,
+            min_hole_to_hole: 0.4,
             min_silk_clearance: 0.15,
             min_track_width: 0.102,
-            min_via_diameter: 0.25,
-            min_via_drill: 0.15,
-            min_via_annular_width: 0.05,
-            min_through_hole_diameter: 0.3,
-            min_microvia_diameter: 0.25,
-            min_microvia_drill: 0.15,
+            min_via_diameter: 0.45,
+            min_via_drill: 0.20,
+            min_via_annular_width: 0.125,
+            min_through_hole_diameter: 0.20,
+            min_microvia_diameter: 0.45,
+            min_microvia_drill: 0.20,
             solder_mask_to_copper_clearance: 0.05,
             min_text_height: 1.0,
             min_text_thickness: 0.15,
         }
-    }
-
-    /// JLCPCB 4‑layer board (0.5 oz inner, 1 oz outer copper).
-    ///
-    /// Minimum track/clearance: 0.102 mm (4 mil) per Quilter.
-    pub fn jlcpcb_4layer() -> Self {
-        Self {
-            min_clearance: 0.102,
-            min_pad_to_pad_clearance: 0.0,
-            min_connection: 0.102,
-            min_copper_edge_clearance: 0.3,
-            min_hole_clearance: 0.25,
-            min_hole_to_hole: 0.5,
-            min_silk_clearance: 0.15,
-            min_track_width: 0.102,
-            min_via_diameter: 0.25,
-            min_via_drill: 0.15,
-            min_via_annular_width: 0.05,
-            min_through_hole_diameter: 0.2,
-            min_microvia_diameter: 0.25,
-            min_microvia_drill: 0.15,
-            solder_mask_to_copper_clearance: 0.05,
-            min_text_height: 1.0,
-            min_text_thickness: 0.15,
-        }
-    }
-
-    /// JLCPCB 6‑layer board (same minimums as 4‑layer).
-    pub fn jlcpcb_6layer() -> Self {
-        Self::jlcpcb_4layer()
     }
 }
 
@@ -182,49 +186,92 @@ mod tests {
     }
 
     #[test]
-    fn jlcpcb_2layer_min_clearance_is_4mil() {
-        let rules = DesignRules::jlcpcb_2layer();
+    fn jlcpcb_6mil_track_and_clearance() {
+        let rules = DesignRules::jlcpcb_6mil();
+        assert!((rules.min_clearance - 0.152).abs() < 0.001);
+        assert!((rules.min_track_width - 0.152).abs() < 0.001);
+        assert!((rules.min_connection - 0.152).abs() < 0.001);
+    }
+
+    #[test]
+    fn jlcpcb_4mil_track_and_clearance() {
+        let rules = DesignRules::jlcpcb_4mil();
         assert!((rules.min_clearance - 0.102).abs() < 0.001);
         assert!((rules.min_track_width - 0.102).abs() < 0.001);
+        assert!((rules.min_connection - 0.102).abs() < 0.001);
     }
 
     #[test]
-    fn jlcpcb_4layer_min_clearance_is_4mil() {
-        let rules = DesignRules::jlcpcb_4layer();
-        assert!((rules.min_clearance - 0.102).abs() < 0.001);
-        assert!((rules.min_track_width - 0.102).abs() < 0.001);
+    fn jlcpcb_6mil_via_values() {
+        let rules = DesignRules::jlcpcb_6mil();
+        assert!(
+            (rules.min_via_diameter - 0.60).abs() < 0.01,
+            "via diameter should be 0.60 mm"
+        );
+        assert!(
+            (rules.min_via_drill - 0.30).abs() < 0.01,
+            "via drill should be 0.30 mm"
+        );
+        assert!(
+            (rules.min_via_annular_width - 0.15).abs() < 0.01,
+            "annular width should be 0.15 mm"
+        );
     }
 
     #[test]
-    fn jlcpcb_via_values() {
-        for rules in [DesignRules::jlcpcb_2layer(), DesignRules::jlcpcb_4layer()] {
-            assert!(
-                (rules.min_via_diameter - 0.25).abs() < 0.01,
-                "via diameter should be 0.25 mm"
-            );
-            assert!(
-                (rules.min_via_drill - 0.15).abs() < 0.01,
-                "via drill should be 0.15 mm"
-            );
-        }
+    fn jlcpcb_4mil_via_values() {
+        let rules = DesignRules::jlcpcb_4mil();
+        assert!(
+            (rules.min_via_diameter - 0.45).abs() < 0.01,
+            "via diameter should be 0.45 mm"
+        );
+        assert!(
+            (rules.min_via_drill - 0.20).abs() < 0.01,
+            "via drill should be 0.20 mm"
+        );
+        assert!(
+            (rules.min_via_annular_width - 0.125).abs() < 0.01,
+            "annular width should be 0.125 mm"
+        );
     }
 
     #[test]
-    fn jlcpcb_6layer_equals_4layer() {
-        let r4 = DesignRules::jlcpcb_4layer();
-        let r6 = DesignRules::jlcpcb_6layer();
-        // Compare field-by-field since we don't derive PartialEq.
-        assert!((r4.min_clearance - r6.min_clearance).abs() < 1e-9);
-        assert!((r4.min_track_width - r6.min_track_width).abs() < 1e-9);
-        assert!((r4.min_via_diameter - r6.min_via_diameter).abs() < 1e-9);
+    fn jlcpcb_4mil_tighter_than_6mil() {
+        let r4 = DesignRules::jlcpcb_4mil();
+        let r6 = DesignRules::jlcpcb_6mil();
+        assert!(r4.min_clearance < r6.min_clearance);
+        assert!(r4.min_track_width < r6.min_track_width);
+        assert!(r4.min_via_diameter < r6.min_via_diameter);
+        assert!(r4.min_via_drill < r6.min_via_drill);
+        assert!(r4.min_hole_clearance < r6.min_hole_clearance);
     }
 
     #[test]
     fn jlcpcb_edge_clearance() {
-        for rules in [DesignRules::jlcpcb_2layer(), DesignRules::jlcpcb_4layer()] {
+        assert!((DesignRules::jlcpcb_6mil().min_copper_edge_clearance - 0.3).abs() < 0.01);
+        assert!((DesignRules::jlcpcb_4mil().min_copper_edge_clearance - 0.25).abs() < 0.01);
+    }
+
+    #[test]
+    fn jlcpcb_hole_clearance() {
+        assert!((DesignRules::jlcpcb_6mil().min_hole_clearance - 0.25).abs() < 0.01);
+        assert!((DesignRules::jlcpcb_4mil().min_hole_clearance - 0.20).abs() < 0.01);
+    }
+
+    #[test]
+    fn jlcpcb_through_hole_drill_is_manufacturable() {
+        // KiCad enforces `min_through_hole_diameter` as a hole-size limit on
+        // PTH pads *and* vias.  JLCPCB's minimum drill is 0.20 mm for 4+
+        // layers, so the profiles must not reject 0.20 mm holes (e.g. the
+        // MM8108 module's corner pins) or flag standard 0.4 mm via drills.
+        for rules in [DesignRules::jlcpcb_6mil(), DesignRules::jlcpcb_4mil()] {
             assert!(
-                (rules.min_copper_edge_clearance - 0.3).abs() < 0.01,
-                "edge clearance should be ~0.3 mm"
+                rules.min_through_hole_diameter <= 0.20 + 1e-9,
+                "through-hole drill minimum must be <= JLCPCB 0.20 mm 4-layer minimum"
+            );
+            assert!(
+                rules.min_through_hole_diameter >= 0.20 - 1e-9,
+                "through-hole drill minimum must not understate JLCPCB capability"
             );
         }
     }

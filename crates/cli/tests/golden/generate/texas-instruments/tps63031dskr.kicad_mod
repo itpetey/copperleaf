@@ -91,7 +91,7 @@
     (at 0 0)
     (size 1.2 2)
     (layers F.Cu F.Mask)
-    (solder_mask_margin 0.102))
+    (solder_mask_margin 0))
   (pad "" thru_hole circle
     (at 0.35 0)
     (size 0.3 0.3)

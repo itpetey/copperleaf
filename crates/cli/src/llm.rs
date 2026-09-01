@@ -31,7 +31,10 @@ pub fn new_from_datasheet(path: &str, args: &NewArgs) -> Result<Manifest, CliErr
     let prompt = new_prompt(args.title.as_deref(), args.description.as_deref());
     let raw = call_opencode(&prompt, &[&text], &args.model)?;
     let toml = extract_toml(&raw, path)?;
-    let manifest = crate::manifest::deserialise(&toml)?;
+    let mut manifest = crate::manifest::deserialise(&toml)?;
+    // `model_3d_data` is only ever produced from a real 3D model file via
+    // `embed_model_data`; never trust a value emitted by the LLM.
+    manifest.component.model_3d_data = None;
     Ok(manifest)
 }
 
@@ -43,11 +46,23 @@ pub fn update_from_datasheet(
 ) -> Result<Manifest, CliError> {
     let _ = args;
     let text = extract_pdf_text(path)?;
-    let existing_toml = crate::manifest::serialise(existing);
+
+    // `model_3d_data` is an opaque base64-encoded 3D model that can be
+    // megabytes long — far beyond what an LLM can reproduce reliably. Keep it
+    // out of the LLM round-trip entirely: strip it from `existing.toml` before
+    // prompting, then re-inject the original value afterwards.
+    let preserved_model_3d_data = existing.component.model_3d_data.clone();
+    let mut stripped = existing.clone();
+    stripped.component.model_3d_data = None;
+    let existing_toml = crate::manifest::serialise(&stripped);
+
     let prompt = update_prompt();
     let raw = call_opencode(&prompt, &[&existing_toml, &text], &args.model)?;
     let toml = extract_toml(&raw, path)?;
-    let manifest = crate::manifest::deserialise(&toml)?;
+    let mut manifest = crate::manifest::deserialise(&toml)?;
+    // Restore deterministically: whatever the model emitted (or omitted),
+    // `model_3d_data` always comes back as the original value.
+    manifest.component.model_3d_data = preserved_model_3d_data;
     Ok(manifest)
 }
 
@@ -234,22 +249,28 @@ Rules:
    - gnd: ground / VSS pins
    - pwr: supply input with a voltage range (requires v_min, v_max, i_max)
    - pwr_fixed: fixed-voltage regulator output or fixed supply (requires v, i)
-   - pwr_out: power output (requires v, i)
+   - pwr_out: power-supply output rail that feeds external loads (requires v, i).
+     NOT for internal regulator bypass pins that only need a decoupling capacitor.
    - dio: general digital I/O
    - analog_in: analog input
-   - analog_rf: RF / high-speed analog differential pairs
+   - analog_rf: RF or high-speed analog I/O (single-ended or differential).
+     Includes RF ports, antenna pins, PA/LNA connections, and internal LDO bypass
+     pins in the RF/analog domain (e.g. PA_LDO_OUT).
    - clk: clock input/output (requires bw_mhz)
    - spi: SPI bus pins (requires bw_mhz)
-4. For power pins include the required electrical fields; never leave them blank.
-5. For clocks and SPI set a sensible bw_mhz based on the datasheet max frequency.
-6. Add brief notes for ambiguous pins (e.g. "do not connect", "analog 3.3V", "active-low reset").
-7. Only use these constraint types with their exact fields:
+4. Internal LDO bypass pins (e.g. PA_LDO_OUT, DIG_LDO_OUT, RF_LDO_OUT) are NOT
+   pwr_out. They only need a decoupling capacitor to ground. Classify them by domain:
+   analog_rf for RF/analog LDO outputs, dio for digital LDO outputs.
+5. For power pins include the required electrical fields; never leave them blank.
+6. For clocks and SPI set a sensible bw_mhz based on the datasheet max frequency.
+7. Add brief notes for ambiguous pins (e.g. "do not connect", "analog 3.3V", "active-low reset").
+8. Only use these constraint types with their exact fields:
    - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
    - LengthMatch: group (string), skew_ps (number)
    - MaxJunction: temp (string like "125C")
    Do NOT invent constraint types or fields not listed above.
-8. Do NOT invent pins or values not present in the datasheet.
-9. Output ONLY the TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text.{title_hint}{description_hint}"#,
+9. Do NOT invent pins or values not present in the datasheet. In particular, do NOT add a `model_3d_data` field — it is managed by the tool.
+10. Output ONLY the TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text.{title_hint}{description_hint}"#,
         title_hint = title_hint,
         description_hint = description_hint,
     )
@@ -267,20 +288,31 @@ Read both files and produce an updated, valid TOML manifest.
 
 Rules:
 1. Preserve every pin and every existing field unless the datasheet clearly contradicts it.
-2. Enrich the title with manufacturer name, part number, functional description, and package type if not already descriptive. Format: "Manufacturer PartNumber Description (Package)".
-3. Add the datasheet URL in the datasheet field if missing.
-4. Enrich pins with purpose, notes, and electrical specs (v_min, v_max, i_max, v, i, bw_mhz) where the datasheet provides them.
-5. Preserve the existing pin kind unless the datasheet clearly contradicts it.
-6. Only add new pins if the datasheet explicitly lists them and they are missing from the existing manifest.
-7. Use the Copperleaf pin kinds: gnd, dio, analog_in, analog_rf, clk, spi, pwr, pwr_fixed, pwr_out.
-8. For kind=pwr include v_min, v_max, i_max. For kind=pwr_fixed or pwr_out include v and i. For kind=clk or spi include bw_mhz.
-9. Only use these constraint types with their exact fields:
-   - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
-   - LengthMatch: group (string), skew_ps (number)
-   - MaxJunction: temp (string like "125C")
-   Do NOT invent constraint types or fields not listed above.
-10. Do NOT invent information not present in the datasheet.
-11. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#
+2. `model_3d_data` is intentionally omitted from `existing.toml`. It is an opaque base64-encoded 3D model (STEP file), typically hundreds of kilobytes to megabytes long, managed by the tool and unrelated to the datasheet text. Ignore it completely: do NOT emit a `model_3d_data` field in your output, do NOT invent or recreate it, and do NOT add any placeholder for it.
+3. Apply the verbatim rule to every other existing field: copy it unchanged unless the datasheet clearly contradicts it. Do not paraphrase, reformat, or "clean up" existing values, and do not invent replacements for values you cannot reproduce.
+4. Enrich the title with manufacturer name, part number, functional description, and package type if not already descriptive. Format: "Manufacturer PartNumber Description (Package)".
+5. Add the datasheet URL in the datasheet field if missing.
+6. Enrich pins with purpose, notes, and electrical specs (v_min, v_max, i_max, v, i, bw_mhz) where the datasheet provides them.
+7. Preserve the existing pin kind unless the datasheet clearly contradicts it.
+   If the existing kind is already correct (e.g. analog_rf for an RF-domain pin
+   like PA_LDO_OUT), do NOT change it — even if the pin name contains "LDO" or
+   "_OUT". Internal LDO bypass pins that only need a decoupling capacitor are
+   NOT pwr_out.
+8. Only add new pins if the datasheet explicitly lists them and they are missing from the existing manifest.
+9. Use the Copperleaf pin kinds: gnd, dio, analog_in, analog_rf, clk, spi, pwr, pwr_fixed, pwr_out.
+   - pwr_out is for power-supply output rails that feed external loads — NOT for
+     internal regulator bypass pins that only need a decoupling capacitor.
+   - analog_rf covers RF and high-speed analog I/O (single-ended or differential),
+     including RF ports, antenna pins, PA/LNA connections, and internal LDO bypass
+     pins in the RF/analog domain (e.g. PA_LDO_OUT).
+10. For kind=pwr include v_min, v_max, i_max. For kind=pwr_fixed or pwr_out include v and i. For kind=clk or spi include bw_mhz.
+11. Only use these constraint types with their exact fields:
+    - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
+    - LengthMatch: group (string), skew_ps (number)
+    - MaxJunction: temp (string like "125C")
+    Do NOT invent constraint types or fields not listed above.
+12. Do NOT invent information not present in the datasheet.
+13. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#
         .to_string()
 }
 
