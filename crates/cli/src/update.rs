@@ -17,13 +17,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:NO_SOURCE".into(),
             severity: Severity::Error,
-            message:
-                "No source provided — pass --symbol, --datasheet, --dir, or --model-3d"
-                    .into(),
+            message: "No source provided — pass --symbol, --datasheet, --dir, or --model-3d".into(),
             entities: vec![],
             hint: Some(
-                "--model-3d alone (re)embeds the 3D model data from the given .step file"
-                    .into(),
+                "--model-3d alone (re)embeds the 3D model data from the given .step file".into(),
             ),
         }));
     }
