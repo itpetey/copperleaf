@@ -10,6 +10,7 @@ use crate::{CliError, UpdateArgs, discover, kindmap::KindMap, manifest};
 pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     // At least one source must be provided.
     if args.symbol.is_none()
+        && args.footprint.is_none()
         && args.datasheet.is_none()
         && args.dir.is_none()
         && args.model_3d.is_none()
@@ -17,7 +18,9 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         return Err(CliError::Diagnostic(Diagnostic {
             code: "CLI:NO_SOURCE".into(),
             severity: Severity::Error,
-            message: "No source provided — pass --symbol, --datasheet, --dir, or --model-3d".into(),
+            message:
+                "No source provided — pass --symbol, --footprint, --datasheet, --dir, or --model-3d"
+                    .into(),
             entities: vec![],
             hint: Some(
                 "--model-3d alone (re)embeds the 3D model data from the given .step file".into(),
@@ -28,16 +31,16 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     // If --dir is used, auto-detect lib_id from the directory contents.
     let lib_id = if let Some(ref dir) = args.dir {
         let discovered = discover::discover(std::path::Path::new(dir))?;
-        if discovered.symbol.is_none() {
+        if discovered.symbol.is_none() && discovered.footprint.is_none() {
             return Err(CliError::Diagnostic(Diagnostic {
                 code: "CLI:NO_SOURCE".into(),
                 severity: Severity::Error,
                 message: format!(
-                    "No .kicad_sym file found in '{}'",
+                    "No .kicad_sym or .kicad_mod files found in '{}'",
                     dir
                 ),
                 entities: vec![],
-                hint: Some("Place a .kicad_sym file in the directory, or use --symbol for an individual file".into()),
+                hint: Some("Place both files in the directory, or use --symbol / --footprint for individual files".into()),
             }));
         }
         discover::resolve_lib_id(args.lib_id.as_deref(), &discovered, None)?
@@ -90,7 +93,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         manifest.component.model_3d_data = None;
     }
 
-    // ── --dir: auto-discover symbol ──────────────────────────────────
+    // ── --dir: auto-discover symbol + footprint ─────────────────────
     if let Some(ref dir) = args.dir {
         let discovered = discover::discover(std::path::Path::new(dir))?;
 
@@ -101,6 +104,15 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
                 &lib_id,
                 &kindmap,
                 &args.default_kind,
+            )?;
+        }
+
+        if let Some(ref fp_path) = discovered.footprint {
+            merge_footprint_source(
+                &mut manifest,
+                fp_path.to_str().unwrap_or_default(),
+                &lib_id,
+                &args,
             )?;
         }
     }
@@ -120,6 +132,10 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         )?;
     }
 
+    if let Some(ref footprint_path) = args.footprint {
+        merge_footprint_source(&mut manifest, footprint_path, &lib_id, &args)?;
+    }
+
     manifest::embed_model_data(&mut manifest);
 
     let output = manifest::serialise(&manifest);
@@ -130,6 +146,119 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
         .unwrap_or_else(|| part_toml.clone());
 
     std::fs::write(&out_path, output)?;
+    Ok(())
+}
+
+/// Merge footprint data from a file into the manifest.
+fn merge_footprint_source(
+    manifest: &mut copperleaf_part_codegen::Manifest,
+    footprint_path: &str,
+    cli_lib_id: &str,
+    args: &UpdateArgs,
+) -> Result<(), CliError> {
+    let resolved_lib_id = cli_lib_id;
+    // Idiot check: verify the source matches this part.
+    if let Some(ref existing) = manifest.component.lib_id
+        && *existing != resolved_lib_id
+    {
+        return Err(CliError::Diagnostic(Diagnostic {
+            code: "CLI:LIB_ID_MISMATCH".into(),
+            severity: Severity::Error,
+            message: format!(
+                "Part TOML has lib_id '{}', but source contains '{}'",
+                existing, resolved_lib_id
+            ),
+            entities: vec![existing.clone(), resolved_lib_id.to_string()],
+            hint: Some("Use --lib-id to override, or update the correct TOML file".into()),
+        }));
+    }
+    let pads = if std::fs::metadata(footprint_path)?.is_dir() {
+        let lib = copperleaf_backend_kicad::parse_footprint_lib(footprint_path)?;
+        let Some((_, pads)) = lib.into_iter().find(|(name, _)| *name == resolved_lib_id) else {
+            return Err(CliError::Diagnostic(Diagnostic {
+                code: "CLI:FOOTPRINT_NOT_FOUND".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "Footprint '{}' not found in '{}'",
+                    resolved_lib_id, footprint_path
+                ),
+                entities: vec![resolved_lib_id.to_string()],
+                hint: None,
+            }));
+        };
+        pads
+    } else {
+        manifest::check_extension(
+            footprint_path,
+            "kicad_sym",
+            "CLI:SYMBOL_AS_FOOTPRINT",
+            "a symbol file",
+            "a footprint",
+            "--symbol",
+        )?;
+        copperleaf_backend_kicad::parse_footprint(footprint_path)?
+    };
+    // Idiot check: warn if pad count doesn't match pin count.
+    let electrical_pad_count = pads
+        .iter()
+        .filter(|p| {
+            if p.pad_type.eq_ignore_ascii_case("np_thru_hole")
+                || p.number.eq_ignore_ascii_case("none")
+                || p.number.is_empty()
+            {
+                return false;
+            }
+            if p.pad_type.eq_ignore_ascii_case("thru_hole") {
+                return !manifest::is_thermal_via(p, &manifest.pins);
+            }
+            true
+        })
+        .count();
+    if !manifest.pins.is_empty() && electrical_pad_count != manifest.pins.len() {
+        crate::print_diagnostic(&Diagnostic {
+            code: "CLI:PAD_COUNT_MISMATCH".into(),
+            severity: Severity::Warning,
+            message: format!(
+                "Footprint has {} electrical pads, but part TOML has {} pins",
+                electrical_pad_count,
+                manifest.pins.len()
+            ),
+            entities: vec![],
+            hint: Some("This may indicate the wrong footprint for this part".into()),
+        });
+    }
+    let diags = manifest::merge_footprint(manifest, &pads);
+    for d in &diags {
+        crate::print_diagnostic(d);
+    }
+
+    // Extract fabrication body outline from the footprint source.
+    {
+        let fab_path: std::path::PathBuf = if std::fs::metadata(footprint_path)?.is_dir() {
+            std::path::Path::new(footprint_path).join(format!("{}.kicad_mod", resolved_lib_id))
+        } else {
+            footprint_path.into()
+        };
+        if let Ok(Some(extent)) = copperleaf_backend_kicad::parse_footprint_fab_extent(&fab_path) {
+            manifest.component.fab_extent = Some(extent);
+        }
+    }
+
+    // Extract 3D model path from the footprint source, unless overridden
+    // by --model-3d (which is applied before merging and sets model_3d).
+    if manifest.component.model_3d.is_none() && args.model_3d.is_none() {
+        let extracted_model = if std::fs::metadata(footprint_path)?.is_dir() {
+            copperleaf_backend_kicad::parse_footprint_model_lib(footprint_path, resolved_lib_id)?
+        } else {
+            copperleaf_backend_kicad::parse_footprint_model(footprint_path)?
+        };
+        manifest.component.model_3d = extracted_model;
+
+        if manifest.component.model_3d.is_none() {
+            manifest.component.model_3d = manifest::find_step_file_alongside(footprint_path);
+        }
+    }
+
     Ok(())
 }
 

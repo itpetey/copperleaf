@@ -427,6 +427,13 @@ pub(crate) fn is_mechanical_pad(pad: &PadDef) -> bool {
         || pad.pad_type == "np_thru_hole"
 }
 
+/// Return `true` if `pad` is a thru-hole that sits inside any existing pin's
+/// bounding box (i.e. it is a thermal via, not an electrical pad).
+pub(crate) fn is_thermal_via(pad: &PadDef, pins: &[PinDef]) -> bool {
+    pins.iter()
+        .any(|pin| pin.number != pad.number && pin_contains_point(pin, pad.pos))
+}
+
 /// Convert a [`PadDef`] into a [`MechanicalDef`] for TOML storage.
 pub(crate) fn mech_def_from_pad(pad: &PadDef) -> MechanicalDef {
     MechanicalDef {

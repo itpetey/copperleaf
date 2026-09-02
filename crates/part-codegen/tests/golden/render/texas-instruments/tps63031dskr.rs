@@ -50,7 +50,7 @@ impl Tps63031dskr {
                 Pin::build("VINA").number("8").pos(1.195, 0.0).rotation(0.0).length(0.84).width(0.84).height(0.27).pad_type("smd").pad_shape("roundrect").roundrect_rratio(0.125).solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").pwr(1.8.volt(), 5.5.volt(), 0.01.amp()).pin(),
                 Pin::build("GND").number("9").pos(1.195, -0.5).rotation(0.0).length(0.84).width(0.84).height(0.27).pad_type("smd").pad_shape("roundrect").roundrect_rratio(0.125).solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").gnd(),
                 Pin::build("FB").number("10").pos(1.195, -1.0).rotation(0.0).length(0.84).width(0.84).height(0.27).pad_type("smd").pad_shape("roundrect").roundrect_rratio(0.125).solder_mask_margin(0.102).layers("F.Cu F.Mask F.Paste").dio(),
-                Pin::build("EXP").number("11").pos(0.0, 0.0).rotation(0.0).length(2.0).width(1.2).height(2.0).pad_type("smd").pad_shape("rect").solder_mask_margin(0.102).layers("F.Cu F.Mask").thermal_via((0.35, 0.0), 0.2, 0.3).thermal_via((-0.35, 0.0), 0.2, 0.3).thermal_via((0.0, -0.75), 0.2, 0.3).thermal_via((0.0, 0.75), 0.2, 0.3).dio(),
+                Pin::build("EXP").number("11").pos(0.0, 0.0).rotation(0.0).length(2.0).width(1.2).height(2.0).pad_type("smd").pad_shape("rect").solder_mask_margin(0.0).layers("F.Cu F.Mask").thermal_via((0.35, 0.0), 0.2, 0.3).thermal_via((-0.35, 0.0), 0.2, 0.3).thermal_via((0.0, -0.75), 0.2, 0.3).thermal_via((0.0, 0.75), 0.2, 0.3).dio(),
             ],
             mechanical: vec![
             ],
