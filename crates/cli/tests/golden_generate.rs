@@ -13,14 +13,14 @@ use std::{
     process::Command,
 };
 
-/// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
-fn blessing_enabled_from(value: Option<&str>) -> bool {
-    value == Some("1")
-}
-
 /// Whether snapshots should be written rather than compared.
 fn blessing_enabled() -> bool {
     blessing_enabled_from(std::env::var("COPPERLEAF_BLESS").ok().as_deref())
+}
+
+/// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
+fn blessing_enabled_from(value: Option<&str>) -> bool {
+    value == Some("1")
 }
 
 /// Compare every golden, or write them when blessing.  All failures are
@@ -47,17 +47,6 @@ fn collect_failures(goldens: &[(PathBuf, String)], bless: bool) -> Vec<String> {
         }
     }
     failures
-}
-
-/// Fail with every collected golden problem at once.
-fn report_failures(failures: Vec<String>) {
-    if !failures.is_empty() {
-        panic!(
-            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
-            failures.len(),
-            failures.join("\n")
-        );
-    }
 }
 
 fn copperleaf() -> Command {
@@ -137,6 +126,17 @@ fn parts_tomls() -> Vec<(String, String, PathBuf)> {
     }
     out.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
     out
+}
+
+/// Fail with every collected golden problem at once.
+fn report_failures(failures: Vec<String>) {
+    if !failures.is_empty() {
+        panic!(
+            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
 }
 
 fn run_generate(kind: &str, toml: &Path, out: &Path) {

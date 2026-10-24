@@ -189,73 +189,10 @@ impl Backend for KiCad {
     }
 }
 
-/// Reject invalid boards before writing any file.
-fn ensure_valid(board: &CompiledBoard, layout: Option<&Layout>) -> Result<(), BackendError> {
-    let findings = validate_compiled_board(board, layout);
-    let errors: Vec<String> = findings
-        .iter()
-        .filter(|diagnostic| diagnostic.severity == Severity::Error)
-        .map(|diagnostic| format!("[{}] {}", diagnostic.code, diagnostic.message))
-        .collect();
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(BackendError::EmitError(format!(
-            "board validation failed:\n{}",
-            errors.join("\n")
-        )))
-    }
-}
-
-/// Validate every filename that emission plans to write before any file is
-/// created, so a traversal attempt cannot leave partial output behind.
-fn validate_output_names(
-    out: &Path,
-    board: &CompiledBoard,
-    project_name: &str,
-) -> Result<(), BackendError> {
-    for extension in ["kicad_pro", "kicad_sch", "kicad_pcb", "net"] {
-        let _ = contained(out, &format!("{project_name}.{extension}"))?;
-    }
-    let _ = contained(out, "fp-lib-table")?;
-
-    let footprints_dir = out.join("footprints");
-    let models_dir = out.join("models");
-    for comp in &board.components {
-        let fp_ref = common::footprint_ref(comp);
-        if let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") {
-            let _ = contained(&footprints_dir, &format!("{fp_name}.kicad_mod"))?;
-        }
-        if comp
-            .meta
-            .model_3d_data
-            .as_deref()
-            .is_some_and(|data| !data.trim().is_empty())
-        {
-            let filename = comp
-                .meta
-                .model_3d
-                .as_deref()
-                .and_then(|path| Path::new(path).file_name())
-                .and_then(|name| name.to_str())
-                .map(str::to_owned)
-                .unwrap_or_else(|| format!("{}.step", comp.refdes));
-            let _ = contained(&models_dir, &filename)?;
-        }
-    }
-    Ok(())
-}
-
 /// Join one untrusted filename beneath a trusted output directory.
 fn contained(root: &Path, component: &str) -> Result<std::path::PathBuf, BackendError> {
     safe_join(root, component)
         .map_err(|error| BackendError::EmitError(format!("path containment: {error}")))
-}
-
-/// Write one output file, refusing names that escape the destination.
-fn write_contained(root: &Path, component: &str, contents: &str) -> Result<(), BackendError> {
-    fs::write(contained(root, component)?, contents)?;
-    Ok(())
 }
 
 /// Write 3D model files from embedded base64 data into the `models/` subdir.
@@ -317,6 +254,69 @@ fn emit_local_footprints(out: &Path, board: &CompiledBoard) -> Result<(), Backen
         write_contained(out, "fp-lib-table", &fp_lib_table)?;
     }
 
+    Ok(())
+}
+
+/// Reject invalid boards before writing any file.
+fn ensure_valid(board: &CompiledBoard, layout: Option<&Layout>) -> Result<(), BackendError> {
+    let findings = validate_compiled_board(board, layout);
+    let errors: Vec<String> = findings
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == Severity::Error)
+        .map(|diagnostic| format!("[{}] {}", diagnostic.code, diagnostic.message))
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(BackendError::EmitError(format!(
+            "board validation failed:\n{}",
+            errors.join("\n")
+        )))
+    }
+}
+
+/// Validate every filename that emission plans to write before any file is
+/// created, so a traversal attempt cannot leave partial output behind.
+fn validate_output_names(
+    out: &Path,
+    board: &CompiledBoard,
+    project_name: &str,
+) -> Result<(), BackendError> {
+    for extension in ["kicad_pro", "kicad_sch", "kicad_pcb", "net"] {
+        let _ = contained(out, &format!("{project_name}.{extension}"))?;
+    }
+    let _ = contained(out, "fp-lib-table")?;
+
+    let footprints_dir = out.join("footprints");
+    let models_dir = out.join("models");
+    for comp in &board.components {
+        let fp_ref = common::footprint_ref(comp);
+        if let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") {
+            let _ = contained(&footprints_dir, &format!("{fp_name}.kicad_mod"))?;
+        }
+        if comp
+            .meta
+            .model_3d_data
+            .as_deref()
+            .is_some_and(|data| !data.trim().is_empty())
+        {
+            let filename = comp
+                .meta
+                .model_3d
+                .as_deref()
+                .and_then(|path| Path::new(path).file_name())
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+                .unwrap_or_else(|| format!("{}.step", comp.refdes));
+            let _ = contained(&models_dir, &filename)?;
+        }
+    }
+    Ok(())
+}
+
+/// Write one output file, refusing names that escape the destination.
+fn write_contained(root: &Path, component: &str, contents: &str) -> Result<(), BackendError> {
+    fs::write(contained(root, component)?, contents)?;
     Ok(())
 }
 

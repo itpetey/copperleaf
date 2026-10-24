@@ -902,163 +902,9 @@ fn layers_node(stackup: &Stackup) -> Sexpr {
     Sexpr::list(entries)
 }
 
-fn net_class_node(
-    name: &str,
-    desc: &str,
-    clearance: &str,
-    trace_width: &str,
-    nets: &[String],
-) -> Sexpr {
-    let mut children = vec![
-        Sexpr::atom("net_class"),
-        Sexpr::str(name),
-        Sexpr::str(desc),
-        Sexpr::list([Sexpr::atom("clearance"), Sexpr::atom(clearance)]),
-        Sexpr::list([Sexpr::atom("trace_width"), Sexpr::atom(trace_width)]),
-        Sexpr::list([Sexpr::atom("via_dia"), Sexpr::atom("0.8")]),
-        Sexpr::list([Sexpr::atom("via_drill"), Sexpr::atom("0.4")]),
-        Sexpr::list([Sexpr::atom("uvia_dia"), Sexpr::atom("0.3")]),
-        Sexpr::list([Sexpr::atom("uvia_drill"), Sexpr::atom("0.1")]),
-    ];
-    for net in nets {
-        children.push(Sexpr::list([Sexpr::atom("add_net"), Sexpr::str(net)]));
-    }
-    Sexpr::list(children)
-}
-
-fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<Sexpr> {
-    use std::collections::BTreeMap;
-    let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
-    let mut default_nets: Vec<String> = Vec::new();
-
-    for (name, _) in net_codes {
-        let net = board.nets.iter().find(|n| &n.name == name);
-        match net.map(|n| &n.class) {
-            Some(NetClass {
-                min_width: Some(w),
-                clearance: Some(c),
-            }) => {
-                let key = (fmt_mm(w.as_base()), fmt_mm(c.as_base()));
-                groups.entry(key).or_default().push(name.clone());
-            }
-            _ => default_nets.push(name.clone()),
-        }
-    }
-
-    let rules = &board.design_rules;
-    let clearance = fmt_mm(rules.min_clearance / 1000.0);
-    let track_width = fmt_mm(rules.min_track_width / 1000.0);
-
-    let mut nodes = vec![net_class_node(
-        "Default",
-        "",
-        &clearance,
-        &track_width,
-        &default_nets,
-    )];
-    for ((width, clearance), nets) in groups {
-        let name = format!("Power_{}mm_{}mm", width, clearance);
-        nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
-    }
-    nodes
-}
-
-fn normalised_layer_name(layer: CopperLayer, total: usize) -> String {
-    match layer.0 {
-        0 => "F.Cu".into(),
-        i if i == total - 1 => "B.Cu".into(),
-        i => format!("In{i}.Cu"),
-    }
-}
-
-/// Map one footprint-side layer name to its mirror.
-fn mirrored_layer_name(name: &str) -> &str {
-    match name {
-        "F.Cu" => "B.Cu",
-        "B.Cu" => "F.Cu",
-        "F.Mask" => "B.Mask",
-        "B.Mask" => "F.Mask",
-        "F.Paste" => "B.Paste",
-        "B.Paste" => "F.Paste",
-        "F.SilkS" => "B.SilkS",
-        "B.SilkS" => "F.SilkS",
-        "F.Fab" => "B.Fab",
-        "B.Fab" => "F.Fab",
-        "F.CrtYd" => "B.CrtYd",
-        "B.CrtYd" => "F.CrtYd",
-        // Wildcards such as `*.Cu` and `*.Mask` are side-independent.
-        other => other,
-    }
-}
-
-fn mirrored_layer_field(field: &str) -> String {
-    field
-        .split_whitespace()
-        .map(mirrored_layer_name)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Mirror a pad across the footprint Y axis for back-side emission.
-fn mirror_pad(pad: &mut copperleaf::Pad) {
-    pad.pos.0 = -pad.pos.0;
-    pad.rotation = -pad.rotation;
-    if let Some(layers) = &pad.layers {
-        pad.layers = Some(mirrored_layer_field(layers));
-    }
-}
-
-fn negate_atom(atom: &mut Sexpr) {
-    if let Sexpr::Atom(text) = atom
-        && let Ok(value) = text.parse::<f64>()
-    {
-        let mirrored = if value == 0.0 { 0.0 } else { -value };
-        *text = format_float(mirrored, 4);
-    }
-}
-
 fn mirror_coordinate(parts: &mut [Sexpr], index: usize) {
     if let Some(atom) = parts.get_mut(index) {
         negate_atom(atom);
-    }
-}
-
-fn mirror_layer_atom(atom: &mut String) {
-    let quoted = atom.starts_with('"') && atom.ends_with('"');
-    let mapped = mirrored_layer_name(atom.trim_matches('"'));
-    *atom = if quoted {
-        format!("\"{mapped}\"")
-    } else {
-        mapped.to_string()
-    };
-}
-
-fn mirror_layers(node: &mut Sexpr) {
-    let Sexpr::List(parts) = node else {
-        return;
-    };
-    let head = match parts.first() {
-        Some(Sexpr::Atom(head)) => head.clone(),
-        _ => return,
-    };
-    match head.as_str() {
-        "layer" => {
-            if let Some(Sexpr::Atom(layer)) = parts.get_mut(1) {
-                mirror_layer_atom(layer);
-            }
-        }
-        "layers" => {
-            for part in parts.iter_mut().skip(1) {
-                if let Sexpr::Atom(layer) = part {
-                    mirror_layer_atom(layer);
-                }
-            }
-        }
-        _ => {
-            for part in parts.iter_mut().skip(1) {
-                mirror_layers(part);
-            }
-        }
     }
 }
 
@@ -1148,6 +994,160 @@ fn mirror_footprint_node(node: &mut Sexpr) {
         _ => {}
     }
     mirror_layers(node);
+}
+
+fn mirror_layer_atom(atom: &mut String) {
+    let quoted = atom.starts_with('"') && atom.ends_with('"');
+    let mapped = mirrored_layer_name(atom.trim_matches('"'));
+    *atom = if quoted {
+        format!("\"{mapped}\"")
+    } else {
+        mapped.to_string()
+    };
+}
+
+fn mirror_layers(node: &mut Sexpr) {
+    let Sexpr::List(parts) = node else {
+        return;
+    };
+    let head = match parts.first() {
+        Some(Sexpr::Atom(head)) => head.clone(),
+        _ => return,
+    };
+    match head.as_str() {
+        "layer" => {
+            if let Some(Sexpr::Atom(layer)) = parts.get_mut(1) {
+                mirror_layer_atom(layer);
+            }
+        }
+        "layers" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::Atom(layer) = part {
+                    mirror_layer_atom(layer);
+                }
+            }
+        }
+        _ => {
+            for part in parts.iter_mut().skip(1) {
+                mirror_layers(part);
+            }
+        }
+    }
+}
+
+/// Mirror a pad across the footprint Y axis for back-side emission.
+fn mirror_pad(pad: &mut copperleaf::Pad) {
+    pad.pos.0 = -pad.pos.0;
+    pad.rotation = -pad.rotation;
+    if let Some(layers) = &pad.layers {
+        pad.layers = Some(mirrored_layer_field(layers));
+    }
+}
+
+fn mirrored_layer_field(field: &str) -> String {
+    field
+        .split_whitespace()
+        .map(mirrored_layer_name)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Map one footprint-side layer name to its mirror.
+fn mirrored_layer_name(name: &str) -> &str {
+    match name {
+        "F.Cu" => "B.Cu",
+        "B.Cu" => "F.Cu",
+        "F.Mask" => "B.Mask",
+        "B.Mask" => "F.Mask",
+        "F.Paste" => "B.Paste",
+        "B.Paste" => "F.Paste",
+        "F.SilkS" => "B.SilkS",
+        "B.SilkS" => "F.SilkS",
+        "F.Fab" => "B.Fab",
+        "B.Fab" => "F.Fab",
+        "F.CrtYd" => "B.CrtYd",
+        "B.CrtYd" => "F.CrtYd",
+        // Wildcards such as `*.Cu` and `*.Mask` are side-independent.
+        other => other,
+    }
+}
+
+fn negate_atom(atom: &mut Sexpr) {
+    if let Sexpr::Atom(text) = atom
+        && let Ok(value) = text.parse::<f64>()
+    {
+        let mirrored = if value == 0.0 { 0.0 } else { -value };
+        *text = format_float(mirrored, 4);
+    }
+}
+
+fn net_class_node(
+    name: &str,
+    desc: &str,
+    clearance: &str,
+    trace_width: &str,
+    nets: &[String],
+) -> Sexpr {
+    let mut children = vec![
+        Sexpr::atom("net_class"),
+        Sexpr::str(name),
+        Sexpr::str(desc),
+        Sexpr::list([Sexpr::atom("clearance"), Sexpr::atom(clearance)]),
+        Sexpr::list([Sexpr::atom("trace_width"), Sexpr::atom(trace_width)]),
+        Sexpr::list([Sexpr::atom("via_dia"), Sexpr::atom("0.8")]),
+        Sexpr::list([Sexpr::atom("via_drill"), Sexpr::atom("0.4")]),
+        Sexpr::list([Sexpr::atom("uvia_dia"), Sexpr::atom("0.3")]),
+        Sexpr::list([Sexpr::atom("uvia_drill"), Sexpr::atom("0.1")]),
+    ];
+    for net in nets {
+        children.push(Sexpr::list([Sexpr::atom("add_net"), Sexpr::str(net)]));
+    }
+    Sexpr::list(children)
+}
+
+fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<Sexpr> {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    let mut default_nets: Vec<String> = Vec::new();
+
+    for (name, _) in net_codes {
+        let net = board.nets.iter().find(|n| &n.name == name);
+        match net.map(|n| &n.class) {
+            Some(NetClass {
+                min_width: Some(w),
+                clearance: Some(c),
+            }) => {
+                let key = (fmt_mm(w.as_base()), fmt_mm(c.as_base()));
+                groups.entry(key).or_default().push(name.clone());
+            }
+            _ => default_nets.push(name.clone()),
+        }
+    }
+
+    let rules = &board.design_rules;
+    let clearance = fmt_mm(rules.min_clearance / 1000.0);
+    let track_width = fmt_mm(rules.min_track_width / 1000.0);
+
+    let mut nodes = vec![net_class_node(
+        "Default",
+        "",
+        &clearance,
+        &track_width,
+        &default_nets,
+    )];
+    for ((width, clearance), nets) in groups {
+        let name = format!("Power_{}mm_{}mm", width, clearance);
+        nodes.push(net_class_node(&name, "", &clearance, &width, &nets));
+    }
+    nodes
+}
+
+fn normalised_layer_name(layer: CopperLayer, total: usize) -> String {
+    match layer.0 {
+        0 => "F.Cu".into(),
+        i if i == total - 1 => "B.Cu".into(),
+        i => format!("In{i}.Cu"),
+    }
 }
 
 /// Walk a footprint S-expression and update `(net ...)` references inside

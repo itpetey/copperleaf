@@ -1,4 +1,6 @@
 //! Rebuild this crate when any part TOML changes.
+
+//! Rebuild this crate when any part TOML changes.
 fn main() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     if let Ok(entries) = std::fs::read_dir(dir) {

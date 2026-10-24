@@ -6,6 +6,41 @@
 use copperleaf::{Board, BoardView, PinId, PinRef, UnitExt, pin::resolve_pin_identities};
 
 #[test]
+fn display_name_lookup_is_rejected_when_it_is_not_a_canonical_identity() {
+    let mut board = Board::new("w5500_identity");
+    let u1 = board.add("U1", copperleaf_parts_wiznet::W5500::new());
+    let r1 = board.add(
+        "R1",
+        copperleaf_parts_passives::Resistor::new(
+            10.0.kohm(),
+            copperleaf_parts_passives::footprint::Package::M1608,
+        ),
+    );
+
+    let error = board
+        .connect(u1.pin(PinRef("AVDD")), r1.pin(PinRef("1")))
+        .expect_err("display-name lookup must not resolve");
+    assert_eq!(error.errors[0].code, "BOARD:INVALID_PIN");
+    assert!(error.errors[0].message.contains("AVDD"));
+}
+
+/// Return the net name attached to a PCB pad, scanning that pad's block.
+fn pad_net(pcb: &str, number: &str) -> Option<String> {
+    let start = pcb.find(&format!("(pad \"{number}\""))?;
+    let rest = &pcb[start..];
+    let end = rest[1..]
+        .find("(pad \"")
+        .map(|offset| offset + 1)
+        .unwrap_or(rest.len());
+    let block = &rest[..end];
+    let net_start = block.find("(net ")?;
+    let net_block = &block[net_start..];
+    let end = net_block.find(')')?;
+    let quoted = net_block[..end].split_once('"')?.1;
+    Some(quoted.split('"').next()?.to_string())
+}
+
+#[test]
 fn w5500_repeated_avdd_pads_connect_independently() {
     let mut board = Board::new("w5500_identity");
     let u1 = board.add("U1", copperleaf_parts_wiznet::W5500::new());
@@ -75,41 +110,6 @@ fn w5500_repeated_avdd_pads_connect_independently() {
     assert_eq!(pad4_connections[0].pin, w5500.pins[pad4_index].id().clone());
     assert_ne!(w5500.pins[pad4_index].id(), w5500.pins[pad8_index].id());
     assert!(w5500.pins[pad4_index].id() != &PinId("4".into()));
-}
-
-#[test]
-fn display_name_lookup_is_rejected_when_it_is_not_a_canonical_identity() {
-    let mut board = Board::new("w5500_identity");
-    let u1 = board.add("U1", copperleaf_parts_wiznet::W5500::new());
-    let r1 = board.add(
-        "R1",
-        copperleaf_parts_passives::Resistor::new(
-            10.0.kohm(),
-            copperleaf_parts_passives::footprint::Package::M1608,
-        ),
-    );
-
-    let error = board
-        .connect(u1.pin(PinRef("AVDD")), r1.pin(PinRef("1")))
-        .expect_err("display-name lookup must not resolve");
-    assert_eq!(error.errors[0].code, "BOARD:INVALID_PIN");
-    assert!(error.errors[0].message.contains("AVDD"));
-}
-
-/// Return the net name attached to a PCB pad, scanning that pad's block.
-fn pad_net(pcb: &str, number: &str) -> Option<String> {
-    let start = pcb.find(&format!("(pad \"{number}\""))?;
-    let rest = &pcb[start..];
-    let end = rest[1..]
-        .find("(pad \"")
-        .map(|offset| offset + 1)
-        .unwrap_or(rest.len());
-    let block = &rest[..end];
-    let net_start = block.find("(net ")?;
-    let net_block = &block[net_start..];
-    let end = net_block.find(')')?;
-    let quoted = net_block[..end].split_once('"')?.1;
-    Some(quoted.split('"').next()?.to_string())
 }
 
 #[test]

@@ -21,6 +21,38 @@ use copperleaf_backend_kicad::KiCad;
 
 const PROJECT: &str = "w5500";
 
+/// Tie ground pins together and group power pins by nominal voltage, leaving
+/// signal and NC pins unconnected so ERC findings are visible in the baseline.
+fn auto_wire(board: &mut Board, handle: ComponentHandle) {
+    let mut groups: BTreeMap<(bool, i64), Vec<&'static str>> = BTreeMap::new();
+    let pins = board.components[handle.0].component.pins();
+    let identities = copperleaf::resolve_pin_identities(&board.components[handle.0].name, pins);
+    for (pin, canonical) in pins.iter().zip(identities.pins.iter()) {
+        if pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_") {
+            continue;
+        }
+        let key = match pin.role() {
+            Role::Gnd => (true, 0),
+            Role::PowerIn | Role::PowerOut => {
+                let Some(v) = pin.power_spec().v_nom else {
+                    continue;
+                };
+                (false, (v.as_base() * 1000.0).round() as i64)
+            }
+            _ => continue,
+        };
+        let identity: &'static str = Box::leak(canonical.key.clone().into_boxed_str());
+        groups.entry(key).or_default().push(identity);
+    }
+    for names in groups.values() {
+        for pair in names.windows(2) {
+            board
+                .connect(handle.pin(PinRef(pair[0])), handle.pin(PinRef(pair[1])))
+                .expect("auto-wire connect");
+        }
+    }
+}
+
 fn main() {
     let out = PathBuf::from(
         std::env::args()
@@ -136,36 +168,4 @@ fn main() {
         );
     }
     println!("emitted {} to {}", PROJECT, out.display());
-}
-
-/// Tie ground pins together and group power pins by nominal voltage, leaving
-/// signal and NC pins unconnected so ERC findings are visible in the baseline.
-fn auto_wire(board: &mut Board, handle: ComponentHandle) {
-    let mut groups: BTreeMap<(bool, i64), Vec<&'static str>> = BTreeMap::new();
-    let pins = board.components[handle.0].component.pins();
-    let identities = copperleaf::resolve_pin_identities(&board.components[handle.0].name, pins);
-    for (pin, canonical) in pins.iter().zip(identities.pins.iter()) {
-        if pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_") {
-            continue;
-        }
-        let key = match pin.role() {
-            Role::Gnd => (true, 0),
-            Role::PowerIn | Role::PowerOut => {
-                let Some(v) = pin.power_spec().v_nom else {
-                    continue;
-                };
-                (false, (v.as_base() * 1000.0).round() as i64)
-            }
-            _ => continue,
-        };
-        let identity: &'static str = Box::leak(canonical.key.clone().into_boxed_str());
-        groups.entry(key).or_default().push(identity);
-    }
-    for names in groups.values() {
-        for pair in names.windows(2) {
-            board
-                .connect(handle.pin(PinRef(pair[0])), handle.pin(PinRef(pair[1])))
-                .expect("auto-wire connect");
-        }
-    }
 }

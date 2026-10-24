@@ -27,97 +27,6 @@ const PROJECT: &str = "golden";
 /// Snapshot of every compiler warning, so warning regressions are reviewed.
 const WARNINGS_FILE: &str = "golden.warnings";
 
-/// Wire a component's power and ground pins into nets without hand-written
-/// per-part knowledge:
-///
-/// - all `Gnd` pins are tied into one ground net;
-/// - `PowerIn`/`PowerOut` pins are grouped by nominal voltage and tied
-///   per-group (flexible pins without `v_nom` are left unconnected — a
-///   power net without a voltage source is a compile error);
-/// - NC pins and signal pins are left unconnected (ERC warnings only).
-fn auto_wire(board: &mut Board, handle: ComponentHandle) {
-    let mut groups: BTreeMap<(bool, i64), Vec<&'static str>> = BTreeMap::new();
-    let pins = board.components[handle.0].component.pins();
-    let identities = copperleaf::resolve_pin_identities(&board.components[handle.0].name, pins);
-    for (pin, canonical) in pins.iter().zip(identities.pins.iter()) {
-        if pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_") {
-            continue;
-        }
-        let key = match pin.role() {
-            Role::Gnd => (true, 0),
-            Role::PowerIn | Role::PowerOut => {
-                let Some(v) = pin.power_spec().v_nom else {
-                    continue;
-                };
-                (false, (v.as_base() * 1000.0).round() as i64)
-            }
-            _ => continue,
-        };
-        let identity: &'static str = Box::leak(canonical.key.clone().into_boxed_str());
-        groups.entry(key).or_default().push(identity);
-    }
-    for names in groups.values() {
-        for pair in names.windows(2) {
-            board
-                .connect(handle.pin(PinRef(pair[0])), handle.pin(PinRef(pair[1])))
-                .expect("auto_wire connect");
-        }
-    }
-}
-
-/// Compile `board`, assert its semantic invariants, emit it with the KiCad
-/// backend, and compare all output files and compiler warnings against the
-/// snapshots for `name`.
-fn check_board(name: &str, board: Board) {
-    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default())
-        .unwrap_or_else(|e| panic!("{name} board failed to compile:\n{e}"));
-
-    assert_board_invariants(name, &report);
-    assert!(
-        report.validation.is_empty(),
-        "{name}: board validation findings:\n{:#?}",
-        report.validation
-    );
-
-    let dir = tempfile::tempdir().unwrap();
-    KiCad::new()
-        .with_project_name(PROJECT)
-        .emit(dir.path(), &report.board)
-        .unwrap();
-
-    let mut goldens = Vec::new();
-    for file in FILES {
-        let actual = std::fs::read_to_string(dir.path().join(file)).unwrap();
-        goldens.push((golden_dir().join(name).join(file), actual));
-    }
-    goldens.push((
-        golden_dir().join(name).join(WARNINGS_FILE),
-        warning_snapshot(&report),
-    ));
-    report_failures(collect_failures(&goldens, blessing_enabled()));
-
-    assert_unique_uuids(name, dir.path());
-}
-
-/// Every addressable object in an emitted project must have a distinct UUID
-/// while remaining stable across runs.
-fn assert_unique_uuids(name: &str, dir: &Path) {
-    let mut seen = std::collections::HashMap::new();
-    for file in FILES {
-        let text = std::fs::read_to_string(dir.join(file)).unwrap();
-        for (offset, _) in text.match_indices("(uuid \"") {
-            let rest = &text[offset + "(uuid \"".len()..];
-            let Some(end) = rest.find('"') else {
-                continue;
-            };
-            let uuid = &rest[..end];
-            if let Some(previous) = seen.insert(uuid.to_owned(), file) {
-                panic!("{name}: duplicate UUID {uuid} in {file} (also in {previous})");
-            }
-        }
-    }
-}
-
 /// Assert semantic invariants that byte-for-byte snapshots cannot express.
 fn assert_board_invariants(name: &str, report: &copperleaf_compile::CompileReport) {
     let board = &report.board;
@@ -201,24 +110,66 @@ fn assert_board_invariants(name: &str, report: &copperleaf_compile::CompileRepor
     }
 }
 
-/// Render all compiler warnings as a stable, reviewable snapshot.
-fn warning_snapshot(report: &copperleaf_compile::CompileReport) -> String {
-    let mut lines: Vec<String> = report
-        .warnings
-        .iter()
-        .map(|diagnostic| {
-            format!(
-                "{:?}|{}|{}|{}|{}",
-                diagnostic.severity,
-                diagnostic.code,
-                diagnostic.message,
-                diagnostic.entities.join(","),
-                diagnostic.hint.as_deref().unwrap_or("")
-            )
-        })
-        .collect();
-    lines.sort();
-    lines.join("\n") + "\n"
+/// Every addressable object in an emitted project must have a distinct UUID
+/// while remaining stable across runs.
+fn assert_unique_uuids(name: &str, dir: &Path) {
+    let mut seen = std::collections::HashMap::new();
+    for file in FILES {
+        let text = std::fs::read_to_string(dir.join(file)).unwrap();
+        for (offset, _) in text.match_indices("(uuid \"") {
+            let rest = &text[offset + "(uuid \"".len()..];
+            let Some(end) = rest.find('"') else {
+                continue;
+            };
+            let uuid = &rest[..end];
+            if let Some(previous) = seen.insert(uuid.to_owned(), file) {
+                panic!("{name}: duplicate UUID {uuid} in {file} (also in {previous})");
+            }
+        }
+    }
+}
+
+/// Wire a component's power and ground pins into nets without hand-written
+/// per-part knowledge:
+///
+/// - all `Gnd` pins are tied into one ground net;
+/// - `PowerIn`/`PowerOut` pins are grouped by nominal voltage and tied
+///   per-group (flexible pins without `v_nom` are left unconnected — a
+///   power net without a voltage source is a compile error);
+/// - NC pins and signal pins are left unconnected (ERC warnings only).
+fn auto_wire(board: &mut Board, handle: ComponentHandle) {
+    let mut groups: BTreeMap<(bool, i64), Vec<&'static str>> = BTreeMap::new();
+    let pins = board.components[handle.0].component.pins();
+    let identities = copperleaf::resolve_pin_identities(&board.components[handle.0].name, pins);
+    for (pin, canonical) in pins.iter().zip(identities.pins.iter()) {
+        if pin.nc() || pin.name() == "NC" || pin.name().starts_with("NC_") {
+            continue;
+        }
+        let key = match pin.role() {
+            Role::Gnd => (true, 0),
+            Role::PowerIn | Role::PowerOut => {
+                let Some(v) = pin.power_spec().v_nom else {
+                    continue;
+                };
+                (false, (v.as_base() * 1000.0).round() as i64)
+            }
+            _ => continue,
+        };
+        let identity: &'static str = Box::leak(canonical.key.clone().into_boxed_str());
+        groups.entry(key).or_default().push(identity);
+    }
+    for names in groups.values() {
+        for pair in names.windows(2) {
+            board
+                .connect(handle.pin(PinRef(pair[0])), handle.pin(PinRef(pair[1])))
+                .expect("auto_wire connect");
+        }
+    }
+}
+
+/// Whether snapshots should be written rather than compared.
+fn blessing_enabled() -> bool {
+    blessing_enabled_from(std::env::var("COPPERLEAF_BLESS").ok().as_deref())
 }
 
 /// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
@@ -226,9 +177,38 @@ fn blessing_enabled_from(value: Option<&str>) -> bool {
     value == Some("1")
 }
 
-/// Whether snapshots should be written rather than compared.
-fn blessing_enabled() -> bool {
-    blessing_enabled_from(std::env::var("COPPERLEAF_BLESS").ok().as_deref())
+/// Compile `board`, assert its semantic invariants, emit it with the KiCad
+/// backend, and compare all output files and compiler warnings against the
+/// snapshots for `name`.
+fn check_board(name: &str, board: Board) {
+    let report = copperleaf_compile::run(board, &copperleaf_compile::CompileOptions::default())
+        .unwrap_or_else(|e| panic!("{name} board failed to compile:\n{e}"));
+
+    assert_board_invariants(name, &report);
+    assert!(
+        report.validation.is_empty(),
+        "{name}: board validation findings:\n{:#?}",
+        report.validation
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    KiCad::new()
+        .with_project_name(PROJECT)
+        .emit(dir.path(), &report.board)
+        .unwrap();
+
+    let mut goldens = Vec::new();
+    for file in FILES {
+        let actual = std::fs::read_to_string(dir.path().join(file)).unwrap();
+        goldens.push((golden_dir().join(name).join(file), actual));
+    }
+    goldens.push((
+        golden_dir().join(name).join(WARNINGS_FILE),
+        warning_snapshot(&report),
+    ));
+    report_failures(collect_failures(&goldens, blessing_enabled()));
+
+    assert_unique_uuids(name, dir.path());
 }
 
 /// Compare every golden, or write them when blessing.  All failures are
@@ -255,17 +235,6 @@ fn collect_failures(goldens: &[(PathBuf, String)], bless: bool) -> Vec<String> {
         }
     }
     failures
-}
-
-/// Fail with every collected golden problem at once.
-fn report_failures(failures: Vec<String>) {
-    if !failures.is_empty() {
-        panic!(
-            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
-            failures.len(),
-            failures.join("\n")
-        );
-    }
 }
 
 #[test]
@@ -349,6 +318,37 @@ fn golden_board_wiznet() {
 
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/board")
+}
+
+/// Fail with every collected golden problem at once.
+fn report_failures(failures: Vec<String>) {
+    if !failures.is_empty() {
+        panic!(
+            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+}
+
+/// Render all compiler warnings as a stable, reviewable snapshot.
+fn warning_snapshot(report: &copperleaf_compile::CompileReport) -> String {
+    let mut lines: Vec<String> = report
+        .warnings
+        .iter()
+        .map(|diagnostic| {
+            format!(
+                "{:?}|{}|{}|{}|{}",
+                diagnostic.severity,
+                diagnostic.code,
+                diagnostic.message,
+                diagnostic.entities.join(","),
+                diagnostic.hint.as_deref().unwrap_or("")
+            )
+        })
+        .collect();
+    lines.sort();
+    lines.join("\n") + "\n"
 }
 
 #[cfg(test)]

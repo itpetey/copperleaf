@@ -25,38 +25,6 @@ pub enum BoardSide {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CopperLayer(pub usize);
 
-impl CopperLayer {
-    /// Front copper layer.
-    pub const FRONT: Self = Self(0);
-
-    /// Construct an ordinal.
-    pub const fn new(index: usize) -> Self {
-        Self(index)
-    }
-
-    /// The zero-based ordinal.
-    pub const fn index(self) -> usize {
-        self.0
-    }
-
-    /// Whether this ordinal exists in the given stackup.
-    pub fn is_valid_in(self, stackup: &crate::Stackup) -> bool {
-        self.0 < stackup.copper_layer_count()
-    }
-}
-
-impl From<usize> for CopperLayer {
-    fn from(index: usize) -> Self {
-        Self(index)
-    }
-}
-
-impl From<CopperLayer> for usize {
-    fn from(layer: CopperLayer) -> Self {
-        layer.0
-    }
-}
-
 /// A set of copper layers referenced by canonical ordinal.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct LayerSet {
@@ -165,4 +133,36 @@ pub struct Layout {
     pub tracks: Vec<Track>,
     pub vias: Vec<Via>,
     pub zones: Vec<Zone>,
+}
+
+impl CopperLayer {
+    /// Front copper layer.
+    pub const FRONT: Self = Self(0);
+
+    /// Construct an ordinal.
+    pub const fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    /// The zero-based ordinal.
+    pub const fn index(self) -> usize {
+        self.0
+    }
+
+    /// Whether this ordinal exists in the given stackup.
+    pub fn is_valid_in(self, stackup: &crate::Stackup) -> bool {
+        self.0 < stackup.copper_layer_count()
+    }
+}
+
+impl From<usize> for CopperLayer {
+    fn from(index: usize) -> Self {
+        Self(index)
+    }
+}
+
+impl From<CopperLayer> for usize {
+    fn from(layer: CopperLayer) -> Self {
+        layer.0
+    }
 }

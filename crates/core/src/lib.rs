@@ -23,6 +23,7 @@ pub use units::{
     Amp, Celsius, Diagnostic, Farad, Henry, Hertz, Meter, Ohm, Qty, Second, Severity, UnitExt, Volt,
 };
 pub use util::deterministic_id;
+pub use validation::validate_compiled_board;
 
 pub mod board;
 pub mod design_rules;
@@ -36,8 +37,6 @@ pub mod stackup;
 pub mod units;
 pub mod util;
 pub mod validation;
-
-pub use validation::validate_compiled_board;
 
 /// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
 pub trait Backend {

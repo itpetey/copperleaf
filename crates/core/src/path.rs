@@ -34,27 +34,6 @@ pub enum PathContainmentError {
     Io(#[from] std::io::Error),
 }
 
-/// Validate one untrusted path component.
-pub fn validate_path_component(component: &str) -> Result<(), PathContainmentError> {
-    if component.is_empty() {
-        return Err(PathContainmentError::Empty);
-    }
-    if component.contains('\0') {
-        return Err(PathContainmentError::NulByte);
-    }
-    let path = Path::new(component);
-    if path.is_absolute() {
-        return Err(PathContainmentError::Absolute(component.to_owned()));
-    }
-    if component.contains('/') || component.contains('\\') {
-        return Err(PathContainmentError::Separator(component.to_owned()));
-    }
-    if component == "." || component == ".." {
-        return Err(PathContainmentError::ParentTraversal(component.to_owned()));
-    }
-    Ok(())
-}
-
 /// Join one validated component beneath `root`, refusing escapes.
 pub fn safe_join(root: &Path, component: &str) -> Result<PathBuf, PathContainmentError> {
     validate_path_component(component)?;
@@ -76,6 +55,27 @@ pub fn safe_join(root: &Path, component: &str) -> Result<PathBuf, PathContainmen
     } else {
         Err(PathContainmentError::EscapesRoot(component.to_owned()))
     }
+}
+
+/// Validate one untrusted path component.
+pub fn validate_path_component(component: &str) -> Result<(), PathContainmentError> {
+    if component.is_empty() {
+        return Err(PathContainmentError::Empty);
+    }
+    if component.contains('\0') {
+        return Err(PathContainmentError::NulByte);
+    }
+    let path = Path::new(component);
+    if path.is_absolute() {
+        return Err(PathContainmentError::Absolute(component.to_owned()));
+    }
+    if component.contains('/') || component.contains('\\') {
+        return Err(PathContainmentError::Separator(component.to_owned()));
+    }
+    if component == "." || component == ".." {
+        return Err(PathContainmentError::ParentTraversal(component.to_owned()));
+    }
+    Ok(())
 }
 
 /// Canonicalise the deepest existing ancestor and reattach the missing

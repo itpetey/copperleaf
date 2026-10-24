@@ -12,14 +12,14 @@ use std::path::{Path, PathBuf};
 
 use copperleaf_part_codegen::generate_component_to_string;
 
-/// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
-fn blessing_enabled_from(value: Option<&str>) -> bool {
-    value == Some("1")
-}
-
 /// Whether snapshots should be written rather than compared.
 fn blessing_enabled() -> bool {
     blessing_enabled_from(std::env::var("COPPERLEAF_BLESS").ok().as_deref())
+}
+
+/// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
+fn blessing_enabled_from(value: Option<&str>) -> bool {
+    value == Some("1")
 }
 
 /// Compare every golden, or write them when blessing.  All failures are
@@ -46,17 +46,6 @@ fn collect_failures(goldens: &[(PathBuf, String)], bless: bool) -> Vec<String> {
         }
     }
     failures
-}
-
-/// Fail with every collected golden problem at once.
-fn report_failures(failures: Vec<String>) {
-    if !failures.is_empty() {
-        panic!(
-            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
-            failures.len(),
-            failures.join("\n")
-        );
-    }
 }
 
 /// Generated sources embed base64-encoded 3D models inline, which would make
@@ -164,6 +153,17 @@ fn rendered_components_match_goldens() {
         ));
     }
     report_failures(collect_failures(&goldens, blessing_enabled()));
+}
+
+/// Fail with every collected golden problem at once.
+fn report_failures(failures: Vec<String>) {
+    if !failures.is_empty() {
+        panic!(
+            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
 }
 
 #[cfg(test)]

@@ -72,35 +72,6 @@ pub fn update_from_datasheet(
     Ok(restore_model_payload(manifest, preserved_model_3d_data))
 }
 
-/// Restore a reviewed model payload after an untrusted LLM round-trip.
-fn restore_model_payload(mut manifest: Manifest, payload: Option<String>) -> Manifest {
-    manifest.component.model_3d_data = payload;
-    manifest
-}
-
-/// Write named attachments into the temporary provider working directory.
-fn write_attachments(
-    dir: &std::path::Path,
-    attachments: &[(&str, &str)],
-) -> Result<Vec<std::path::PathBuf>, CliError> {
-    let mut paths = Vec::with_capacity(attachments.len());
-    for (name, content) in attachments {
-        if name.is_empty() || name.contains('/') || name.contains('\\') {
-            return Err(CliError::Diagnostic(copperleaf::Diagnostic {
-                code: "CLI:INVALID_ATTACHMENT".into(),
-                severity: copperleaf::Severity::Error,
-                message: format!("invalid datasheet workflow attachment name '{name}'"),
-                entities: vec![name.to_string()],
-                hint: None,
-            }));
-        }
-        let path = dir.join(name);
-        std::fs::write(&path, content)?;
-        paths.push(path);
-    }
-    Ok(paths)
-}
-
 /// Invoke `opencode run` with the supplied prompt and file attachments.
 ///
 /// The files are written to a temporary directory which is also used as the
@@ -308,6 +279,12 @@ Rules:
     )
 }
 
+/// Restore a reviewed model payload after an untrusted LLM round-trip.
+fn restore_model_payload(mut manifest: Manifest, payload: Option<String>) -> Manifest {
+    manifest.component.model_3d_data = payload;
+    manifest
+}
+
 /// Prompt used when enriching an existing manifest from a datasheet.
 fn update_prompt() -> String {
     r#"You are a hardware engineer updating a Copperleaf part manifest TOML from a component datasheet.
@@ -346,6 +323,77 @@ Rules:
 12. Do NOT invent information not present in the datasheet.
 13. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#
         .to_string()
+}
+
+/// Write named attachments into the temporary provider working directory.
+fn write_attachments(
+    dir: &std::path::Path,
+    attachments: &[(&str, &str)],
+) -> Result<Vec<std::path::PathBuf>, CliError> {
+    let mut paths = Vec::with_capacity(attachments.len());
+    for (name, content) in attachments {
+        if name.is_empty() || name.contains('/') || name.contains('\\') {
+            return Err(CliError::Diagnostic(copperleaf::Diagnostic {
+                code: "CLI:INVALID_ATTACHMENT".into(),
+                severity: copperleaf::Severity::Error,
+                message: format!("invalid datasheet workflow attachment name '{name}'"),
+                entities: vec![name.to_string()],
+                hint: None,
+            }));
+        }
+        let path = dir.join(name);
+        std::fs::write(&path, content)?;
+        paths.push(path);
+    }
+    Ok(paths)
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+
+    #[test]
+    fn attachments_keep_their_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = write_attachments(
+            dir.path(),
+            &[("existing.toml", "a = 1\n"), ("datasheet.txt", "datasheet")],
+        )
+        .unwrap();
+        assert_eq!(paths[0].file_name().unwrap(), "existing.toml");
+        assert_eq!(paths[1].file_name().unwrap(), "datasheet.txt");
+        assert_eq!(std::fs::read_to_string(&paths[0]).unwrap(), "a = 1\n");
+        assert_eq!(std::fs::read_to_string(&paths[1]).unwrap(), "datasheet");
+    }
+
+    #[test]
+    fn attachment_names_cannot_escape_the_temporary_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(write_attachments(dir.path(), &[("../escape.txt", "x")]).is_err());
+        assert!(write_attachments(dir.path(), &[("", "x")]).is_err());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn prompts_name_the_attachments() {
+        let new = new_prompt(None, None);
+        assert!(new.contains("datasheet.txt"), "{new}");
+        assert!(!new.contains("existing.toml"));
+
+        let update = update_prompt();
+        assert!(update.contains("existing.toml"), "{update}");
+        assert!(update.contains("datasheet.txt"), "{update}");
+    }
+
+    #[test]
+    fn update_restores_the_reviewed_model_payload() {
+        let manifest = crate::manifest::deserialise(
+            "[component]\nname = \"Test\"\ntitle = \"Test\"\n[[pin]]\nnum = 1\nname = \"IO\"\npurpose = \"IO\"\nkind = \"dio\"\n",
+        )
+        .unwrap();
+        let restored = restore_model_payload(manifest, Some("payload".into()));
+        assert_eq!(restored.component.model_3d_data.as_deref(), Some("payload"));
+    }
 }
 
 #[cfg(test)]
@@ -424,53 +472,5 @@ kind = "dio""#;
             }
         }
         text
-    }
-}
-
-#[cfg(test)]
-mod attachment_tests {
-    use super::*;
-
-    #[test]
-    fn attachments_keep_their_names() {
-        let dir = tempfile::tempdir().unwrap();
-        let paths = write_attachments(
-            dir.path(),
-            &[("existing.toml", "a = 1\n"), ("datasheet.txt", "datasheet")],
-        )
-        .unwrap();
-        assert_eq!(paths[0].file_name().unwrap(), "existing.toml");
-        assert_eq!(paths[1].file_name().unwrap(), "datasheet.txt");
-        assert_eq!(std::fs::read_to_string(&paths[0]).unwrap(), "a = 1\n");
-        assert_eq!(std::fs::read_to_string(&paths[1]).unwrap(), "datasheet");
-    }
-
-    #[test]
-    fn attachment_names_cannot_escape_the_temporary_directory() {
-        let dir = tempfile::tempdir().unwrap();
-        assert!(write_attachments(dir.path(), &[("../escape.txt", "x")]).is_err());
-        assert!(write_attachments(dir.path(), &[("", "x")]).is_err());
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
-    }
-
-    #[test]
-    fn prompts_name_the_attachments() {
-        let new = new_prompt(None, None);
-        assert!(new.contains("datasheet.txt"), "{new}");
-        assert!(!new.contains("existing.toml"));
-
-        let update = update_prompt();
-        assert!(update.contains("existing.toml"), "{update}");
-        assert!(update.contains("datasheet.txt"), "{update}");
-    }
-
-    #[test]
-    fn update_restores_the_reviewed_model_payload() {
-        let manifest = crate::manifest::deserialise(
-            "[component]\nname = \"Test\"\ntitle = \"Test\"\n[[pin]]\nnum = 1\nname = \"IO\"\npurpose = \"IO\"\nkind = \"dio\"\n",
-        )
-        .unwrap();
-        let restored = restore_model_payload(manifest, Some("payload".into()));
-        assert_eq!(restored.component.model_3d_data.as_deref(), Some("payload"));
     }
 }

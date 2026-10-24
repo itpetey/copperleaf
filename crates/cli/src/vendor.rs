@@ -135,55 +135,6 @@ fn toml_filename(lib_id: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn toml_filename_normalises() {
-        assert_eq!(toml_filename("RP2354A"), "rp2354a");
-    }
-
-    #[test]
-    fn add_member_appends_once() {
-        let dir = tempfile::tempdir().unwrap();
-        let cargo = dir.path().join("Cargo.toml");
-        std::fs::write(&cargo, "[workspace]\nmembers = [\n  \"parts/a\"\n]\n").unwrap();
-
-        add_workspace_member(&cargo, "parts/b").unwrap();
-        let content = std::fs::read_to_string(&cargo).unwrap();
-        assert!(content.contains("\"parts/a\""));
-        assert!(content.contains("\"parts/b\""));
-
-        add_workspace_member(&cargo, "parts/b").unwrap();
-        let content = std::fs::read_to_string(&cargo).unwrap();
-        assert_eq!(content.matches("\"parts/b\"").count(), 1);
-    }
-
-    #[test]
-    fn scaffold_creates_files() {
-        let dir = tempfile::tempdir().unwrap();
-        let cargo = dir.path().join("Cargo.toml");
-        std::fs::write(&cargo, "[workspace]\nmembers = [\n  \"parts/a\"\n]\n").unwrap();
-
-        scaffold(dir.path(), "testvendor", "W5500").unwrap();
-
-        let cargo_toml = dir.path().join("parts/testvendor/Cargo.toml");
-        assert!(cargo_toml.exists());
-        let cargo_content = std::fs::read_to_string(&cargo_toml).unwrap();
-        assert!(cargo_content.contains("copperleaf-parts-testvendor"));
-
-        let lib_rs = dir.path().join("parts/testvendor/lib.rs");
-        assert!(lib_rs.exists());
-        let lib_content = std::fs::read_to_string(&lib_rs).unwrap();
-        assert!(lib_content.contains("build_component"));
-        assert!(lib_content.contains("w5500.toml"));
-
-        let root_content = std::fs::read_to_string(&cargo).unwrap();
-        assert!(root_content.contains("\"parts/testvendor\""));
-    }
-}
-
-#[cfg(test)]
 mod containment_tests {
     use super::*;
 
@@ -254,5 +205,54 @@ mod rebuild_tests {
             .join("../../parts/wurth-elektronik/build.rs");
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("rerun-if-changed"), "{content}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn toml_filename_normalises() {
+        assert_eq!(toml_filename("RP2354A"), "rp2354a");
+    }
+
+    #[test]
+    fn add_member_appends_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let cargo = dir.path().join("Cargo.toml");
+        std::fs::write(&cargo, "[workspace]\nmembers = [\n  \"parts/a\"\n]\n").unwrap();
+
+        add_workspace_member(&cargo, "parts/b").unwrap();
+        let content = std::fs::read_to_string(&cargo).unwrap();
+        assert!(content.contains("\"parts/a\""));
+        assert!(content.contains("\"parts/b\""));
+
+        add_workspace_member(&cargo, "parts/b").unwrap();
+        let content = std::fs::read_to_string(&cargo).unwrap();
+        assert_eq!(content.matches("\"parts/b\"").count(), 1);
+    }
+
+    #[test]
+    fn scaffold_creates_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let cargo = dir.path().join("Cargo.toml");
+        std::fs::write(&cargo, "[workspace]\nmembers = [\n  \"parts/a\"\n]\n").unwrap();
+
+        scaffold(dir.path(), "testvendor", "W5500").unwrap();
+
+        let cargo_toml = dir.path().join("parts/testvendor/Cargo.toml");
+        assert!(cargo_toml.exists());
+        let cargo_content = std::fs::read_to_string(&cargo_toml).unwrap();
+        assert!(cargo_content.contains("copperleaf-parts-testvendor"));
+
+        let lib_rs = dir.path().join("parts/testvendor/lib.rs");
+        assert!(lib_rs.exists());
+        let lib_content = std::fs::read_to_string(&lib_rs).unwrap();
+        assert!(lib_content.contains("build_component"));
+        assert!(lib_content.contains("w5500.toml"));
+
+        let root_content = std::fs::read_to_string(&cargo).unwrap();
+        assert!(root_content.contains("\"parts/testvendor\""));
     }
 }

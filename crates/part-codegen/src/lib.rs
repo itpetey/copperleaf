@@ -264,199 +264,11 @@ pub enum QuantityUnit {
     Celsius,
 }
 
-impl QuantityUnit {
-    /// The `UnitExt` constructor rendered for this unit.
-    pub fn constructor(self) -> &'static str {
-        match self {
-            Self::Volt => "volt",
-            Self::Millivolt => "millivolt",
-            Self::Amp => "amp",
-            Self::Milliamp => "milliamp",
-            Self::Ohm => "ohm",
-            Self::Kiloohm => "kohm",
-            Self::Farad => "farad",
-            Self::Nanofarad => "nf",
-            Self::Microfarad => "uf",
-            Self::Picofarad => "pf",
-            Self::Henry => "henry",
-            Self::Hertz => "hz",
-            Self::Kilohertz => "khz",
-            Self::Megahertz => "mhz",
-            Self::Meter => "meter",
-            Self::Millimetre => "mm",
-            Self::Second => "sec",
-            Self::Celsius => "celsius",
-        }
-    }
-
-    /// Canonical suffix used when serialising a quantity.
-    pub fn suffix(self) -> &'static str {
-        match self {
-            Self::Volt => "V",
-            Self::Millivolt => "mV",
-            Self::Amp => "A",
-            Self::Milliamp => "mA",
-            Self::Ohm => "ohm",
-            Self::Kiloohm => "kohm",
-            Self::Farad => "F",
-            Self::Nanofarad => "nF",
-            Self::Microfarad => "uF",
-            Self::Picofarad => "pF",
-            Self::Henry => "H",
-            Self::Hertz => "Hz",
-            Self::Kilohertz => "kHz",
-            Self::Megahertz => "MHz",
-            Self::Meter => "m",
-            Self::Millimetre => "mm",
-            Self::Second => "s",
-            Self::Celsius => "C",
-        }
-    }
-
-    fn from_suffix(suffix: &str) -> Option<Self> {
-        Some(match suffix {
-            "V" | "v" => Self::Volt,
-            "mV" | "mv" => Self::Millivolt,
-            "A" | "a" => Self::Amp,
-            "mA" | "ma" => Self::Milliamp,
-            "ohm" | "Ω" => Self::Ohm,
-            "kohm" | "kΩ" => Self::Kiloohm,
-            "F" | "f" => Self::Farad,
-            "nF" | "nf" => Self::Nanofarad,
-            "uF" | "µF" | "uf" => Self::Microfarad,
-            "pF" | "pf" => Self::Picofarad,
-            "H" | "h" => Self::Henry,
-            "Hz" | "hz" => Self::Hertz,
-            "kHz" | "khz" => Self::Kilohertz,
-            "MHz" | "mhz" => Self::Megahertz,
-            "m" => Self::Meter,
-            "mm" => Self::Millimetre,
-            "s" | "sec" => Self::Second,
-            "C" | "°C" | "celsius" => Self::Celsius,
-            _ => return None,
-        })
-    }
-
-    fn from_constructor(method: &str) -> Option<Self> {
-        Some(match method {
-            "volt" => Self::Volt,
-            "millivolt" => Self::Millivolt,
-            "amp" => Self::Amp,
-            "milliamp" => Self::Milliamp,
-            "ohm" => Self::Ohm,
-            "kohm" => Self::Kiloohm,
-            "farad" => Self::Farad,
-            "nf" => Self::Nanofarad,
-            "uf" => Self::Microfarad,
-            "pf" => Self::Picofarad,
-            "henry" => Self::Henry,
-            "hz" => Self::Hertz,
-            "khz" => Self::Kilohertz,
-            "mhz" => Self::Megahertz,
-            "meter" => Self::Meter,
-            "mm" => Self::Millimetre,
-            "sec" => Self::Second,
-            "celsius" => Self::Celsius,
-            _ => return None,
-        })
-    }
-}
-
 /// A manifest quantity: a numeric value plus one closed unit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Quantity {
     pub value: f64,
     pub unit: QuantityUnit,
-}
-
-impl Quantity {
-    /// Construct a quantity.
-    pub const fn new(value: f64, unit: QuantityUnit) -> Self {
-        Self { value, unit }
-    }
-
-    /// Render the quantity through its known `UnitExt` constructor.
-    pub fn render(self) -> String {
-        format!("{}.{}()", fmt_f64(self.value), self.unit.constructor())
-    }
-
-    /// Canonical suffix form, for serialisation.
-    pub fn to_suffix_string(self) -> String {
-        format!("{}{}", fmt_f64(self.value), self.unit.suffix())
-    }
-
-    /// Parse a suffix string or a legacy constructor expression.
-    ///
-    /// Accepted examples: `"100nF"`, `"0.2mm"`, `"3.3V"`, `"10kohm"`, and
-    /// legacy manifest strings such as `"100.0.nf()"` or `"85.0.celsius()"`.
-    pub fn parse(input: &str) -> Result<Self, String> {
-        let input = input.trim();
-        if input.is_empty() {
-            return Err("quantity is empty".into());
-        }
-        if input.contains('(') || input.contains(')') {
-            let Some(body) = input.strip_suffix("()") else {
-                return Err(format!("unterminated quantity expression '{input}'"));
-            };
-            let Some((number, method)) = body.rsplit_once('.') else {
-                return Err(format!("invalid quantity expression '{input}'"));
-            };
-            let value: f64 = number
-                .trim()
-                .parse::<f64>()
-                .map_err(|_| format!("invalid numeric value in '{input}'"))?;
-            check_finite(value, input)?;
-            let method = method.trim();
-            let unit = QuantityUnit::from_constructor(method)
-                .ok_or_else(|| format!("unknown quantity constructor '{method}' in '{input}'"))?;
-            return Ok(Self { value, unit });
-        }
-
-        let split = input
-            .find(|ch: char| ch.is_alphabetic() || ch == '°' || ch == 'Ω' || ch == 'µ')
-            .ok_or_else(|| format!("quantity '{input}' has no unit"))?;
-        let number = input[..split].trim();
-        let suffix = input[split..].trim();
-        let value: f64 = number
-            .parse::<f64>()
-            .map_err(|_| format!("invalid numeric value in '{input}'"))?;
-        check_finite(value, input)?;
-        let unit = QuantityUnit::from_suffix(suffix)
-            .ok_or_else(|| format!("unknown quantity unit '{suffix}' in '{input}'"))?;
-        Ok(Self { value, unit })
-    }
-}
-
-fn check_finite(value: f64, input: &str) -> Result<(), String> {
-    if value.is_finite() {
-        Ok(())
-    } else {
-        Err(format!("quantity '{input}' is not finite"))
-    }
-}
-
-impl Serialize for Quantity {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_suffix_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for Quantity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct QuantityVisitor;
-        impl serde::de::Visitor<'_> for QuantityVisitor {
-            type Value = Quantity;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a quantity such as \"100nF\" or \"0.2mm\"")
-            }
-
-            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Quantity, E> {
-                Quantity::parse(value).map_err(E::custom)
-            }
-        }
-        deserializer.deserialize_str(QuantityVisitor)
-    }
 }
 
 /// A constraint definition from the TOML `[[constraint]]` table.
@@ -692,99 +504,188 @@ impl ElectricalFields {
     }
 }
 
-pub fn fmt_f64(v: f64) -> String {
-    format!("{:?}", v)
-}
+impl QuantityUnit {
+    /// The `UnitExt` constructor rendered for this unit.
+    pub fn constructor(self) -> &'static str {
+        match self {
+            Self::Volt => "volt",
+            Self::Millivolt => "millivolt",
+            Self::Amp => "amp",
+            Self::Milliamp => "milliamp",
+            Self::Ohm => "ohm",
+            Self::Kiloohm => "kohm",
+            Self::Farad => "farad",
+            Self::Nanofarad => "nf",
+            Self::Microfarad => "uf",
+            Self::Picofarad => "pf",
+            Self::Henry => "henry",
+            Self::Hertz => "hz",
+            Self::Kilohertz => "khz",
+            Self::Megahertz => "mhz",
+            Self::Meter => "meter",
+            Self::Millimetre => "mm",
+            Self::Second => "sec",
+            Self::Celsius => "celsius",
+        }
+    }
 
-/// Render a Rust string literal through `proc-macro2`, which escapes quotes,
-/// backslashes, control characters, and newlines correctly.
-fn rust_string(value: &str) -> String {
-    proc_macro2::Literal::string(value).to_string()
-}
+    /// Canonical suffix used when serialising a quantity.
+    pub fn suffix(self) -> &'static str {
+        match self {
+            Self::Volt => "V",
+            Self::Millivolt => "mV",
+            Self::Amp => "A",
+            Self::Milliamp => "mA",
+            Self::Ohm => "ohm",
+            Self::Kiloohm => "kohm",
+            Self::Farad => "F",
+            Self::Nanofarad => "nF",
+            Self::Microfarad => "uF",
+            Self::Picofarad => "pF",
+            Self::Henry => "H",
+            Self::Hertz => "Hz",
+            Self::Kilohertz => "kHz",
+            Self::Megahertz => "MHz",
+            Self::Meter => "m",
+            Self::Millimetre => "mm",
+            Self::Second => "s",
+            Self::Celsius => "C",
+        }
+    }
 
-/// Strip characters that would break out of a `///` doc comment.
-fn doc_text(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| if ch == '\n' || ch == '\r' { ' ' } else { ch })
-        .collect::<String>()
-        .trim()
-        .to_string()
-}
-
-fn is_rust_keyword(value: &str) -> bool {
-    matches!(
-        value,
-        "as" | "break"
-            | "const"
-            | "continue"
-            | "crate"
-            | "else"
-            | "enum"
-            | "extern"
-            | "false"
-            | "fn"
-            | "for"
-            | "if"
-            | "impl"
-            | "in"
-            | "let"
-            | "loop"
-            | "match"
-            | "mod"
-            | "move"
-            | "mut"
-            | "pub"
-            | "ref"
-            | "return"
-            | "self"
-            | "Self"
-            | "static"
-            | "struct"
-            | "super"
-            | "trait"
-            | "true"
-            | "type"
-            | "unsafe"
-            | "use"
-            | "where"
-            | "while"
-            | "async"
-            | "await"
-            | "dyn"
-            | "abstract"
-            | "become"
-            | "box"
-            | "do"
-            | "final"
-            | "macro"
-            | "override"
-            | "priv"
-            | "typeof"
-            | "unsized"
-            | "virtual"
-            | "yield"
-            | "try"
-            | "union"
-    )
-}
-
-/// Validate a generated Rust identifier before it reaches the template.
-fn validate_ident(field: &str, value: &str) -> Result<(), CodegenError> {
-    let mut chars = value.chars();
-    let valid = chars
-        .next()
-        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
-        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
-        && !is_rust_keyword(value);
-    if valid {
-        Ok(())
-    } else {
-        Err(CodegenError::InvalidIdentifier {
-            field: field.to_string(),
-            value: value.to_string(),
+    fn from_suffix(suffix: &str) -> Option<Self> {
+        Some(match suffix {
+            "V" | "v" => Self::Volt,
+            "mV" | "mv" => Self::Millivolt,
+            "A" | "a" => Self::Amp,
+            "mA" | "ma" => Self::Milliamp,
+            "ohm" | "Ω" => Self::Ohm,
+            "kohm" | "kΩ" => Self::Kiloohm,
+            "F" | "f" => Self::Farad,
+            "nF" | "nf" => Self::Nanofarad,
+            "uF" | "µF" | "uf" => Self::Microfarad,
+            "pF" | "pf" => Self::Picofarad,
+            "H" | "h" => Self::Henry,
+            "Hz" | "hz" => Self::Hertz,
+            "kHz" | "khz" => Self::Kilohertz,
+            "MHz" | "mhz" => Self::Megahertz,
+            "m" => Self::Meter,
+            "mm" => Self::Millimetre,
+            "s" | "sec" => Self::Second,
+            "C" | "°C" | "celsius" => Self::Celsius,
+            _ => return None,
         })
     }
+
+    fn from_constructor(method: &str) -> Option<Self> {
+        Some(match method {
+            "volt" => Self::Volt,
+            "millivolt" => Self::Millivolt,
+            "amp" => Self::Amp,
+            "milliamp" => Self::Milliamp,
+            "ohm" => Self::Ohm,
+            "kohm" => Self::Kiloohm,
+            "farad" => Self::Farad,
+            "nf" => Self::Nanofarad,
+            "uf" => Self::Microfarad,
+            "pf" => Self::Picofarad,
+            "henry" => Self::Henry,
+            "hz" => Self::Hertz,
+            "khz" => Self::Kilohertz,
+            "mhz" => Self::Megahertz,
+            "meter" => Self::Meter,
+            "mm" => Self::Millimetre,
+            "sec" => Self::Second,
+            "celsius" => Self::Celsius,
+            _ => return None,
+        })
+    }
+}
+
+impl Quantity {
+    /// Construct a quantity.
+    pub const fn new(value: f64, unit: QuantityUnit) -> Self {
+        Self { value, unit }
+    }
+
+    /// Render the quantity through its known `UnitExt` constructor.
+    pub fn render(self) -> String {
+        format!("{}.{}()", fmt_f64(self.value), self.unit.constructor())
+    }
+
+    /// Canonical suffix form, for serialisation.
+    pub fn to_suffix_string(self) -> String {
+        format!("{}{}", fmt_f64(self.value), self.unit.suffix())
+    }
+
+    /// Parse a suffix string or a legacy constructor expression.
+    ///
+    /// Accepted examples: `"100nF"`, `"0.2mm"`, `"3.3V"`, `"10kohm"`, and
+    /// legacy manifest strings such as `"100.0.nf()"` or `"85.0.celsius()"`.
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err("quantity is empty".into());
+        }
+        if input.contains('(') || input.contains(')') {
+            let Some(body) = input.strip_suffix("()") else {
+                return Err(format!("unterminated quantity expression '{input}'"));
+            };
+            let Some((number, method)) = body.rsplit_once('.') else {
+                return Err(format!("invalid quantity expression '{input}'"));
+            };
+            let value: f64 = number
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| format!("invalid numeric value in '{input}'"))?;
+            check_finite(value, input)?;
+            let method = method.trim();
+            let unit = QuantityUnit::from_constructor(method)
+                .ok_or_else(|| format!("unknown quantity constructor '{method}' in '{input}'"))?;
+            return Ok(Self { value, unit });
+        }
+
+        let split = input
+            .find(|ch: char| ch.is_alphabetic() || ch == '°' || ch == 'Ω' || ch == 'µ')
+            .ok_or_else(|| format!("quantity '{input}' has no unit"))?;
+        let number = input[..split].trim();
+        let suffix = input[split..].trim();
+        let value: f64 = number
+            .parse::<f64>()
+            .map_err(|_| format!("invalid numeric value in '{input}'"))?;
+        check_finite(value, input)?;
+        let unit = QuantityUnit::from_suffix(suffix)
+            .ok_or_else(|| format!("unknown quantity unit '{suffix}' in '{input}'"))?;
+        Ok(Self { value, unit })
+    }
+}
+
+impl Serialize for Quantity {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_suffix_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Quantity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct QuantityVisitor;
+        impl serde::de::Visitor<'_> for QuantityVisitor {
+            type Value = Quantity;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a quantity such as \"100nF\" or \"0.2mm\"")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Quantity, E> {
+                Quantity::parse(value).map_err(E::custom)
+            }
+        }
+        deserializer.deserialize_str(QuantityVisitor)
+    }
+}
+
+pub fn fmt_f64(v: f64) -> String {
+    format!("{:?}", v)
 }
 
 /// Generate a Rust source file from all `*.toml` files in `definitions_dir`.
@@ -933,31 +834,6 @@ pub fn validate_structure_or_error(manifest: &Manifest) -> Result<(), CodegenErr
     validate_errors(manifest, true)
 }
 
-fn validate_errors(manifest: &Manifest, structural_only: bool) -> Result<(), CodegenError> {
-    let errors: Vec<String> = validate(manifest)
-        .into_iter()
-        .filter(|diagnostic| diagnostic.severity == copperleaf::Severity::Error)
-        .filter(|diagnostic| !structural_only || diagnostic.code == "VALIDATE:DUPLICATE_PAD")
-        .map(|diagnostic| {
-            if diagnostic.entities.is_empty() {
-                format!("{}: {}", diagnostic.code, diagnostic.message)
-            } else {
-                format!(
-                    "{}: {} ({})",
-                    diagnostic.code,
-                    diagnostic.message,
-                    diagnostic.entities.join(", ")
-                )
-            }
-        })
-        .collect();
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(CodegenError::Validation(errors.join("\n")))
-    }
-}
-
 fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
     let base = format!("Pin::build({})", rust_string(&pin.name));
     let suffix = physical_suffix(pin);
@@ -1046,31 +922,11 @@ fn builder_expr(pin: &PinDef) -> Result<String, CodegenError> {
     }
 }
 
-/// Canonical physical identity for a manifest pin: the explicit KiCad pin
-/// number when present, otherwise its numeric ordinal.
-fn pin_identity(pin: &PinDef) -> String {
-    if pin.number.is_empty() {
-        pin.num.to_string()
+fn check_finite(value: f64, input: &str) -> Result<(), String> {
+    if value.is_finite() {
+        Ok(())
     } else {
-        pin.number.clone()
-    }
-}
-
-/// Turn a physical identity into a Rust-identifier-safe suffix.
-fn identity_suffix(identity: &str) -> String {
-    let mut out = String::new();
-    for ch in identity.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch);
-        } else {
-            out.push('_');
-        }
-    }
-    let trimmed = out.trim_matches('_');
-    if trimmed.is_empty() {
-        "PIN".to_string()
-    } else {
-        trimmed.to_string()
+        Err(format!("quantity '{input}' is not finite"))
     }
 }
 
@@ -1201,6 +1057,91 @@ fn default_mech_pad_type() -> String {
 
 fn default_mech_shape() -> String {
     "circle".into()
+}
+
+/// Strip characters that would break out of a `///` doc comment.
+fn doc_text(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch == '\n' || ch == '\r' { ' ' } else { ch })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// Turn a physical identity into a Rust-identifier-safe suffix.
+fn identity_suffix(identity: &str) -> String {
+    let mut out = String::new();
+    for ch in identity.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    let trimmed = out.trim_matches('_');
+    if trimmed.is_empty() {
+        "PIN".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn is_rust_keyword(value: &str) -> bool {
+    matches!(
+        value,
+        "as" | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "fn"
+            | "for"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "type"
+            | "unsafe"
+            | "use"
+            | "where"
+            | "while"
+            | "async"
+            | "await"
+            | "dyn"
+            | "abstract"
+            | "become"
+            | "box"
+            | "do"
+            | "final"
+            | "macro"
+            | "override"
+            | "priv"
+            | "typeof"
+            | "unsized"
+            | "virtual"
+            | "yield"
+            | "try"
+            | "union"
+    )
 }
 
 /// Generate `LayoutConstraint::*` expressions from the `[layout]` table.
@@ -1359,6 +1300,16 @@ fn physical_suffix(pin: &PinDef) -> String {
     suffix
 }
 
+/// Canonical physical identity for a manifest pin: the explicit KiCad pin
+/// number when present, otherwise its numeric ordinal.
+fn pin_identity(pin: &PinDef) -> String {
+    if pin.number.is_empty() {
+        pin.num.to_string()
+    } else {
+        pin.number.clone()
+    }
+}
+
 fn render_component(
     module_name: &str,
     manifest: &Manifest,
@@ -1476,219 +1427,52 @@ fn render_component_file(
     render_component(&module_name, &manifest, renderer)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Render a Rust string literal through `proc-macro2`, which escapes quotes,
+/// backslashes, control characters, and newlines correctly.
+fn rust_string(value: &str) -> String {
+    proc_macro2::Literal::string(value).to_string()
+}
 
-    fn pin_with_physical() -> PinDef {
-        PinDef {
-            num: 1,
-            number: String::new(),
-            name: "TXN".into(),
-            purpose: "Test".into(),
-            notes: String::new(),
-            electrical: ElectricalFields {
-                kind: "dio".into(),
-                ..Default::default()
-            },
-            pos: Some((101.6, 12.7)),
-            rotation: Some(90.0),
-            length: Some(2.54),
-            width: None,
-            height: None,
-            pad_type: None,
-            pad_shape: None,
-            roundrect_rratio: None,
-            solder_mask_margin: None,
-            layers: None,
-            drill: None,
-            thermal_vias: vec![],
-        }
+fn validate_errors(manifest: &Manifest, structural_only: bool) -> Result<(), CodegenError> {
+    let errors: Vec<String> = validate(manifest)
+        .into_iter()
+        .filter(|diagnostic| diagnostic.severity == copperleaf::Severity::Error)
+        .filter(|diagnostic| !structural_only || diagnostic.code == "VALIDATE:DUPLICATE_PAD")
+        .map(|diagnostic| {
+            if diagnostic.entities.is_empty() {
+                format!("{}: {}", diagnostic.code, diagnostic.message)
+            } else {
+                format!(
+                    "{}: {} ({})",
+                    diagnostic.code,
+                    diagnostic.message,
+                    diagnostic.entities.join(", ")
+                )
+            }
+        })
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CodegenError::Validation(errors.join("\n")))
     }
+}
 
-    fn pin_def(num: usize, number: &str, name: &str) -> PinDef {
-        PinDef {
-            num,
-            number: number.into(),
-            name: name.into(),
-            purpose: "Test".into(),
-            notes: String::new(),
-            electrical: ElectricalFields {
-                kind: "dio".into(),
-                ..Default::default()
-            },
-            pos: None,
-            rotation: None,
-            length: None,
-            width: None,
-            height: None,
-            pad_type: None,
-            pad_shape: None,
-            roundrect_rratio: None,
-            solder_mask_margin: None,
-            layers: None,
-            drill: None,
-            thermal_vias: vec![],
-        }
-    }
-
-    #[test]
-    fn pin_def_physical_round_trip() {
-        let pin = pin_with_physical();
-        let toml = toml::to_string(&pin).unwrap();
-        let parsed: PinDef = toml::from_str(&toml).unwrap();
-        assert_eq!(parsed.pos, Some((101.6, 12.7)));
-        assert_eq!(parsed.rotation, Some(90.0));
-        assert_eq!(parsed.length, Some(2.54));
-    }
-
-    #[test]
-    fn unique_names_keep_readable_constants() {
-        let rows = constant_rows(&[pin_def(12, "12", "IOVDD")]).unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].name, "IOVDD");
-        assert_eq!(rows[0].pin_name, "\"12\"");
-    }
-
-    #[test]
-    fn repeated_names_gain_physical_suffixes() {
-        let rows = constant_rows(&[
-            pin_def(1, "4", "AVDD"),
-            pin_def(2, "8", "AVDD"),
-            pin_def(3, "11", "AVDD"),
-        ])
-        .unwrap();
-        let names: Vec<_> = rows.iter().map(|row| row.name.as_str()).collect();
-        let identities: Vec<_> = rows.iter().map(|row| row.pin_name.as_str()).collect();
-        assert_eq!(names, ["AVDD_4", "AVDD_8", "AVDD_11"]);
-        assert_eq!(identities, ["\"4\"", "\"8\"", "\"11\""]);
-    }
-
-    #[test]
-    fn non_numeric_pad_numbers_are_sanitised() {
-        let rows =
-            constant_rows(&[pin_def(1, "TD1+", "SHIELD"), pin_def(2, "TD2+", "SHIELD")]).unwrap();
-        assert_eq!(rows[0].name, "SHIELD_TD1");
-        assert_eq!(rows[1].name, "SHIELD_TD2");
-        assert_eq!(rows[0].pin_name, "\"TD1+\"");
-        assert_eq!(rows[1].pin_name, "\"TD2+\"");
-    }
-
-    #[test]
-    fn suffix_collisions_append_an_ordinal() {
-        let rows =
-            constant_rows(&[pin_def(1, "A+", "SHIELD"), pin_def(2, "A-", "SHIELD")]).unwrap();
-        assert_eq!(rows[0].name, "SHIELD_A");
-        assert_eq!(rows[1].name, "SHIELD_A_2");
-        assert!(rows.iter().all(|row| {
-            row.name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        }));
-    }
-
-    #[test]
-    fn builder_expr_emits_physical_fields() {
-        let pin = pin_with_physical();
-        let expr = builder_expr(&pin).unwrap();
-        assert!(expr.contains(".pos(101.6, 12.7)"), "{}", expr);
-        assert!(expr.contains(".rotation(90.0)"), "{}", expr);
-        assert!(expr.contains(".length(2.54)"), "{}", expr);
-    }
-
-    #[test]
-    fn validate_flags_unresolved_power() {
-        let manifest = Manifest {
-            component: ComponentMeta {
-                name: "Test".into(),
-                title: "Test".into(),
-                description: None,
-                datasheet: None,
-                lib_id: None,
-                model_3d: None,
-                model_3d_data: None,
-                model_3d_rotation: None,
-                model_3d_offset: None,
-                fab_extent: None,
-            },
-            pins: vec![PinDef {
-                num: 1,
-                number: String::new(),
-                name: "VDD".into(),
-                purpose: "Supply".into(),
-                notes: String::new(),
-                electrical: ElectricalFields {
-                    kind: "pwr".into(),
-                    ..Default::default()
-                },
-                pos: None,
-                rotation: None,
-                length: None,
-                width: None,
-                height: None,
-                pad_type: None,
-                pad_shape: None,
-                roundrect_rratio: None,
-                solder_mask_margin: None,
-                layers: None,
-                drill: None,
-                thermal_vias: vec![],
-            }],
-            constraints: vec![],
-            layout: Default::default(),
-            mechanical: vec![],
-        };
-        let diags = validate(&manifest);
-        assert!(diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
-    }
-
-    #[test]
-    fn validate_passes_complete_power() {
-        let manifest = Manifest {
-            component: ComponentMeta {
-                name: "Test".into(),
-                title: "Test".into(),
-                description: None,
-                datasheet: None,
-                lib_id: None,
-                model_3d: None,
-                model_3d_data: None,
-                model_3d_rotation: None,
-                model_3d_offset: None,
-                fab_extent: None,
-            },
-            pins: vec![PinDef {
-                num: 1,
-                number: String::new(),
-                name: "VDD".into(),
-                purpose: "Supply".into(),
-                notes: String::new(),
-                electrical: ElectricalFields {
-                    kind: "pwr".into(),
-                    v_min: Some(1.8),
-                    v_max: Some(3.3),
-                    i_max: Some(0.1),
-                    ..Default::default()
-                },
-                pos: None,
-                rotation: None,
-                length: None,
-                width: None,
-                height: None,
-                pad_type: None,
-                pad_shape: None,
-                roundrect_rratio: None,
-                solder_mask_margin: None,
-                layers: None,
-                drill: None,
-                thermal_vias: vec![],
-            }],
-            constraints: vec![],
-            layout: Default::default(),
-            mechanical: vec![],
-        };
-        let diags = validate(&manifest);
-        assert!(!diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
+/// Validate a generated Rust identifier before it reaches the template.
+fn validate_ident(field: &str, value: &str) -> Result<(), CodegenError> {
+    let mut chars = value.chars();
+    let valid = chars
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        && !is_rust_keyword(value);
+    if valid {
+        Ok(())
+    } else {
+        Err(CodegenError::InvalidIdentifier {
+            field: field.to_string(),
+            value: value.to_string(),
+        })
     }
 }
 
@@ -1922,6 +1706,222 @@ mod security_tests {
         for value in ["OK", "_ok", "OK_1"] {
             validate_ident("field", value).unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pin_with_physical() -> PinDef {
+        PinDef {
+            num: 1,
+            number: String::new(),
+            name: "TXN".into(),
+            purpose: "Test".into(),
+            notes: String::new(),
+            electrical: ElectricalFields {
+                kind: "dio".into(),
+                ..Default::default()
+            },
+            pos: Some((101.6, 12.7)),
+            rotation: Some(90.0),
+            length: Some(2.54),
+            width: None,
+            height: None,
+            pad_type: None,
+            pad_shape: None,
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: None,
+            drill: None,
+            thermal_vias: vec![],
+        }
+    }
+
+    fn pin_def(num: usize, number: &str, name: &str) -> PinDef {
+        PinDef {
+            num,
+            number: number.into(),
+            name: name.into(),
+            purpose: "Test".into(),
+            notes: String::new(),
+            electrical: ElectricalFields {
+                kind: "dio".into(),
+                ..Default::default()
+            },
+            pos: None,
+            rotation: None,
+            length: None,
+            width: None,
+            height: None,
+            pad_type: None,
+            pad_shape: None,
+            roundrect_rratio: None,
+            solder_mask_margin: None,
+            layers: None,
+            drill: None,
+            thermal_vias: vec![],
+        }
+    }
+
+    #[test]
+    fn pin_def_physical_round_trip() {
+        let pin = pin_with_physical();
+        let toml = toml::to_string(&pin).unwrap();
+        let parsed: PinDef = toml::from_str(&toml).unwrap();
+        assert_eq!(parsed.pos, Some((101.6, 12.7)));
+        assert_eq!(parsed.rotation, Some(90.0));
+        assert_eq!(parsed.length, Some(2.54));
+    }
+
+    #[test]
+    fn unique_names_keep_readable_constants() {
+        let rows = constant_rows(&[pin_def(12, "12", "IOVDD")]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "IOVDD");
+        assert_eq!(rows[0].pin_name, "\"12\"");
+    }
+
+    #[test]
+    fn repeated_names_gain_physical_suffixes() {
+        let rows = constant_rows(&[
+            pin_def(1, "4", "AVDD"),
+            pin_def(2, "8", "AVDD"),
+            pin_def(3, "11", "AVDD"),
+        ])
+        .unwrap();
+        let names: Vec<_> = rows.iter().map(|row| row.name.as_str()).collect();
+        let identities: Vec<_> = rows.iter().map(|row| row.pin_name.as_str()).collect();
+        assert_eq!(names, ["AVDD_4", "AVDD_8", "AVDD_11"]);
+        assert_eq!(identities, ["\"4\"", "\"8\"", "\"11\""]);
+    }
+
+    #[test]
+    fn non_numeric_pad_numbers_are_sanitised() {
+        let rows =
+            constant_rows(&[pin_def(1, "TD1+", "SHIELD"), pin_def(2, "TD2+", "SHIELD")]).unwrap();
+        assert_eq!(rows[0].name, "SHIELD_TD1");
+        assert_eq!(rows[1].name, "SHIELD_TD2");
+        assert_eq!(rows[0].pin_name, "\"TD1+\"");
+        assert_eq!(rows[1].pin_name, "\"TD2+\"");
+    }
+
+    #[test]
+    fn suffix_collisions_append_an_ordinal() {
+        let rows =
+            constant_rows(&[pin_def(1, "A+", "SHIELD"), pin_def(2, "A-", "SHIELD")]).unwrap();
+        assert_eq!(rows[0].name, "SHIELD_A");
+        assert_eq!(rows[1].name, "SHIELD_A_2");
+        assert!(rows.iter().all(|row| {
+            row.name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        }));
+    }
+
+    #[test]
+    fn builder_expr_emits_physical_fields() {
+        let pin = pin_with_physical();
+        let expr = builder_expr(&pin).unwrap();
+        assert!(expr.contains(".pos(101.6, 12.7)"), "{}", expr);
+        assert!(expr.contains(".rotation(90.0)"), "{}", expr);
+        assert!(expr.contains(".length(2.54)"), "{}", expr);
+    }
+
+    #[test]
+    fn validate_flags_unresolved_power() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+                fab_extent: None,
+            },
+            pins: vec![PinDef {
+                num: 1,
+                number: String::new(),
+                name: "VDD".into(),
+                purpose: "Supply".into(),
+                notes: String::new(),
+                electrical: ElectricalFields {
+                    kind: "pwr".into(),
+                    ..Default::default()
+                },
+                pos: None,
+                rotation: None,
+                length: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
+            }],
+            constraints: vec![],
+            layout: Default::default(),
+            mechanical: vec![],
+        };
+        let diags = validate(&manifest);
+        assert!(diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
+    }
+
+    #[test]
+    fn validate_passes_complete_power() {
+        let manifest = Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: None,
+                model_3d: None,
+                model_3d_data: None,
+                model_3d_rotation: None,
+                model_3d_offset: None,
+                fab_extent: None,
+            },
+            pins: vec![PinDef {
+                num: 1,
+                number: String::new(),
+                name: "VDD".into(),
+                purpose: "Supply".into(),
+                notes: String::new(),
+                electrical: ElectricalFields {
+                    kind: "pwr".into(),
+                    v_min: Some(1.8),
+                    v_max: Some(3.3),
+                    i_max: Some(0.1),
+                    ..Default::default()
+                },
+                pos: None,
+                rotation: None,
+                length: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
+            }],
+            constraints: vec![],
+            layout: Default::default(),
+            mechanical: vec![],
+        };
+        let diags = validate(&manifest);
+        assert!(!diags.iter().any(|d| d.code == "VALIDATE:UNRESOLVED_POWER"));
     }
 }
 

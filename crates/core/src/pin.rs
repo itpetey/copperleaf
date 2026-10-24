@@ -230,6 +230,35 @@ pub struct RawConnection {
     pub id: usize,
 }
 
+/// Where a canonical pin identity came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinIdentitySource {
+    /// The pad's explicit `number` field.
+    PadNumber,
+    /// The pin's explicit `number` field.
+    PinNumber,
+    /// Deterministic 1-based insertion ordinal used when no number exists.
+    InsertionOrdinal,
+}
+
+/// One component-local canonical pin identity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CanonicalPin {
+    /// The canonical, component-local physical key.
+    pub key: String,
+    /// Which declaration supplied the key.
+    pub source: PinIdentitySource,
+}
+
+/// Outcome of resolving one component's pins to canonical identities.
+#[derive(Clone, Debug, Default)]
+pub struct ComponentPinResolution {
+    /// Canonical identity for each pin, in declaration order.
+    pub pins: Vec<CanonicalPin>,
+    /// Diagnostics produced while resolving identities.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
 impl PadType {
     /// Return the KiCad string representation of this pad type.
     pub fn as_str(&self) -> &'static str {
@@ -1005,35 +1034,6 @@ pub fn resolve_pad(pin: &Pin, index: usize) -> Pad {
         layers: Some(layers),
         drill,
     }
-}
-
-/// Where a canonical pin identity came from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PinIdentitySource {
-    /// The pad's explicit `number` field.
-    PadNumber,
-    /// The pin's explicit `number` field.
-    PinNumber,
-    /// Deterministic 1-based insertion ordinal used when no number exists.
-    InsertionOrdinal,
-}
-
-/// One component-local canonical pin identity.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CanonicalPin {
-    /// The canonical, component-local physical key.
-    pub key: String,
-    /// Which declaration supplied the key.
-    pub source: PinIdentitySource,
-}
-
-/// Outcome of resolving one component's pins to canonical identities.
-#[derive(Clone, Debug, Default)]
-pub struct ComponentPinResolution {
-    /// Canonical identity for each pin, in declaration order.
-    pub pins: Vec<CanonicalPin>,
-    /// Diagnostics produced while resolving identities.
-    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Resolve every pin on one component to a component-local canonical identity.

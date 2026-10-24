@@ -16,11 +16,14 @@
 //! are recovered by decompressing filtered data, so the surrounding text and
 //! drawing operators survive untouched.
 
+use std::{
+    collections::HashSet,
+    panic::{AssertUnwindSafe, catch_unwind},
+};
+
 use anyhow::{Result, anyhow};
 use flate2::{Decompress, FlushDecompress, Status};
 use lopdf::{Document, Object, ObjectId};
-use std::collections::HashSet;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Extract the plain text from the PDF at `path`.
 ///
@@ -54,6 +57,105 @@ pub fn extract_text(path: &str) -> Result<String> {
     }
 }
 
+/// The number of colour components for a (possibly abbreviated) colour space.
+fn colour_components(name: &[u8]) -> Option<usize> {
+    match name {
+        b"DeviceGray" | b"Gray" | b"G" => Some(1),
+        b"DeviceRGB" | b"RGB" => Some(3),
+        b"DeviceCMYK" | b"CMYK" => Some(4),
+        b"DeviceRGBA" | b"RGBA" => Some(4),
+        _ => None,
+    }
+}
+
+/// The object ids of every stream that `pdf-extract` will parse as a content
+/// stream: page `/Contents` and every `/Subtype /Form` XObject.
+fn content_stream_ids(doc: &Document) -> Vec<ObjectId> {
+    let mut ids = HashSet::new();
+
+    for (_, page_id) in doc.get_pages() {
+        let Ok(page) = doc.get_object(page_id).and_then(|object| object.as_dict()) else {
+            continue;
+        };
+        match page.get(b"Contents") {
+            Ok(Object::Reference(id)) => {
+                ids.insert(*id);
+            }
+            Ok(Object::Array(parts)) => {
+                for part in parts {
+                    if let Ok(id) = part.as_reference() {
+                        ids.insert(id);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for (id, object) in &doc.objects {
+        if let Ok(stream) = object.as_stream()
+            && stream.dict.get(b"Subtype").and_then(|o| o.as_name()).ok()
+                == Some(b"Form".as_slice())
+        {
+            ids.insert(*id);
+        }
+    }
+
+    ids.into_iter().collect()
+}
+
+/// Split an inline image dictionary into tokens, treating PDF delimiters as
+/// separators and stripping the leading slash from names.
+fn dict_tokens(dict: &[u8]) -> Vec<&[u8]> {
+    let mut tokens = Vec::new();
+    let mut start: Option<usize> = None;
+
+    for (i, &byte) in dict.iter().enumerate() {
+        let delimiter = byte.is_ascii_whitespace()
+            || matches!(byte, b'/' | b'<' | b'>' | b'[' | b']' | b'(' | b')');
+        if delimiter {
+            if let Some(start) = start.take() {
+                tokens.push(&dict[start..i]);
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(start) = start {
+        tokens.push(&dict[start..]);
+    }
+    tokens
+}
+
+/// Find a whitespace-delimited `EI` after `from`, returning the index past it.
+fn find_ei_marker(data: &[u8], from: usize) -> Option<usize> {
+    let mut i = from;
+    while i + 3 <= data.len() {
+        let delimited = data[i].is_ascii_whitespace()
+            && &data[i + 1..i + 3] == b"EI"
+            && (i + 3 == data.len() || data[i + 3].is_ascii_whitespace());
+        if delimited {
+            return Some(i + 3);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Find the whitespace-delimited `ID` token that ends the inline image dict.
+fn find_id_token(data: &[u8], mut i: usize) -> Option<usize> {
+    while i + 1 < data.len() {
+        if &data[i..i + 2] == b"ID"
+            && (i == 0 || data[i - 1].is_ascii_whitespace())
+            && (i + 2 == data.len() || data[i + 2].is_ascii_whitespace())
+        {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
 /// Run `extract`, converting a panic into an ordinary error.
 ///
 /// `pdf-extract` panics rather than returning an error for streams it cannot
@@ -71,13 +173,61 @@ where
     }
 }
 
-/// Run a closure with the panic hook temporarily silenced, catching panics.
-fn with_panics_silenced<R>(f: impl FnOnce() -> R) -> std::thread::Result<R> {
-    let previous_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let outcome = catch_unwind(AssertUnwindSafe(f));
-    std::panic::set_hook(previous_hook);
-    outcome
+/// Locate the end of the inline image beginning at `bi`, or `None` if the
+/// bounds cannot be determined.
+fn inline_image_end(data: &[u8], bi: usize) -> Option<usize> {
+    let id = find_id_token(data, bi + 2)?;
+    let dict = dict_tokens(&data[bi + 2..id]);
+    let filtered = dict
+        .iter()
+        .any(|token| *token == b"F" || *token == b"Filter");
+
+    let mut data_start = id + 2;
+    if data.get(data_start).is_some_and(u8::is_ascii_whitespace) {
+        data_start += 1;
+    }
+
+    let end = if filtered {
+        data_start + zlib_consumed(&data[data_start..])?
+    } else {
+        let width = token_int(&dict, b"W")?;
+        let height = token_int(&dict, b"H")?;
+        let bits = token_int(&dict, b"BPC").unwrap_or(8);
+        let components = token_name(&dict, b"CS")
+            .and_then(colour_components)
+            .unwrap_or(1);
+        let stride = width
+            .checked_mul(components)?
+            .checked_mul(bits)?
+            .div_ceil(8);
+        data_start.checked_add(stride.checked_mul(height)?)?
+    };
+
+    // The image data is followed by optional whitespace and the `EI` operator.
+    let mut cursor = end;
+    while data.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+        cursor += 1;
+    }
+    if data.get(cursor..cursor + 2) == Some(b"EI") {
+        return Some(cursor + 2);
+    }
+
+    // Fallback for image filters we cannot decode (e.g. ASCIIHexDecode).
+    find_ei_marker(data, end)
+}
+
+/// Whether `data[i..]` begins the `BI` operator of an inline image.
+fn is_inline_image_start(data: &[u8], i: usize) -> bool {
+    if data.get(i..i + 2) != Some(b"BI") {
+        return false;
+    }
+    let left_ok =
+        i == 0 || !(data[i - 1].is_ascii_alphanumeric() || matches!(data[i - 1], b'*' | b'/'));
+    let right_ok = matches!(
+        data.get(i + 2),
+        Some(byte) if byte.is_ascii_whitespace() || matches!(byte, b'/' | b'<')
+    );
+    left_ok && right_ok
 }
 
 /// Load the PDF and return a copy with all inline images removed from content
@@ -118,40 +268,28 @@ fn sanitise(path: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// The object ids of every stream that `pdf-extract` will parse as a content
-/// stream: page `/Contents` and every `/Subtype /Form` XObject.
-fn content_stream_ids(doc: &Document) -> Vec<ObjectId> {
-    let mut ids = HashSet::new();
-
-    for (_, page_id) in doc.get_pages() {
-        let Ok(page) = doc.get_object(page_id).and_then(|object| object.as_dict()) else {
-            continue;
-        };
-        match page.get(b"Contents") {
-            Ok(Object::Reference(id)) => {
-                ids.insert(*id);
+/// Return the index just past a literal string beginning at `start` (`(`).
+fn skip_literal_string(data: &[u8], start: usize) -> usize {
+    let mut i = start + 1;
+    let mut depth = 1u32;
+    while i < data.len() {
+        match data[i] {
+            b'\\' => i += 2,
+            b'(' => {
+                depth += 1;
+                i += 1;
             }
-            Ok(Object::Array(parts)) => {
-                for part in parts {
-                    if let Ok(id) = part.as_reference() {
-                        ids.insert(id);
-                    }
+            b')' => {
+                depth -= 1;
+                i += 1;
+                if depth == 0 {
+                    return i;
                 }
             }
-            _ => {}
+            _ => i += 1,
         }
     }
-
-    for (id, object) in &doc.objects {
-        if let Ok(stream) = object.as_stream()
-            && stream.dict.get(b"Subtype").and_then(|o| o.as_name()).ok()
-                == Some(b"Form".as_slice())
-        {
-            ids.insert(*id);
-        }
-    }
-
-    ids.into_iter().collect()
+    i.min(data.len())
 }
 
 /// Remove every inline image (`BI ... ID <data> EI`) from a content stream,
@@ -200,139 +338,6 @@ fn strip_inline_images(data: &[u8]) -> (Vec<u8>, usize) {
     (out, removed)
 }
 
-/// Return the index just past a literal string beginning at `start` (`(`).
-fn skip_literal_string(data: &[u8], start: usize) -> usize {
-    let mut i = start + 1;
-    let mut depth = 1u32;
-    while i < data.len() {
-        match data[i] {
-            b'\\' => i += 2,
-            b'(' => {
-                depth += 1;
-                i += 1;
-            }
-            b')' => {
-                depth -= 1;
-                i += 1;
-                if depth == 0 {
-                    return i;
-                }
-            }
-            _ => i += 1,
-        }
-    }
-    i.min(data.len())
-}
-
-/// Whether `data[i..]` begins the `BI` operator of an inline image.
-fn is_inline_image_start(data: &[u8], i: usize) -> bool {
-    if data.get(i..i + 2) != Some(b"BI") {
-        return false;
-    }
-    let left_ok =
-        i == 0 || !(data[i - 1].is_ascii_alphanumeric() || matches!(data[i - 1], b'*' | b'/'));
-    let right_ok = matches!(
-        data.get(i + 2),
-        Some(byte) if byte.is_ascii_whitespace() || matches!(byte, b'/' | b'<')
-    );
-    left_ok && right_ok
-}
-
-/// Locate the end of the inline image beginning at `bi`, or `None` if the
-/// bounds cannot be determined.
-fn inline_image_end(data: &[u8], bi: usize) -> Option<usize> {
-    let id = find_id_token(data, bi + 2)?;
-    let dict = dict_tokens(&data[bi + 2..id]);
-    let filtered = dict
-        .iter()
-        .any(|token| *token == b"F" || *token == b"Filter");
-
-    let mut data_start = id + 2;
-    if data.get(data_start).is_some_and(u8::is_ascii_whitespace) {
-        data_start += 1;
-    }
-
-    let end = if filtered {
-        data_start + zlib_consumed(&data[data_start..])?
-    } else {
-        let width = token_int(&dict, b"W")?;
-        let height = token_int(&dict, b"H")?;
-        let bits = token_int(&dict, b"BPC").unwrap_or(8);
-        let components = token_name(&dict, b"CS")
-            .and_then(colour_components)
-            .unwrap_or(1);
-        let stride = width
-            .checked_mul(components)?
-            .checked_mul(bits)?
-            .div_ceil(8);
-        data_start.checked_add(stride.checked_mul(height)?)?
-    };
-
-    // The image data is followed by optional whitespace and the `EI` operator.
-    let mut cursor = end;
-    while data.get(cursor).is_some_and(u8::is_ascii_whitespace) {
-        cursor += 1;
-    }
-    if data.get(cursor..cursor + 2) == Some(b"EI") {
-        return Some(cursor + 2);
-    }
-
-    // Fallback for image filters we cannot decode (e.g. ASCIIHexDecode).
-    find_ei_marker(data, end)
-}
-
-/// Find a whitespace-delimited `EI` after `from`, returning the index past it.
-fn find_ei_marker(data: &[u8], from: usize) -> Option<usize> {
-    let mut i = from;
-    while i + 3 <= data.len() {
-        let delimited = data[i].is_ascii_whitespace()
-            && &data[i + 1..i + 3] == b"EI"
-            && (i + 3 == data.len() || data[i + 3].is_ascii_whitespace());
-        if delimited {
-            return Some(i + 3);
-        }
-        i += 1;
-    }
-    None
-}
-
-/// Find the whitespace-delimited `ID` token that ends the inline image dict.
-fn find_id_token(data: &[u8], mut i: usize) -> Option<usize> {
-    while i + 1 < data.len() {
-        if &data[i..i + 2] == b"ID"
-            && (i == 0 || data[i - 1].is_ascii_whitespace())
-            && (i + 2 == data.len() || data[i + 2].is_ascii_whitespace())
-        {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
-}
-
-/// Split an inline image dictionary into tokens, treating PDF delimiters as
-/// separators and stripping the leading slash from names.
-fn dict_tokens(dict: &[u8]) -> Vec<&[u8]> {
-    let mut tokens = Vec::new();
-    let mut start: Option<usize> = None;
-
-    for (i, &byte) in dict.iter().enumerate() {
-        let delimiter = byte.is_ascii_whitespace()
-            || matches!(byte, b'/' | b'<' | b'>' | b'[' | b']' | b'(' | b')');
-        if delimiter {
-            if let Some(start) = start.take() {
-                tokens.push(&dict[start..i]);
-            }
-        } else if start.is_none() {
-            start = Some(i);
-        }
-    }
-    if let Some(start) = start {
-        tokens.push(&dict[start..]);
-    }
-    tokens
-}
-
 /// The integer value following the `/key` entry, if present.
 fn token_int(tokens: &[&[u8]], key: &[u8]) -> Option<usize> {
     let index = tokens.iter().position(|token| *token == key)?;
@@ -348,15 +353,13 @@ fn token_name<'a>(tokens: &[&'a [u8]], key: &[u8]) -> Option<&'a [u8]> {
     tokens.get(index + 1).copied()
 }
 
-/// The number of colour components for a (possibly abbreviated) colour space.
-fn colour_components(name: &[u8]) -> Option<usize> {
-    match name {
-        b"DeviceGray" | b"Gray" | b"G" => Some(1),
-        b"DeviceRGB" | b"RGB" => Some(3),
-        b"DeviceCMYK" | b"CMYK" => Some(4),
-        b"DeviceRGBA" | b"RGBA" => Some(4),
-        _ => None,
-    }
+/// Run a closure with the panic hook temporarily silenced, catching panics.
+fn with_panics_silenced<R>(f: impl FnOnce() -> R) -> std::thread::Result<R> {
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let outcome = catch_unwind(AssertUnwindSafe(f));
+    std::panic::set_hook(previous_hook);
+    outcome
 }
 
 /// Decompress a zlib stream and report how many input bytes it consumed.

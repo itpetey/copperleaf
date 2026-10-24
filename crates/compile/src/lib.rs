@@ -42,15 +42,6 @@ pub struct NetInfo {
     pub pin_count: usize,
 }
 
-#[derive(Clone, Debug)]
-pub struct CompileSummary {
-    pub nets: Vec<NetInfo>,
-    /// Every decoupling capacitor created by synthesis, in allocation order.
-    pub caps_synthesised: Vec<SynthCap>,
-    pub pin_count: usize,
-    pub component_count: usize,
-}
-
 /// Description of one capacitor created by decoupling synthesis.
 #[derive(Clone, Debug)]
 pub struct SynthCap {
@@ -58,6 +49,15 @@ pub struct SynthCap {
     pub refdes: String,
     /// Capacitance value.
     pub value: Qty<Farad>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CompileSummary {
+    pub nets: Vec<NetInfo>,
+    /// Every decoupling capacitor created by synthesis, in allocation order.
+    pub caps_synthesised: Vec<SynthCap>,
+    pub pin_count: usize,
+    pub component_count: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -91,102 +91,6 @@ pub struct CompileOptions {
     /// Footprint code used for synthesised decoupling capacitors.
     /// Defaults to `DEFAULT_CAP_FOOTPRINT` (0603 / 1608 metric).
     pub decoupling_footprint: Package,
-}
-
-/// Build, for each component, a map from canonical pin identity to every
-/// component-local pin index carrying that identity.  A valid component has
-/// exactly one index per key; duplicates remain visible here so compilation
-/// can reject ambiguous handles rather than silently choosing one.
-fn canonical_pin_maps(compiled: &[CompiledComponent]) -> Vec<HashMap<String, Vec<usize>>> {
-    compiled
-        .iter()
-        .map(|component| {
-            let resolution =
-                copperleaf::pin::resolve_pin_identities(&component.refdes, &component.pins);
-            let mut map: HashMap<String, Vec<usize>> = HashMap::new();
-            for (index, canonical) in resolution.pins.into_iter().enumerate() {
-                map.entry(canonical.key).or_default().push(index);
-            }
-            map
-        })
-        .collect()
-}
-
-fn resolve_handle_index(
-    handle: &PinHandle,
-    compiled: &[CompiledComponent],
-    maps: &[HashMap<String, Vec<usize>>],
-) -> Result<usize, Diagnostic> {
-    let Some(component) = compiled.get(handle.component) else {
-        return Err(Diagnostic {
-            code: "BOARD:INVALID_COMPONENT".into(),
-            severity: Severity::Error,
-            message: format!("component index {} does not exist", handle.component),
-            entities: vec![format!("{}", handle.component)],
-            hint: None,
-        });
-    };
-    let Some(indices) = maps
-        .get(handle.component)
-        .and_then(|map| map.get(handle.pin))
-    else {
-        let display_match = component.pins.iter().any(|pin| pin.name() == handle.pin);
-        return Err(Diagnostic {
-            code: "BOARD:INVALID_PIN".into(),
-            severity: Severity::Error,
-            message: format!(
-                "pin identity '{}' does not match exactly one physical pin on component '{}'",
-                handle.pin, component.refdes
-            ),
-            entities: vec![format!("{}.{}", component.refdes, handle.pin)],
-            hint: Some(if display_match {
-                "The handle carries a display name; use the pin constant for a physical pad.".into()
-            } else {
-                "Use a generated pin constant, which carries the canonical physical identity."
-                    .into()
-            }),
-        });
-    };
-    match indices.len() {
-        1 => Ok(indices[0]),
-        count => Err(Diagnostic {
-            code: "BOARD:AMBIGUOUS_PIN".into(),
-            severity: Severity::Error,
-            message: format!(
-                "pin identity '{}' matches {} physical pins on component '{}'",
-                handle.pin, count, component.refdes
-            ),
-            entities: vec![format!("{}.{}", component.refdes, handle.pin)],
-            hint: Some("Every electrical pin needs a distinct pad number.".into()),
-        }),
-    }
-}
-
-/// Validate every authored pin handle before net grouping.
-fn validate_handles(
-    connections: &[RawConnection],
-    single_pin_nets: &[(usize, PinHandle)],
-    compiled: &[CompiledComponent],
-    maps: &[HashMap<String, Vec<usize>>],
-) -> Result<(), CompileError> {
-    let mut errors = Vec::new();
-    for connection in connections {
-        for handle in [connection.from, connection.to] {
-            if let Err(error) = resolve_handle_index(&handle, compiled, maps) {
-                errors.push(error);
-            }
-        }
-    }
-    for &(_, handle) in single_pin_nets {
-        if let Err(error) = resolve_handle_index(&handle, compiled, maps) {
-            errors.push(error);
-        }
-    }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(CompileError::new(errors))
-    }
 }
 
 impl NetGrouping {
@@ -576,6 +480,43 @@ fn build_summary(board: &CompiledBoard, caps_synthesised: Vec<SynthCap>) -> Comp
     }
 }
 
+/// Build, for each component, a map from canonical pin identity to every
+/// component-local pin index carrying that identity.  A valid component has
+/// exactly one index per key; duplicates remain visible here so compilation
+/// can reject ambiguous handles rather than silently choosing one.
+fn canonical_pin_maps(compiled: &[CompiledComponent]) -> Vec<HashMap<String, Vec<usize>>> {
+    compiled
+        .iter()
+        .map(|component| {
+            let resolution =
+                copperleaf::pin::resolve_pin_identities(&component.refdes, &component.pins);
+            let mut map: HashMap<String, Vec<usize>> = HashMap::new();
+            for (index, canonical) in resolution.pins.into_iter().enumerate() {
+                map.entry(canonical.key).or_default().push(index);
+            }
+            map
+        })
+        .collect()
+}
+
+/// Scan existing refdes for the next free capacitor designator.
+///
+/// Allocation starts after the highest numeric `C<n>` refdes and skips every
+/// occupied refdes, so an existing component is never renamed or reused.
+fn capacitor_refdes_state(board: &CompiledBoard) -> (u32, std::collections::HashSet<String>) {
+    let mut max_c = 0u32;
+    let mut occupied = std::collections::HashSet::new();
+    for component in &board.components {
+        occupied.insert(component.refdes.clone());
+        if let Some(suffix) = component.refdes.strip_prefix('C')
+            && let Ok(number) = suffix.parse::<u32>()
+        {
+            max_c = max_c.max(number);
+        }
+    }
+    (max_c + 1, occupied)
+}
+
 /// Type-erase [`Component`] trait objects into [`CompiledComponent`]s with
 /// deterministic pin IDs.
 fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
@@ -583,31 +524,6 @@ fn compile_components(entries: &[ComponentEntry]) -> Vec<CompiledComponent> {
         .iter()
         .map(|entry| CompiledComponent::from_component(&entry.name, entry.component.as_ref()))
         .collect()
-}
-
-fn net_has_ground_pin(board: &CompiledBoard, net_idx: usize) -> bool {
-    board.connections.iter().any(|connection| {
-        connection.net.0 == net_idx
-            && board
-                .components
-                .get(connection.component)
-                .and_then(|component| component.pins.get(connection.pin_index))
-                .is_some_and(|pin| matches!(pin.role(), Role::Gnd))
-    })
-}
-
-fn unique_net_name(board: &CompiledBoard, preferred: &str) -> String {
-    if board.find_net(preferred).is_none() {
-        return preferred.to_owned();
-    }
-    let mut ordinal = 1u32;
-    loop {
-        let candidate = format!("{preferred}_{ordinal}");
-        if board.find_net(&candidate).is_none() {
-            return candidate;
-        }
-        ordinal += 1;
-    }
 }
 
 /// Choose the electrical ground return for synthesised decoupling capacitors.
@@ -664,24 +580,6 @@ fn ground_net_idx_and_fallback(board: &CompiledBoard) -> (NetIdx, Option<Net>, V
     (idx, Some(net), diagnostics)
 }
 
-/// Scan existing refdes for the next free capacitor designator.
-///
-/// Allocation starts after the highest numeric `C<n>` refdes and skips every
-/// occupied refdes, so an existing component is never renamed or reused.
-fn capacitor_refdes_state(board: &CompiledBoard) -> (u32, std::collections::HashSet<String>) {
-    let mut max_c = 0u32;
-    let mut occupied = std::collections::HashSet::new();
-    for component in &board.components {
-        occupied.insert(component.refdes.clone());
-        if let Some(suffix) = component.refdes.strip_prefix('C')
-            && let Ok(number) = suffix.parse::<u32>()
-        {
-            max_c = max_c.max(number);
-        }
-    }
-    (max_c + 1, occupied)
-}
-
 /// Create a decoupling capacitor [`CompiledComponent`] with a proper SMD
 /// footprint from the passives library.
 fn make_capacitor_component(
@@ -691,6 +589,17 @@ fn make_capacitor_component(
 ) -> CompiledComponent {
     let cap = copperleaf_parts_passives::Capacitor::decoupling(value, package);
     CompiledComponent::from_component(refdes, &cap)
+}
+
+fn net_has_ground_pin(board: &CompiledBoard, net_idx: usize) -> bool {
+    board.connections.iter().any(|connection| {
+        connection.net.0 == net_idx
+            && board
+                .components
+                .get(connection.component)
+                .and_then(|component| component.pins.get(connection.pin_index))
+                .is_some_and(|pin| matches!(pin.role(), Role::Gnd))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -771,6 +680,56 @@ fn place_decoupling_set(
             pin_index: 1,
             net: gnd_net_idx,
         });
+    }
+}
+
+fn resolve_handle_index(
+    handle: &PinHandle,
+    compiled: &[CompiledComponent],
+    maps: &[HashMap<String, Vec<usize>>],
+) -> Result<usize, Diagnostic> {
+    let Some(component) = compiled.get(handle.component) else {
+        return Err(Diagnostic {
+            code: "BOARD:INVALID_COMPONENT".into(),
+            severity: Severity::Error,
+            message: format!("component index {} does not exist", handle.component),
+            entities: vec![format!("{}", handle.component)],
+            hint: None,
+        });
+    };
+    let Some(indices) = maps
+        .get(handle.component)
+        .and_then(|map| map.get(handle.pin))
+    else {
+        let display_match = component.pins.iter().any(|pin| pin.name() == handle.pin);
+        return Err(Diagnostic {
+            code: "BOARD:INVALID_PIN".into(),
+            severity: Severity::Error,
+            message: format!(
+                "pin identity '{}' does not match exactly one physical pin on component '{}'",
+                handle.pin, component.refdes
+            ),
+            entities: vec![format!("{}.{}", component.refdes, handle.pin)],
+            hint: Some(if display_match {
+                "The handle carries a display name; use the pin constant for a physical pad.".into()
+            } else {
+                "Use a generated pin constant, which carries the canonical physical identity."
+                    .into()
+            }),
+        });
+    };
+    match indices.len() {
+        1 => Ok(indices[0]),
+        count => Err(Diagnostic {
+            code: "BOARD:AMBIGUOUS_PIN".into(),
+            severity: Severity::Error,
+            message: format!(
+                "pin identity '{}' matches {} physical pins on component '{}'",
+                handle.pin, count, component.refdes
+            ),
+            entities: vec![format!("{}.{}", component.refdes, handle.pin)],
+            hint: Some("Every electrical pin needs a distinct pad number.".into()),
+        }),
     }
 }
 
@@ -1076,6 +1035,89 @@ fn synthesise_decoupling(
         fallback_gnd_net,
         synth_caps,
     )
+}
+
+fn unique_net_name(board: &CompiledBoard, preferred: &str) -> String {
+    if board.find_net(preferred).is_none() {
+        return preferred.to_owned();
+    }
+    let mut ordinal = 1u32;
+    loop {
+        let candidate = format!("{preferred}_{ordinal}");
+        if board.find_net(&candidate).is_none() {
+            return candidate;
+        }
+        ordinal += 1;
+    }
+}
+
+/// Validate every authored pin handle before net grouping.
+fn validate_handles(
+    connections: &[RawConnection],
+    single_pin_nets: &[(usize, PinHandle)],
+    compiled: &[CompiledComponent],
+    maps: &[HashMap<String, Vec<usize>>],
+) -> Result<(), CompileError> {
+    let mut errors = Vec::new();
+    for connection in connections {
+        for handle in [connection.from, connection.to] {
+            if let Err(error) = resolve_handle_index(&handle, compiled, maps) {
+                errors.push(error);
+            }
+        }
+    }
+    for &(_, handle) in single_pin_nets {
+        if let Err(error) = resolve_handle_index(&handle, compiled, maps) {
+            errors.push(error);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CompileError::new(errors))
+    }
+}
+
+#[cfg(test)]
+mod summary_tests {
+    use super::*;
+    use copperleaf::{Component, Pin, PinRef};
+
+    struct Decoupled;
+
+    impl Component for Decoupled {
+        fn pins(&self) -> &[Pin] {
+            static PINS: std::sync::OnceLock<Vec<Pin>> = std::sync::OnceLock::new();
+            PINS.get_or_init(|| {
+                vec![
+                    Pin::build("VIN")
+                        .number("1")
+                        .pwr_fixed(3.3.volt(), 0.1.amp())
+                        .pin(),
+                ]
+            })
+        }
+
+        fn constraints(&self) -> Vec<Constraint> {
+            vec![Constraint::Decoupling {
+                values: vec![100.0.nf()],
+                per_pin: true,
+            }]
+        }
+    }
+
+    #[test]
+    fn compile_summary_lists_synthesised_capacitors() {
+        let mut board = Board::new("summary");
+        let u1 = board.add("U1", Decoupled);
+        let power = board.net(u1.pin(PinRef("1"))).unwrap();
+        board.set_net_voltage(power, 3.3.volt());
+
+        let report = crate::run(board, &CompileOptions::default()).expect("compiles");
+        assert_eq!(report.summary.caps_synthesised.len(), 1);
+        assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
+        assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-15);
+    }
 }
 
 #[cfg(test)]
@@ -1479,47 +1521,5 @@ mod tests {
             names.contains(&"PAIR_NET"),
             "connect net lost its name override: {names:?}"
         );
-    }
-}
-
-#[cfg(test)]
-mod summary_tests {
-    use super::*;
-    use copperleaf::{Component, Pin, PinRef};
-
-    struct Decoupled;
-
-    impl Component for Decoupled {
-        fn pins(&self) -> &[Pin] {
-            static PINS: std::sync::OnceLock<Vec<Pin>> = std::sync::OnceLock::new();
-            PINS.get_or_init(|| {
-                vec![
-                    Pin::build("VIN")
-                        .number("1")
-                        .pwr_fixed(3.3.volt(), 0.1.amp())
-                        .pin(),
-                ]
-            })
-        }
-
-        fn constraints(&self) -> Vec<Constraint> {
-            vec![Constraint::Decoupling {
-                values: vec![100.0.nf()],
-                per_pin: true,
-            }]
-        }
-    }
-
-    #[test]
-    fn compile_summary_lists_synthesised_capacitors() {
-        let mut board = Board::new("summary");
-        let u1 = board.add("U1", Decoupled);
-        let power = board.net(u1.pin(PinRef("1"))).unwrap();
-        board.set_net_voltage(power, 3.3.volt());
-
-        let report = crate::run(board, &CompileOptions::default()).expect("compiles");
-        assert_eq!(report.summary.caps_synthesised.len(), 1);
-        assert_eq!(report.summary.caps_synthesised[0].refdes, "C1");
-        assert!((report.summary.caps_synthesised[0].value.as_base() - 100e-9).abs() < 1e-15);
     }
 }

@@ -58,151 +58,35 @@ fn positive(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
 
-fn validate_dimensions(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
-    if !positive(board.width) {
-        diagnostics.push(error(
-            "BOARD:INVALID_DIMENSION",
-            format!(
-                "board width must be finite and positive, got {}",
-                board.width
-            ),
-            vec!["board:width".into()],
-            None,
-        ));
-    }
-    if !positive(board.height) {
-        diagnostics.push(error(
-            "BOARD:INVALID_DIMENSION",
-            format!(
-                "board height must be finite and positive, got {}",
-                board.height
-            ),
-            vec!["board:height".into()],
-            None,
-        ));
-    }
-}
+fn validate_component_pins(component: &CompiledComponent, diagnostics: &mut Vec<Diagnostic>) {
+    // Canonical identity diagnostics: missing/conflicting numbers and
+    // duplicate component-local identities.
+    diagnostics.extend(resolve_pin_identities(&component.refdes, &component.pins).diagnostics);
 
-fn validate_design_rules(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
-    let rules = &board.design_rules;
-    let fields = [
-        ("min_clearance", rules.min_clearance),
-        ("min_pad_to_pad_clearance", rules.min_pad_to_pad_clearance),
-        ("min_connection", rules.min_connection),
-        ("min_copper_edge_clearance", rules.min_copper_edge_clearance),
-        ("min_hole_clearance", rules.min_hole_clearance),
-        ("min_hole_to_hole", rules.min_hole_to_hole),
-        ("min_silk_clearance", rules.min_silk_clearance),
-        ("min_track_width", rules.min_track_width),
-        ("min_via_diameter", rules.min_via_diameter),
-        ("min_via_drill", rules.min_via_drill),
-        ("min_via_annular_width", rules.min_via_annular_width),
-        ("min_through_hole_diameter", rules.min_through_hole_diameter),
-        ("min_microvia_diameter", rules.min_microvia_diameter),
-        ("min_microvia_drill", rules.min_microvia_drill),
-        (
-            "solder_mask_to_copper_clearance",
-            rules.solder_mask_to_copper_clearance,
-        ),
-        ("min_text_height", rules.min_text_height),
-        ("min_text_thickness", rules.min_text_thickness),
-    ];
-    for (name, value) in fields {
-        if !finite(value) || value < 0.0 {
+    let mut ids: HashMap<&str, usize> = HashMap::new();
+    for (index, pin) in component.pins.iter().enumerate() {
+        if pin.id().0.is_empty() {
             diagnostics.push(error(
-                "BOARD:INVALID_DESIGN_RULE",
-                format!("design rule '{name}' must be finite and non-negative, got {value}"),
-                vec![format!("design_rule:{name}")],
-                None,
-            ));
-        }
-    }
-}
-
-fn validate_stackup(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
-    let stackup = &board.stackup;
-    if stackup.layers.is_empty() {
-        diagnostics.push(error(
-            "BOARD:INVALID_STACKUP",
-            "stackup has no layers".into(),
-            vec!["stackup".into()],
-            Some("Configure at least one copper layer."),
-        ));
-        return;
-    }
-    if !matches!(stackup.layers.first(), Some(StackupLayer::Copper { .. })) {
-        diagnostics.push(error(
-            "BOARD:INVALID_STACKUP",
-            "stackup must start with a copper layer".into(),
-            vec!["stackup:first".into()],
-            None,
-        ));
-    }
-    if !matches!(stackup.layers.last(), Some(StackupLayer::Copper { .. })) {
-        diagnostics.push(error(
-            "BOARD:INVALID_STACKUP",
-            "stackup must end with a copper layer".into(),
-            vec!["stackup:last".into()],
-            None,
-        ));
-    }
-    for (index, layer) in stackup.layers.iter().enumerate() {
-        let is_copper = matches!(layer, StackupLayer::Copper { .. });
-        if is_copper != (index % 2 == 0) {
-            diagnostics.push(error(
-                "BOARD:INVALID_STACKUP",
+                "BOARD:EMPTY_PIN_ID",
                 format!(
-                    "stackup layer {index} is {} but must alternate copper/dielectric",
-                    if is_copper { "copper" } else { "dielectric" }
+                    "pin '{}' on '{}' has an empty PinId",
+                    pin.name(),
+                    component.refdes
                 ),
-                vec![format!("stackup:{index}")],
+                vec![format!("{}.{}", component.refdes, pin.name())],
                 None,
             ));
-        }
-        let thickness = match layer {
-            StackupLayer::Copper { thickness_mm, .. } => *thickness_mm,
-            StackupLayer::Dielectric { thickness_mm, .. } => *thickness_mm,
-        };
-        if !positive(thickness) {
+        } else if let Some(previous) = ids.insert(pin.id().0.as_str(), index) {
             diagnostics.push(error(
-                "BOARD:INVALID_STACKUP",
-                format!("stackup layer {index} has non-positive thickness {thickness}"),
-                vec![format!("stackup:{index}")],
+                "BOARD:DUPLICATE_PIN_ID",
+                format!(
+                    "pins {previous} and {index} on '{}' share a PinId",
+                    component.refdes
+                ),
+                vec![format!("{}.{}", component.refdes, pin.name())],
                 None,
             ));
         }
-    }
-}
-
-fn validate_pad(pad: &Pad, owner: &str, diagnostics: &mut Vec<Diagnostic>) {
-    if !finite(pad.pos.0) || !finite(pad.pos.1) {
-        diagnostics.push(error(
-            "BOARD:INVALID_GEOMETRY",
-            format!("pad '{owner}' has a non-finite position"),
-            vec![owner.to_owned()],
-            None,
-        ));
-    }
-    if !positive(pad.width) || !positive(pad.height) {
-        diagnostics.push(error(
-            "BOARD:INVALID_GEOMETRY",
-            format!(
-                "pad '{owner}' dimensions must be finite and positive, got {}x{}",
-                pad.width, pad.height
-            ),
-            vec![owner.to_owned()],
-            None,
-        ));
-    }
-    if let Some(drill) = pad.drill
-        && !positive(drill)
-    {
-        diagnostics.push(error(
-            "BOARD:INVALID_GEOMETRY",
-            format!("pad '{owner}' drill must be finite and positive, got {drill}"),
-            vec![owner.to_owned()],
-            None,
-        ));
     }
 }
 
@@ -264,73 +148,6 @@ fn validate_components(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>)
     }
 }
 
-fn validate_component_pins(component: &CompiledComponent, diagnostics: &mut Vec<Diagnostic>) {
-    // Canonical identity diagnostics: missing/conflicting numbers and
-    // duplicate component-local identities.
-    diagnostics.extend(resolve_pin_identities(&component.refdes, &component.pins).diagnostics);
-
-    let mut ids: HashMap<&str, usize> = HashMap::new();
-    for (index, pin) in component.pins.iter().enumerate() {
-        if pin.id().0.is_empty() {
-            diagnostics.push(error(
-                "BOARD:EMPTY_PIN_ID",
-                format!(
-                    "pin '{}' on '{}' has an empty PinId",
-                    pin.name(),
-                    component.refdes
-                ),
-                vec![format!("{}.{}", component.refdes, pin.name())],
-                None,
-            ));
-        } else if let Some(previous) = ids.insert(pin.id().0.as_str(), index) {
-            diagnostics.push(error(
-                "BOARD:DUPLICATE_PIN_ID",
-                format!(
-                    "pins {previous} and {index} on '{}' share a PinId",
-                    component.refdes
-                ),
-                vec![format!("{}.{}", component.refdes, pin.name())],
-                None,
-            ));
-        }
-    }
-}
-
-fn validate_nets(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
-    let mut names: HashMap<&str, usize> = HashMap::new();
-    let mut referenced = vec![false; board.nets.len()];
-    for connection in &board.connections {
-        if connection.net.0 < referenced.len() {
-            referenced[connection.net.0] = true;
-        }
-    }
-    for (index, net) in board.nets.iter().enumerate() {
-        if net.name.trim().is_empty() {
-            diagnostics.push(error(
-                "BOARD:EMPTY_NET_NAME",
-                format!("net at index {index} has an empty name"),
-                vec![format!("net:{index}")],
-                None,
-            ));
-        } else if let Some(previous) = names.insert(&net.name, index) {
-            diagnostics.push(error(
-                "BOARD:DUPLICATE_NET",
-                format!("nets {previous} and {index} share the name '{}'", net.name),
-                vec![format!("net:{}", net.name)],
-                None,
-            ));
-        }
-        if !referenced[index] {
-            diagnostics.push(error(
-                "BOARD:ORPHAN_NET",
-                format!("net '{}' has no connections", net.name),
-                vec![format!("net:{}", net.name)],
-                None,
-            ));
-        }
-    }
-}
-
 fn validate_connections(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
     for connection in &board.connections {
         let Some(component) = board.components.get(connection.component) else {
@@ -380,62 +197,64 @@ fn validate_connections(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>
     }
 }
 
-fn validate_layer(
-    board: &CompiledBoard,
-    layer: CopperLayer,
-    owner: &str,
-    out: &mut Vec<Diagnostic>,
-) {
-    if board.stackup.validate_copper_layer(layer).is_err() {
-        out.push(error(
-            "BOARD:LAYER_OUT_OF_RANGE",
+fn validate_design_rules(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    let rules = &board.design_rules;
+    let fields = [
+        ("min_clearance", rules.min_clearance),
+        ("min_pad_to_pad_clearance", rules.min_pad_to_pad_clearance),
+        ("min_connection", rules.min_connection),
+        ("min_copper_edge_clearance", rules.min_copper_edge_clearance),
+        ("min_hole_clearance", rules.min_hole_clearance),
+        ("min_hole_to_hole", rules.min_hole_to_hole),
+        ("min_silk_clearance", rules.min_silk_clearance),
+        ("min_track_width", rules.min_track_width),
+        ("min_via_diameter", rules.min_via_diameter),
+        ("min_via_drill", rules.min_via_drill),
+        ("min_via_annular_width", rules.min_via_annular_width),
+        ("min_through_hole_diameter", rules.min_through_hole_diameter),
+        ("min_microvia_diameter", rules.min_microvia_diameter),
+        ("min_microvia_drill", rules.min_microvia_drill),
+        (
+            "solder_mask_to_copper_clearance",
+            rules.solder_mask_to_copper_clearance,
+        ),
+        ("min_text_height", rules.min_text_height),
+        ("min_text_thickness", rules.min_text_thickness),
+    ];
+    for (name, value) in fields {
+        if !finite(value) || value < 0.0 {
+            diagnostics.push(error(
+                "BOARD:INVALID_DESIGN_RULE",
+                format!("design rule '{name}' must be finite and non-negative, got {value}"),
+                vec![format!("design_rule:{name}")],
+                None,
+            ));
+        }
+    }
+}
+
+fn validate_dimensions(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    if !positive(board.width) {
+        diagnostics.push(error(
+            "BOARD:INVALID_DIMENSION",
             format!(
-                "{owner} references copper ordinal {} outside the stackup",
-                layer.0
+                "board width must be finite and positive, got {}",
+                board.width
             ),
-            vec![format!("{owner}:layer:{}", layer.0)],
+            vec!["board:width".into()],
             None,
         ));
     }
-}
-
-fn validate_layer_set(
-    board: &CompiledBoard,
-    layers: &LayerSet,
-    owner: &str,
-    out: &mut Vec<Diagnostic>,
-) {
-    if layers.layers.is_empty() {
-        out.push(error(
-            "BOARD:INVALID_LAYER_SET",
-            format!("{owner} has an empty layer set"),
-            vec![owner.to_owned()],
+    if !positive(board.height) {
+        diagnostics.push(error(
+            "BOARD:INVALID_DIMENSION",
+            format!(
+                "board height must be finite and positive, got {}",
+                board.height
+            ),
+            vec!["board:height".into()],
             None,
         ));
-    }
-    for layer in &layers.layers {
-        validate_layer(board, *layer, owner, out);
-    }
-}
-
-fn validate_directives(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
-    for (component_index, component) in board.components.iter().enumerate() {
-        for directive in &component.layout {
-            validate_directive(
-                board,
-                directive,
-                &format!("component:{component_index}"),
-                diagnostics,
-            );
-        }
-    }
-    for (net_index, net) in board.nets.iter().enumerate() {
-        for directive in &net.layout {
-            validate_directive(board, directive, &format!("net:{net_index}"), diagnostics);
-        }
-    }
-    for directive in &board.layout {
-        validate_directive(board, directive, "board", diagnostics);
     }
 }
 
@@ -484,30 +303,62 @@ fn validate_directive(
     }
 }
 
-fn validate_region(region: &crate::layout::Region, owner: &str, diagnostics: &mut Vec<Diagnostic>) {
-    let points: Vec<(f64, f64)> = match region {
-        crate::layout::Region::Rect { x1, y1, x2, y2 } => {
-            vec![(*x1, *y1), (*x2, *y2)]
+fn validate_directives(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    for (component_index, component) in board.components.iter().enumerate() {
+        for directive in &component.layout {
+            validate_directive(
+                board,
+                directive,
+                &format!("component:{component_index}"),
+                diagnostics,
+            );
         }
-        crate::layout::Region::Circle { cx, cy, r } => {
-            if !positive(*r) {
-                diagnostics.push(error(
-                    "BOARD:INVALID_GEOMETRY",
-                    format!("{owner} has a non-positive keepout radius"),
-                    vec![owner.to_owned()],
-                    None,
-                ));
-            }
-            vec![(*cx, *cy)]
+    }
+    for (net_index, net) in board.nets.iter().enumerate() {
+        for directive in &net.layout {
+            validate_directive(board, directive, &format!("net:{net_index}"), diagnostics);
         }
-    };
-    if points.iter().any(|(x, y)| !finite(*x) || !finite(*y)) {
-        diagnostics.push(error(
-            "BOARD:INVALID_GEOMETRY",
-            format!("{owner} has non-finite keepout geometry"),
+    }
+    for directive in &board.layout {
+        validate_directive(board, directive, "board", diagnostics);
+    }
+}
+
+fn validate_layer(
+    board: &CompiledBoard,
+    layer: CopperLayer,
+    owner: &str,
+    out: &mut Vec<Diagnostic>,
+) {
+    if board.stackup.validate_copper_layer(layer).is_err() {
+        out.push(error(
+            "BOARD:LAYER_OUT_OF_RANGE",
+            format!(
+                "{owner} references copper ordinal {} outside the stackup",
+                layer.0
+            ),
+            vec![format!("{owner}:layer:{}", layer.0)],
+            None,
+        ));
+    }
+}
+
+fn validate_layer_set(
+    board: &CompiledBoard,
+    layers: &LayerSet,
+    owner: &str,
+    out: &mut Vec<Diagnostic>,
+) {
+    if layers.layers.is_empty() {
+        out.push(error(
+            "BOARD:INVALID_LAYER_SET",
+            format!("{owner} has an empty layer set"),
             vec![owner.to_owned()],
             None,
         ));
+    }
+    for layer in &layers.layers {
+        validate_layer(board, *layer, owner, out);
     }
 }
 
@@ -644,6 +495,155 @@ fn validate_layout(board: &CompiledBoard, layout: &Layout, diagnostics: &mut Vec
                 "BOARD:INVALID_ZONE",
                 format!("zone {index} has non-finite geometry"),
                 vec![format!("zone:{index}")],
+                None,
+            ));
+        }
+    }
+}
+
+fn validate_nets(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    let mut names: HashMap<&str, usize> = HashMap::new();
+    let mut referenced = vec![false; board.nets.len()];
+    for connection in &board.connections {
+        if connection.net.0 < referenced.len() {
+            referenced[connection.net.0] = true;
+        }
+    }
+    for (index, net) in board.nets.iter().enumerate() {
+        if net.name.trim().is_empty() {
+            diagnostics.push(error(
+                "BOARD:EMPTY_NET_NAME",
+                format!("net at index {index} has an empty name"),
+                vec![format!("net:{index}")],
+                None,
+            ));
+        } else if let Some(previous) = names.insert(&net.name, index) {
+            diagnostics.push(error(
+                "BOARD:DUPLICATE_NET",
+                format!("nets {previous} and {index} share the name '{}'", net.name),
+                vec![format!("net:{}", net.name)],
+                None,
+            ));
+        }
+        if !referenced[index] {
+            diagnostics.push(error(
+                "BOARD:ORPHAN_NET",
+                format!("net '{}' has no connections", net.name),
+                vec![format!("net:{}", net.name)],
+                None,
+            ));
+        }
+    }
+}
+
+fn validate_pad(pad: &Pad, owner: &str, diagnostics: &mut Vec<Diagnostic>) {
+    if !finite(pad.pos.0) || !finite(pad.pos.1) {
+        diagnostics.push(error(
+            "BOARD:INVALID_GEOMETRY",
+            format!("pad '{owner}' has a non-finite position"),
+            vec![owner.to_owned()],
+            None,
+        ));
+    }
+    if !positive(pad.width) || !positive(pad.height) {
+        diagnostics.push(error(
+            "BOARD:INVALID_GEOMETRY",
+            format!(
+                "pad '{owner}' dimensions must be finite and positive, got {}x{}",
+                pad.width, pad.height
+            ),
+            vec![owner.to_owned()],
+            None,
+        ));
+    }
+    if let Some(drill) = pad.drill
+        && !positive(drill)
+    {
+        diagnostics.push(error(
+            "BOARD:INVALID_GEOMETRY",
+            format!("pad '{owner}' drill must be finite and positive, got {drill}"),
+            vec![owner.to_owned()],
+            None,
+        ));
+    }
+}
+
+fn validate_region(region: &crate::layout::Region, owner: &str, diagnostics: &mut Vec<Diagnostic>) {
+    let points: Vec<(f64, f64)> = match region {
+        crate::layout::Region::Rect { x1, y1, x2, y2 } => {
+            vec![(*x1, *y1), (*x2, *y2)]
+        }
+        crate::layout::Region::Circle { cx, cy, r } => {
+            if !positive(*r) {
+                diagnostics.push(error(
+                    "BOARD:INVALID_GEOMETRY",
+                    format!("{owner} has a non-positive keepout radius"),
+                    vec![owner.to_owned()],
+                    None,
+                ));
+            }
+            vec![(*cx, *cy)]
+        }
+    };
+    if points.iter().any(|(x, y)| !finite(*x) || !finite(*y)) {
+        diagnostics.push(error(
+            "BOARD:INVALID_GEOMETRY",
+            format!("{owner} has non-finite keepout geometry"),
+            vec![owner.to_owned()],
+            None,
+        ));
+    }
+}
+
+fn validate_stackup(board: &CompiledBoard, diagnostics: &mut Vec<Diagnostic>) {
+    let stackup = &board.stackup;
+    if stackup.layers.is_empty() {
+        diagnostics.push(error(
+            "BOARD:INVALID_STACKUP",
+            "stackup has no layers".into(),
+            vec!["stackup".into()],
+            Some("Configure at least one copper layer."),
+        ));
+        return;
+    }
+    if !matches!(stackup.layers.first(), Some(StackupLayer::Copper { .. })) {
+        diagnostics.push(error(
+            "BOARD:INVALID_STACKUP",
+            "stackup must start with a copper layer".into(),
+            vec!["stackup:first".into()],
+            None,
+        ));
+    }
+    if !matches!(stackup.layers.last(), Some(StackupLayer::Copper { .. })) {
+        diagnostics.push(error(
+            "BOARD:INVALID_STACKUP",
+            "stackup must end with a copper layer".into(),
+            vec!["stackup:last".into()],
+            None,
+        ));
+    }
+    for (index, layer) in stackup.layers.iter().enumerate() {
+        let is_copper = matches!(layer, StackupLayer::Copper { .. });
+        if is_copper != (index % 2 == 0) {
+            diagnostics.push(error(
+                "BOARD:INVALID_STACKUP",
+                format!(
+                    "stackup layer {index} is {} but must alternate copper/dielectric",
+                    if is_copper { "copper" } else { "dielectric" }
+                ),
+                vec![format!("stackup:{index}")],
+                None,
+            ));
+        }
+        let thickness = match layer {
+            StackupLayer::Copper { thickness_mm, .. } => *thickness_mm,
+            StackupLayer::Dielectric { thickness_mm, .. } => *thickness_mm,
+        };
+        if !positive(thickness) {
+            diagnostics.push(error(
+                "BOARD:INVALID_STACKUP",
+                format!("stackup layer {index} has non-positive thickness {thickness}"),
+                vec![format!("stackup:{index}")],
                 None,
             ));
         }
