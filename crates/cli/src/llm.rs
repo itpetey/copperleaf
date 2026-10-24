@@ -1,8 +1,8 @@
 //! LLM-assisted datasheet-to-TOML generation using the local `opencode` CLI.
 //!
 //! This module extracts text from a PDF datasheet, prompts a locally-running
-//! LLM via `opencode run`, and parses the resulting TOML into a Copperleaf
-//! part manifest.
+//! LLM via `opencode run` (OpenCode v2), and parses the resulting TOML into a
+//! Copperleaf part manifest.
 
 use copperleaf::{Diagnostic, Severity};
 use copperleaf_part_codegen::Manifest;
@@ -68,9 +68,12 @@ pub fn update_from_datasheet(
 
 /// Invoke `opencode run` with the supplied prompt and file attachments.
 ///
-/// The files are written to a temporary directory which is also passed as
-/// `--dir` so that `opencode` does not attempt to index the project
-/// workspace (which produces noisy progress output and can be slow).
+/// The files are written to a temporary directory which is also used as the
+/// child process's working directory so that `opencode` operates in that
+/// temporary project rather than indexing the caller's workspace (which
+/// produces noisy progress output and can be slow). OpenCode v2 dropped the
+/// `run --dir` flag in favour of a top-level directory argument, so setting
+/// the process working directory is the portable equivalent.
 fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<String, CliError> {
     let dir = tempfile::tempdir()?;
 
@@ -93,9 +96,10 @@ fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<St
         .arg("json")
         .arg("--model")
         .arg(model)
-        .arg("--dangerously-skip-permissions")
-        .arg("--dir")
-        .arg(dir.path());
+        .arg("--auto")
+        // OpenCode v2 removed `run --dir`; run inside the temp directory
+        // instead so it does not index the caller's project workspace.
+        .current_dir(dir.path());
 
     for path in &file_paths {
         cmd.arg("--file").arg(path);
@@ -153,7 +157,7 @@ fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<St
 
 /// Extract plain text from a PDF file.
 fn extract_pdf_text(path: &str) -> Result<String, CliError> {
-    pdf_extract::extract_text(path).map_err(|e| {
+    crate::pdf::extract_text(path).map_err(|e| {
         CliError::Diagnostic(Diagnostic {
             code: "CLI:PDF_EXTRACT".into(),
             severity: Severity::Error,
@@ -236,11 +240,11 @@ nc = false                       # Optional: true if this pin must not be connec
 
 [[constraint]]
 type = "..."                   # Exactly one of: Decoupling, LengthMatch, MaxJunction
-values = ["100nF"]              # Required for Decoupling: capacitor values as unit strings
+values = ["100.0.nf()"]         # Required for Decoupling: capacitor values as Rust quantity expressions
 per_pin = false                 # Optional for Decoupling: true if each pin needs its own cap
 group = "..."                   # Required for LengthMatch: net group name
 skew_ps = 0.0                   # Required for LengthMatch: max skew in picoseconds
-temp = "125C"                   # Required for MaxJunction: max junction temperature
+temp = "125.0.celsius()"        # Required for MaxJunction: max junction temperature as a Rust quantity expression
 
 Rules:
 1. Use the exact pin numbering and names from the datasheet.
@@ -265,9 +269,9 @@ Rules:
 6. For clocks and SPI set a sensible bw_mhz based on the datasheet max frequency.
 7. Add brief notes for ambiguous pins (e.g. "do not connect", "analog 3.3V", "active-low reset").
 8. Only use these constraint types with their exact fields:
-   - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
+   - Decoupling: values (array of Rust quantity strings like "100.0.nf()"), per_pin (bool, optional)
    - LengthMatch: group (string), skew_ps (number)
-   - MaxJunction: temp (string like "125C")
+   - MaxJunction: temp (Rust quantity string like "125.0.celsius()")
    Do NOT invent constraint types or fields not listed above.
 9. Do NOT invent pins or values not present in the datasheet. In particular, do NOT add a `model_3d_data` field — it is managed by the tool.
 10. Output ONLY the TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text.{title_hint}{description_hint}"#,
@@ -307,9 +311,9 @@ Rules:
      pins in the RF/analog domain (e.g. PA_LDO_OUT).
 10. For kind=pwr include v_min, v_max, i_max. For kind=pwr_fixed or pwr_out include v and i. For kind=clk or spi include bw_mhz.
 11. Only use these constraint types with their exact fields:
-    - Decoupling: values (array of strings like "100nF"), per_pin (bool, optional)
+    - Decoupling: values (array of Rust quantity strings like "100.0.nf()"), per_pin (bool, optional)
     - LengthMatch: group (string), skew_ps (number)
-    - MaxJunction: temp (string like "125C")
+    - MaxJunction: temp (Rust quantity string like "125.0.celsius()")
     Do NOT invent constraint types or fields not listed above.
 12. Do NOT invent information not present in the datasheet.
 13. Output ONLY the updated TOML inside a single fenced code block (` ```toml ... ``` `). No explanatory text."#

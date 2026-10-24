@@ -13,6 +13,7 @@ mod kindmap;
 mod llm;
 mod manifest;
 mod new;
+mod pdf;
 mod update;
 mod vendor;
 

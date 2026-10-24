@@ -156,6 +156,29 @@ impl Stackup {
         }
     }
 
+    /// Standard 6‑layer FR‑4 board.
+    ///
+    /// Layer sequence: top signal → prepreg → ground plane → core →
+    /// power plane → prepreg → signal → prepreg → ground plane →
+    /// prepreg → bottom signal.
+    pub fn six_layer() -> Self {
+        Self {
+            layers: vec![
+                StackupLayer::copper("F", 0.035, LayerRole::Signal),
+                StackupLayer::dielectric("prepreg", 0.0994, Dielectric::fr4()),
+                StackupLayer::copper("Gnd", 0.0152, LayerRole::Plane),
+                StackupLayer::dielectric("core", 0.55, Dielectric::fr4()),
+                StackupLayer::copper("Pwr", 0.0152, LayerRole::Plane),
+                StackupLayer::dielectric("prepreg", 0.1088, Dielectric::fr4()),
+                StackupLayer::copper("Sig", 0.0152, LayerRole::Plane),
+                StackupLayer::dielectric("core", 0.55, Dielectric::fr4()),
+                StackupLayer::copper("Gnd", 0.0152, LayerRole::Plane),
+                StackupLayer::dielectric("prepreg", 0.0994, Dielectric::fr4()),
+                StackupLayer::copper("B", 0.035, LayerRole::Signal),
+            ],
+        }
+    }
+
     /// Total board thickness in millimetres (sum of all layer thicknesses).
     pub fn total_thickness_mm(&self) -> f64 {
         self.layers

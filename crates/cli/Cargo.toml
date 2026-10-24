@@ -19,6 +19,8 @@ clap = {
 copperleaf.workspace = true
 copperleaf-backend-kicad.workspace = true
 copperleaf-part-codegen.workspace = true
+flate2.workspace = true
+lopdf.workspace = true
 pdf-extract.workspace = true
 regex = { workspace = true, features = ["unicode-perl"] }
 serde.workspace = true

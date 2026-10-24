@@ -1,0 +1,178 @@
+[component]
+name = "749119250"
+title = "Würth Elektronik 749119250 — Power Over Ethernet (PoE) For For DC/DC Converters SMPS Transformer 1.5kVAC Isolation 200 ~ 500kHz Surface Mount (ER14.5/6)"
+datasheet = "https://www.we-online.com/components/products/datasheet/749119250.pdf"
+lib_id = "749119250"
+model_3d = "/Users/pete/Downloads/749119250/749119250.step"
+model_3d_data = ""
+
+[[pin]]
+num = 1
+number = "1"
+name = "~"
+purpose = "I/O"
+notes = "Primary winding N1 terminal (input, Vin 36-57 V DC)"
+kind = "dio"
+pos = [6.25, -7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 3
+number = "3"
+name = "~"
+purpose = "I/O"
+notes = "Primary winding N1 terminal (input, Vin 36-57 V DC)"
+kind = "dio"
+pos = [1.25, -7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 5
+number = "5"
+name = "~"
+purpose = "I/O"
+notes = "Auxiliary winding N5 terminal (Vaux 9 V)"
+kind = "dio"
+pos = [-3.75, -7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 6
+number = "6"
+name = "~"
+purpose = "I/O"
+notes = "Auxiliary winding N5 terminal (Vaux 9 V)"
+kind = "dio"
+pos = [-6.25, -7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 7
+number = "7"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N3 terminal (Output 2, VOut2 5 V / IOut2 0.47 A)"
+kind = "dio"
+pos = [-6.25, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 8
+number = "8"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N2 terminal (Output 1, VOut1 5 V / IOut1 0.47 A)"
+kind = "dio"
+pos = [-3.75, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 9
+number = "9"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N4 terminal (Output 3, VOut3 5 V / IOut3 0.47 A)"
+kind = "dio"
+pos = [-1.25, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 10
+number = "10"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N4 terminal (Output 3, VOut3 5 V / IOut3 0.47 A)"
+kind = "dio"
+pos = [1.25, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 11
+number = "11"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N3 terminal (Output 2, VOut2 5 V / IOut2 0.47 A)"
+kind = "dio"
+pos = [3.75, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
+[[pin]]
+num = 12
+number = "12"
+name = "~"
+purpose = "I/O"
+notes = "Secondary winding N2 terminal (Output 1, VOut1 5 V / IOut1 0.47 A)"
+kind = "dio"
+pos = [6.25, 7.75]
+rotation = 0.0
+length = 2.5
+width = 1.75
+height = 2.5
+pad_type = "smd"
+pad_shape = "rect"
+solder_mask_margin = 0.102
+layers = "F.Cu F.Mask F.Paste"
+
