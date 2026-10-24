@@ -27,21 +27,21 @@ pub struct Txb0104rgyrg4 {
 }
 
 impl Txb0104rgyrg4 {
-    pub const VCCA: copperleaf::PinRef = copperleaf::PinRef("VCCA");
-    pub const A1: copperleaf::PinRef = copperleaf::PinRef("A1");
-    pub const A2: copperleaf::PinRef = copperleaf::PinRef("A2");
-    pub const A3: copperleaf::PinRef = copperleaf::PinRef("A3");
-    pub const A4: copperleaf::PinRef = copperleaf::PinRef("A4");
-    pub const NC_6: copperleaf::PinRef = copperleaf::PinRef("NC_6");
-    pub const GND: copperleaf::PinRef = copperleaf::PinRef("GND");
-    pub const OE: copperleaf::PinRef = copperleaf::PinRef("OE");
-    pub const NC_9: copperleaf::PinRef = copperleaf::PinRef("NC_9");
-    pub const B4: copperleaf::PinRef = copperleaf::PinRef("B4");
-    pub const B3: copperleaf::PinRef = copperleaf::PinRef("B3");
-    pub const B2: copperleaf::PinRef = copperleaf::PinRef("B2");
-    pub const B1: copperleaf::PinRef = copperleaf::PinRef("B1");
-    pub const VCCB: copperleaf::PinRef = copperleaf::PinRef("VCCB");
-    pub const EXP: copperleaf::PinRef = copperleaf::PinRef("EXP");
+    pub const VCCA: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const A1: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const A2: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const A3: copperleaf::PinRef = copperleaf::PinRef("4");
+    pub const A4: copperleaf::PinRef = copperleaf::PinRef("5");
+    pub const NC_6: copperleaf::PinRef = copperleaf::PinRef("6");
+    pub const GND: copperleaf::PinRef = copperleaf::PinRef("7");
+    pub const OE: copperleaf::PinRef = copperleaf::PinRef("8");
+    pub const NC_9: copperleaf::PinRef = copperleaf::PinRef("9");
+    pub const B4: copperleaf::PinRef = copperleaf::PinRef("10");
+    pub const B3: copperleaf::PinRef = copperleaf::PinRef("11");
+    pub const B2: copperleaf::PinRef = copperleaf::PinRef("12");
+    pub const B1: copperleaf::PinRef = copperleaf::PinRef("13");
+    pub const VCCB: copperleaf::PinRef = copperleaf::PinRef("14");
+    pub const EXP: copperleaf::PinRef = copperleaf::PinRef("15");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};
@@ -110,7 +110,7 @@ impl copperleaf::Component for Txb0104rgyrg4 {
             
             
             description: None,
-            model_3d: Some("/Users/pete/Downloads/TXB0104RGYRG4/TXB0104RGYRG4.step".into()),
+            model_3d: Some("TXB0104RGYRG4.step".into()),
             
             model_3d_data: Some("<elided:578756:5096c791c6835f7a>".into()),
             

@@ -6,20 +6,44 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: clippy, rustfmt
-      - name: Build
-        run: cargo build --workspace --all-targets
-      - name: Format check
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Test
-        run: cargo test --workspace
+      - name: Install verification tools
+        run: cargo install cargo-deny cargo-shear
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.15.0
+      - name: Aggregate verification
+        run: VERIFY_SKIP_KICAD=1 ./scripts/verify.sh
+      - name: Check worktree is clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  kicad-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - name: Emit representative project
+        run: >-
+          cargo run --locked -p copperleaf-backend-kicad
+          --example w5500_acceptance -- target/kicad-acceptance
+      - name: Run pinned KiCad acceptance
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e KICAD_ACCEPTANCE_SKIP_EMIT=1 \
+            kicad/kicad@sha256:c8f05703e865a1caa7266851cf4986dd01d5fb1148e4f63382b6a73466ba7e71 \
+            bash -lc "./scripts/kicad-acceptance.sh"

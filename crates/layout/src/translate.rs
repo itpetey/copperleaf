@@ -110,10 +110,7 @@ fn board_outline(board: &CompiledBoard) -> Vec<(f64, f64)> {
 fn build_pin_net_map(board: &CompiledBoard) -> std::collections::HashMap<(usize, usize), NetIdx> {
     let mut map = std::collections::HashMap::new();
     for conn in &board.connections {
-        let comp = &board.components[conn.component];
-        if let Some(pin_idx) = comp.pins.iter().position(|p| p.name() == conn.pin) {
-            map.insert((conn.component, pin_idx), conn.net);
-        }
+        map.insert((conn.component, conn.pin_index), conn.net);
     }
     map
 }

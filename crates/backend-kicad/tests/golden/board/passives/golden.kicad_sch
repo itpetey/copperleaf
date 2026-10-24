@@ -26,7 +26,7 @@
           (font
             (size 1.27 1.27))
           (justify left)))
-      (property "Footprint" "Capacitor_SMD.3dshapes/C_0603_1608Metric"
+      (property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
         (at 0 0 0)
         (hide yes)
         (effects
@@ -50,7 +50,7 @@
         (effects
           (font
             (size 1.27 1.27))))
-      (property "ki_fp_filters" "Capacitor?SMD.3dshapes/C?0603?1608Metric*"
+      (property "ki_fp_filters" "C?0603?1608Metric*"
         (at 0 0 0)
         (hide yes)
         (effects
@@ -103,7 +103,7 @@
           (font
             (size 1.27 1.27))
           (justify left)))
-      (property "Footprint" "Resistor_SMD.3dshapes/R_0603_1608Metric"
+      (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
         (at 0 0 0)
         (hide yes)
         (effects
@@ -127,7 +127,7 @@
         (effects
           (font
             (size 1.27 1.27))))
-      (property "ki_fp_filters" "Resistor?SMD.3dshapes/R?0603?1608Metric*"
+      (property "ki_fp_filters" "R?0603?1608Metric*"
         (at 0 0 0)
         (hide yes)
         (effects
@@ -413,7 +413,7 @@
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD.3dshapes/C_0603_1608Metric"
+    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
       (at 35.56 33.02 0)
       (hide yes)
       (effects
@@ -442,7 +442,7 @@
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD.3dshapes/R_0603_1608Metric"
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
       (at 68.58 33.02 0)
       (hide yes)
       (effects

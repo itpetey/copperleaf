@@ -37,9 +37,9 @@ struct Slave {
 }
 
 impl PwrSource {
-    const V3V3: PinRef = PinRef("VCC3V3");
-    const V1V8: PinRef = PinRef("VCC1V8");
-    const GND: PinRef = PinRef("GND");
+    const V3V3: PinRef = PinRef("1");
+    const V1V8: PinRef = PinRef("2");
+    const GND: PinRef = PinRef("3");
 
     fn new() -> Self {
         Self {
@@ -59,12 +59,12 @@ impl Component for PwrSource {
 }
 
 impl Mcu {
-    const VDD: PinRef = PinRef("VDD");
-    const VBAT: PinRef = PinRef("VBAT");
-    const GND: PinRef = PinRef("GND");
-    const EP: PinRef = PinRef("EP");
-    const SCK: PinRef = PinRef("SCK");
-    const MOSI: PinRef = PinRef("MOSI");
+    const VDD: PinRef = PinRef("1");
+    const VBAT: PinRef = PinRef("2");
+    const GND: PinRef = PinRef("3");
+    const EP: PinRef = PinRef("4");
+    const SCK: PinRef = PinRef("5");
+    const MOSI: PinRef = PinRef("6");
 
     fn new() -> Self {
         Self {
@@ -116,8 +116,8 @@ impl Component for Mcu {
 }
 
 impl Slave {
-    const SCK: PinRef = PinRef("SCK");
-    const MOSI: PinRef = PinRef("MOSI");
+    const SCK: PinRef = PinRef("1");
+    const MOSI: PinRef = PinRef("2");
 
     fn new() -> Self {
         Self {

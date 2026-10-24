@@ -22,7 +22,7 @@ pub struct {{{struct_name}}} {
 
 impl {{{struct_name}}} {
     {{#constants}}
-    pub const {{{name}}}: copperleaf::PinRef = copperleaf::PinRef("{{{pin_name}}}");
+    pub const {{{name}}}: copperleaf::PinRef = copperleaf::PinRef({{{pin_name}}});
     {{/constants}}
 
     pub fn new() -> Self {
@@ -82,17 +82,17 @@ impl copperleaf::Component for {{{struct_name}}} {
     fn meta(&self) -> &copperleaf::ComponentMeta {
         static META: std::sync::OnceLock<copperleaf::ComponentMeta> = std::sync::OnceLock::new();
         META.get_or_init(|| copperleaf::ComponentMeta {
-            {{#symbol_id}}symbol: Some("{{{symbol_id}}}".into()),{{/symbol_id}}
+            {{#symbol_id}}symbol: Some({{{symbol_id}}}.into()),{{/symbol_id}}
             {{^symbol_id}}symbol: None,{{/symbol_id}}
-            {{#symbol_id}}footprint: Some("{{{symbol_id}}}".into()),{{/symbol_id}}
+            {{#symbol_id}}footprint: Some({{{symbol_id}}}.into()),{{/symbol_id}}
             {{^symbol_id}}footprint: None,{{/symbol_id}}
-            {{#datasheet_lit}}datasheet: Some("{{{datasheet_lit}}}".into()),{{/datasheet_lit}}
+            {{#datasheet_lit}}datasheet: Some({{{datasheet_lit}}}.into()),{{/datasheet_lit}}
             {{^datasheet_lit}}datasheet: None,{{/datasheet_lit}}
-            {{#description_lit}}description: Some("{{{description_lit}}}".into()),{{/description_lit}}
+            {{#description_lit}}description: Some({{{description_lit}}}.into()),{{/description_lit}}
             {{^description_lit}}description: None,{{/description_lit}}
-            {{#model3d_lit}}model_3d: Some("{{{model3d_lit}}}".into()),{{/model3d_lit}}
+            {{#model3d_lit}}model_3d: Some({{{model3d_lit}}}.into()),{{/model3d_lit}}
             {{^model3d_lit}}model_3d: None,{{/model3d_lit}}
-            {{#model3d_data_lit}}model_3d_data: Some("{{{model3d_data_lit}}}".into()),{{/model3d_data_lit}}
+            {{#model3d_data_lit}}model_3d_data: Some({{{model3d_data_lit}}}.into()),{{/model3d_data_lit}}
             {{^model3d_data_lit}}model_3d_data: None,{{/model3d_data_lit}}
             {{#model3d_rotation_lit}}model_3d_rotation: {{{model3d_rotation_lit}}},{{/model3d_rotation_lit}}
             {{^model3d_rotation_lit}}model_3d_rotation: (0.0, 0.0, 0.0),{{/model3d_rotation_lit}}

@@ -16,10 +16,10 @@ pub struct Conmhf4SmdGT {
 }
 
 impl Conmhf4SmdGT {
-    pub const Signal: copperleaf::PinRef = copperleaf::PinRef("Signal");
-    pub const GND1: copperleaf::PinRef = copperleaf::PinRef("GND1");
-    pub const GND2: copperleaf::PinRef = copperleaf::PinRef("GND2");
-    pub const GND3: copperleaf::PinRef = copperleaf::PinRef("GND3");
+    pub const Signal: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const GND1: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const GND2: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const GND3: copperleaf::PinRef = copperleaf::PinRef("4");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

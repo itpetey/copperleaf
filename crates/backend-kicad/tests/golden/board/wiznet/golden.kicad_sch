@@ -628,26 +628,91 @@
       (xy 33.02 101.6))
     (stroke
       (width 0))
-    (uuid "514ed177-1329-2c8f-12a6-4430336ca781"))
+    (uuid "aeb4c6ba-3074-00ed-10d3-42ff6b49e883"))
   (label "NET_U1_AGND"
     (at 33.02 101.6 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "1fa83107-8ff8-41c4-44df-8c64e82fdef6"))
+    (uuid "ce2731a4-6162-6931-3887-c0c3f80bdf8f"))
+  (wire
+    (pts
+      (xy 35.56 99.06)
+      (xy 35.56 101.6))
+    (stroke
+      (width 0))
+    (uuid "9a3cea72-1bdc-e69b-1823-7f9b8ff99015"))
+  (label "NET_U1_AGND"
+    (at 35.56 101.6 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "b3a026de-0501-502e-cb25-c98d93705674"))
+  (wire
+    (pts
+      (xy 38.1 99.06)
+      (xy 38.1 101.6))
+    (stroke
+      (width 0))
+    (uuid "fc4d3dbc-f48f-d801-671e-1422062114cf"))
+  (label "NET_U1_AGND"
+    (at 38.1 101.6 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "32e68d84-a640-1c8d-3275-ebcc0a4df82b"))
+  (wire
+    (pts
+      (xy 40.64 99.06)
+      (xy 40.64 101.6))
+    (stroke
+      (width 0))
+    (uuid "861e2bd2-9eb9-f137-7056-37105f59b6a1"))
+  (label "NET_U1_AGND"
+    (at 40.64 101.6 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "e758bab4-1dc3-b90d-e668-0dfa95700baf"))
+  (wire
+    (pts
+      (xy 43.18 99.06)
+      (xy 43.18 101.6))
+    (stroke
+      (width 0))
+    (uuid "08505987-955c-24f1-6bf7-d37db65956f7"))
+  (label "NET_U1_AGND"
+    (at 43.18 101.6 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "6aca651f-73b6-bd97-634e-b42c1978c0cd"))
   (wire
     (pts
       (xy 45.72 99.06)
       (xy 45.72 101.6))
     (stroke
       (width 0))
-    (uuid "acbbf64c-1baa-5adf-3bf8-077699216159"))
+    (uuid "c6144b61-c8c3-2ace-b582-ede21bd6ba78"))
   (label "NET_U1_AGND"
     (at 45.72 101.6 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "3e8be125-6d08-8fd4-6c73-418f62fe26ea"))
+    (uuid "ed8b0798-3e99-a0d0-eded-e6d7905aa846"))
+  (wire
+    (pts
+      (xy 48.26 99.06)
+      (xy 48.26 101.6))
+    (stroke
+      (width 0))
+    (uuid "c05d73ed-3504-33b8-c8a0-3b3b253a67d6"))
+  (label "NET_U1_AGND"
+    (at 48.26 101.6 0)
+    (effects
+      (font
+        (size 1.27 1.27)))
+    (uuid "b95fd1c1-9e1b-0bee-7e86-43d8e565bde0"))
   (sheet_instances
     (path "/"
       (page "1"))))

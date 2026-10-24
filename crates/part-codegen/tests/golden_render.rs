@@ -12,26 +12,51 @@ use std::path::{Path, PathBuf};
 
 use copperleaf_part_codegen::generate_component_to_string;
 
-/// Compare `actual` against the golden file at `path`, or overwrite the
-/// golden file when running with `COPPERLEAF_BLESS=1`.
-fn compare_or_bless(path: &Path, actual: &str) {
-    if std::env::var_os("COPPERLEAF_BLESS").is_some() {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, actual).unwrap();
-        return;
+/// Returns true only when `COPPERLEAF_BLESS` is exactly `1`.
+fn blessing_enabled_from(value: Option<&str>) -> bool {
+    value == Some("1")
+}
+
+/// Whether snapshots should be written rather than compared.
+fn blessing_enabled() -> bool {
+    blessing_enabled_from(std::env::var("COPPERLEAF_BLESS").ok().as_deref())
+}
+
+/// Compare every golden, or write them when blessing.  All failures are
+/// collected so one run reports every missing or stale snapshot.
+fn collect_failures(goldens: &[(PathBuf, String)], bless: bool) -> Vec<String> {
+    let mut failures = Vec::new();
+    for (path, actual) in goldens {
+        if bless {
+            if let Some(parent) = path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                failures.push(format!("cannot create {}: {e}", parent.display()));
+                continue;
+            }
+            if let Err(e) = std::fs::write(path, actual) {
+                failures.push(format!("cannot write {}: {e}", path.display()));
+            }
+            continue;
+        }
+        match std::fs::read_to_string(path) {
+            Ok(expected) if &expected == actual => {}
+            Ok(_) => failures.push(format!("golden mismatch: {}", path.display())),
+            Err(e) => failures.push(format!("missing golden {}: {e}", path.display())),
+        }
     }
-    let expected = std::fs::read_to_string(path).unwrap_or_else(|e| {
+    failures
+}
+
+/// Fail with every collected golden problem at once.
+fn report_failures(failures: Vec<String>) {
+    if !failures.is_empty() {
         panic!(
-            "missing golden {}: {e} — run with COPPERLEAF_BLESS=1 to create it",
-            path.display()
-        )
-    });
-    assert_eq!(
-        expected,
-        actual,
-        "golden mismatch: {} — run with COPPERLEAF_BLESS=1 to update",
-        path.display()
-    );
+            "{} golden failure(s) — run with COPPERLEAF_BLESS=1 to create or update:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
 }
 
 /// Generated sources embed base64-encoded 3D models inline, which would make
@@ -129,14 +154,16 @@ fn parts_tomls() -> Vec<(String, String, PathBuf)> {
 fn rendered_components_match_goldens() {
     let tomls = parts_tomls();
     assert!(!tomls.is_empty(), "no parts TOMLs found");
+    let mut goldens = Vec::new();
     for (vendor, stem, path) in &tomls {
         let rendered = generate_component_to_string(path)
             .unwrap_or_else(|e| panic!("failed to render {}: {e}", path.display()));
-        compare_or_bless(
-            &golden_dir().join(vendor).join(format!("{stem}.rs")),
-            &elide_long_literals(&rendered),
-        );
+        goldens.push((
+            golden_dir().join(vendor).join(format!("{stem}.rs")),
+            elide_long_literals(&rendered),
+        ));
     }
+    report_failures(collect_failures(&goldens, blessing_enabled()));
 }
 
 #[cfg(test)]
@@ -157,5 +184,42 @@ mod tests {
         let a = elide_long_literals(&long);
         assert!(a.contains("<elided:2048:"), "{a}");
         assert_eq!(a, elide_long_literals(&long));
+    }
+
+    #[test]
+    fn blessing_requires_exact_one() {
+        assert!(blessing_enabled_from(Some("1")));
+        assert!(!blessing_enabled_from(Some("0")));
+        assert!(!blessing_enabled_from(Some("true")));
+        assert!(!blessing_enabled_from(None));
+    }
+
+    #[test]
+    fn all_missing_goldens_are_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let goldens: Vec<_> = ["a", "b", "c"]
+            .iter()
+            .map(|name| (dir.path().join(name), String::new()))
+            .collect();
+        let failures = collect_failures(&goldens, false);
+        assert_eq!(failures.len(), 3, "{failures:?}");
+        for failure in failures {
+            assert!(failure.starts_with("missing golden "), "{failure}");
+        }
+    }
+
+    #[test]
+    fn stale_golden_is_reported_alongside_missing_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let stale = dir.path().join("stale");
+        std::fs::write(&stale, "old").unwrap();
+        let goldens = vec![
+            (stale, "new".to_string()),
+            (dir.path().join("missing"), "new".to_string()),
+        ];
+        let failures = collect_failures(&goldens, false);
+        assert_eq!(failures.len(), 2, "{failures:?}");
+        assert!(failures.iter().any(|f| f.starts_with("golden mismatch: ")));
+        assert!(failures.iter().any(|f| f.starts_with("missing golden ")));
     }
 }

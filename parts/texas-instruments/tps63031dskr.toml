@@ -210,5 +210,5 @@ thermal_vias = [
 
 [[constraint]]
 type = "Decoupling"
-values = ["100.0.nf()", "10.0.uf()"]
+values = ["100nF", "10uF"]
 per_pin = true

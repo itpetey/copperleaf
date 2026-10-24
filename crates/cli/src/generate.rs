@@ -10,7 +10,7 @@ pub fn footprint(args: GenerateFootprintArgs) -> Result<(), CliError> {
 
     let out_path = match args.out {
         Some(ref p) => PathBuf::from(p),
-        None => default_out(&args.part_toml, &manifest, "kicad_mod"),
+        None => default_out(&args.part_toml, &manifest, "kicad_mod")?,
     };
 
     let output_dir = out_path.parent();
@@ -29,7 +29,7 @@ pub fn symbol(args: GenerateSymbolArgs) -> Result<(), CliError> {
 
     let out_path = match args.out {
         Some(ref p) => PathBuf::from(p),
-        None => default_out(&args.part_toml, &manifest, "kicad_sym"),
+        None => default_out(&args.part_toml, &manifest, "kicad_sym")?,
     };
 
     std::fs::write(&out_path, kicad_sym)?;
@@ -41,15 +41,16 @@ fn default_out(
     toml_path: &str,
     manifest: &copperleaf_part_codegen::Manifest,
     extension: &str,
-) -> PathBuf {
+) -> Result<PathBuf, CliError> {
     let toml_path = PathBuf::from(toml_path);
     let stem = toml_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("part");
     let lib_id = manifest.component.lib_id.as_deref().unwrap_or(stem);
-    toml_path
-        .parent()
-        .unwrap_or(std::path::Path::new("."))
-        .join(format!("{}.{}", lib_id, extension))
+    let parent = toml_path.parent().unwrap_or(std::path::Path::new("."));
+    Ok(copperleaf::safe_join(
+        parent,
+        &format!("{}.{}", lib_id, extension),
+    )?)
 }

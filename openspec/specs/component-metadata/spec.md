@@ -1,4 +1,9 @@
-## ADDED Requirements
+# component-metadata Specification
+
+## Purpose
+Define the single metadata model shared by generated components, compilation, and every backend, so symbol, footprint, datasheet, and 3D-model data flow through one path without parallel field sets.
+
+## Requirements
 
 ### Requirement: ComponentMeta is the single component metadata struct
 A `ComponentMeta` struct SHALL be defined in the core crate carrying all non-electrical component metadata: `symbol`, `footprint`, `datasheet`, `description`, `model_3d`, `model_3d_data`, `model_3d_rotation`, and `model_3d_offset`. No other struct in the workspace SHALL re-declare these fields individually (including the codegen `ComponentMeta`, which SHALL be replaced by the core type).

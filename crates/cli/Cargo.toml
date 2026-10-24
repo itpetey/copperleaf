@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "Parts-creation CLI for Copperleaf"
 license.workspace = true
+publish.workspace = true
 
 [[bin]]
 name = "cl"

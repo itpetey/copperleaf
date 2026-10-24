@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "Layout solving with a deterministic force-directed autoplacer"
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 copperleaf.workspace = true

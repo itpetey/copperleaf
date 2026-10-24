@@ -8,7 +8,9 @@
 
 use std::collections::HashMap;
 
-use copperleaf::{BoardSide, CompiledBoard, Layout, NetIdx, Placement, Track, UnitExt, Via, Zone};
+use copperleaf::{
+    BoardSide, CompiledBoard, CopperLayer, Layout, NetIdx, Placement, Track, UnitExt, Via, Zone,
+};
 
 use crate::sexpr::{self, ParseError, Sexpr};
 
@@ -142,7 +144,7 @@ impl ParsedPcb {
                 let layer = layer_name_to_index(&raw.layer, copper_count)?;
                 Some(Track {
                     net,
-                    layer,
+                    layer: CopperLayer::new(layer),
                     width: (raw.width_mm).mm(),
                     path: vec![raw.start, raw.end],
                 })
@@ -157,9 +159,9 @@ impl ParsedPcb {
                 let start = layer_name_to_index(&raw.layer_start, copper_count)?;
                 let end = layer_name_to_index(&raw.layer_end, copper_count)?;
                 let layers = if start <= end {
-                    (start, end)
+                    (CopperLayer::new(start), CopperLayer::new(end))
                 } else {
-                    (end, start)
+                    (CopperLayer::new(end), CopperLayer::new(start))
                 };
                 Some(Via {
                     net,
@@ -179,7 +181,7 @@ impl ParsedPcb {
                 let layer = layer_name_to_index(&raw.layer, copper_count)?;
                 Some(Zone {
                     net,
-                    layer,
+                    layer: CopperLayer::new(layer),
                     outline: raw.outline.clone(),
                 })
             })
@@ -628,7 +630,8 @@ mod tests {
             }],
             connections: vec![Connection {
                 component: 0,
-                pin: "VDD".into(),
+                pin: copperleaf::PinId("VDD".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             }],
             constraints: vec![],
@@ -674,7 +677,7 @@ mod tests {
             }],
             tracks: vec![Track {
                 net: NetIdx(0),
-                layer: 0,
+                layer: copperleaf::CopperLayer(0),
                 width: 0.25.mm(),
                 path: vec![(5.0, 5.0), (15.0, 5.0)],
             }],
@@ -683,11 +686,11 @@ mod tests {
                 at: (15.0, 5.0),
                 drill: 0.4.mm(),
                 diameter: 0.8.mm(),
-                layers: (0, 1),
+                layers: (copperleaf::CopperLayer(0), copperleaf::CopperLayer(1)),
             }],
             zones: vec![Zone {
                 net: NetIdx(0),
-                layer: 1,
+                layer: copperleaf::CopperLayer(1),
                 outline: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 80.0), (0.0, 80.0)],
             }],
         };
@@ -746,7 +749,7 @@ mod tests {
             placements: vec![],
             tracks: vec![Track {
                 net: NetIdx(0),
-                layer: 0,
+                layer: copperleaf::CopperLayer(0),
                 width: 0.25.mm(),
                 path: vec![(5.0, 5.0), (15.0, 5.0)],
             }],
@@ -782,7 +785,7 @@ mod tests {
             placements: vec![],
             tracks: vec![Track {
                 net: NetIdx(0),
-                layer: 0,
+                layer: copperleaf::CopperLayer(0),
                 width: 0.25.mm(),
                 path: vec![(5.0, 5.0), (15.0, 5.0)],
             }],

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::units::{Amp, Hertz, Ohm, Qty, Second, UnitExt, Volt};
+use crate::units::{Amp, Diagnostic, Hertz, Ohm, Qty, Second, Severity, UnitExt, Volt};
 
 /// Default drill for through-hole pads, in mm (0.3 in).
 pub const DEFAULT_DRILL: f64 = 0.762;
@@ -1007,12 +1007,147 @@ pub fn resolve_pad(pin: &Pin, index: usize) -> Pad {
     }
 }
 
+/// Where a canonical pin identity came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinIdentitySource {
+    /// The pad's explicit `number` field.
+    PadNumber,
+    /// The pin's explicit `number` field.
+    PinNumber,
+    /// Deterministic 1-based insertion ordinal used when no number exists.
+    InsertionOrdinal,
+}
+
+/// One component-local canonical pin identity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CanonicalPin {
+    /// The canonical, component-local physical key.
+    pub key: String,
+    /// Which declaration supplied the key.
+    pub source: PinIdentitySource,
+}
+
+/// Outcome of resolving one component's pins to canonical identities.
+#[derive(Clone, Debug, Default)]
+pub struct ComponentPinResolution {
+    /// Canonical identity for each pin, in declaration order.
+    pub pins: Vec<CanonicalPin>,
+    /// Diagnostics produced while resolving identities.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Resolve every pin on one component to a component-local canonical identity.
+///
+/// Precedence is explicit [`Pad::number`], then [`Pin::number`], then the
+/// 1-based insertion ordinal. Resolution is owned by core so compilation and
+/// every emitter derive the same identity.
+///
+/// Diagnostics:
+///
+/// - `PIN:CONFLICTING_NUMBER` (error) when `Pin.number` and `Pad.number` are
+///   both present and disagree;
+/// - `PIN:MISSING_NUMBER` (warning) when neither exists and the ordinal
+///   fallback is used;
+/// - `PIN:DUPLICATE_IDENTITY` (error) when two pins resolve to the same key.
+pub fn resolve_pin_identities(refdes: &str, pins: &[Pin]) -> ComponentPinResolution {
+    let mut resolved = Vec::with_capacity(pins.len());
+    let mut diagnostics = Vec::new();
+
+    for (index, pin) in pins.iter().enumerate() {
+        let pad_number = pin
+            .pad()
+            .map(|pad| pad.number.trim())
+            .filter(|number| !number.is_empty());
+        let pin_number = pin
+            .number()
+            .map(str::trim)
+            .filter(|number| !number.is_empty());
+
+        if let (Some(pad_number), Some(pin_number)) = (pad_number, pin_number)
+            && pad_number != pin_number
+        {
+            diagnostics.push(Diagnostic {
+                code: "PIN:CONFLICTING_NUMBER".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "pin '{}' on '{}' declares pad number '{}' but pin number '{}'",
+                    pin.name(),
+                    refdes,
+                    pad_number,
+                    pin_number
+                ),
+                entities: vec![format!("{refdes}.{}", pin.name())],
+                hint: Some(
+                    "Make Pin.number and Pad.number agree; the physical identity is ambiguous."
+                        .into(),
+                ),
+            });
+        }
+
+        let (key, source) = if let Some(pad_number) = pad_number {
+            (pad_number.to_owned(), PinIdentitySource::PadNumber)
+        } else if let Some(pin_number) = pin_number {
+            (pin_number.to_owned(), PinIdentitySource::PinNumber)
+        } else {
+            let ordinal = (index + 1).to_string();
+            diagnostics.push(Diagnostic {
+                code: "PIN:MISSING_NUMBER".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "pin '{}' on '{}' has no pad or pin number; using insertion ordinal '{}'",
+                    pin.name(),
+                    refdes,
+                    ordinal
+                ),
+                entities: vec![format!("{refdes}.{}", pin.name())],
+                hint: Some(
+                    "Declare a pad number so the physical pin stays stable if declaration order changes."
+                        .into(),
+                ),
+            });
+            (ordinal, PinIdentitySource::InsertionOrdinal)
+        };
+
+        resolved.push(CanonicalPin { key, source });
+    }
+
+    let mut seen: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for (index, pin) in resolved.iter().enumerate() {
+        if let Some(previous) = seen.insert(pin.key.as_str(), index) {
+            diagnostics.push(Diagnostic {
+                code: "PIN:DUPLICATE_IDENTITY".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "pins {} ('{}') and {} ('{}') on '{}' resolve to the same physical identity '{}'",
+                    previous,
+                    pins[previous].name(),
+                    index,
+                    pins[index].name(),
+                    refdes,
+                    pin.key
+                ),
+                entities: vec![
+                    format!("{refdes}.{}#{previous}", pins[previous].name()),
+                    format!("{refdes}.{}#{index}", pins[index].name()),
+                ],
+                hint: Some(
+                    "Each electrical pin needs a distinct pad number; human-readable names may repeat."
+                        .into(),
+                ),
+            });
+        }
+    }
+
+    ComponentPinResolution {
+        pins: resolved,
+        diagnostics,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::UnitExt;
-
-    // ── resolve_pad tests ──
 
     #[test]
     fn resolve_pad_uses_explicit_values() {
@@ -1244,5 +1379,119 @@ mod tests {
             layers: None,
             drill: None,
         }
+    }
+
+    fn numbered_pad(number: &str) -> Pad {
+        Pad {
+            number: number.to_owned(),
+            ..default_pad()
+        }
+    }
+
+    #[test]
+    fn canonical_identity_prefers_pad_number_then_pin_number_then_ordinal() {
+        let from_pad = Pin::build("GND").number("2").pad(numbered_pad("29")).gnd();
+        let from_pin = Pin::build("GND").number("3").gnd();
+        let from_ordinal = Pin::build("GND").gnd();
+
+        let pad_resolution = resolve_pin_identities("U1", &[from_pad]);
+        assert_eq!(pad_resolution.pins[0].key, "29");
+        assert_eq!(pad_resolution.pins[0].source, PinIdentitySource::PadNumber);
+
+        let pin_resolution = resolve_pin_identities("U1", &[from_pin]);
+        assert_eq!(pin_resolution.pins[0].key, "3");
+        assert_eq!(pin_resolution.pins[0].source, PinIdentitySource::PinNumber);
+
+        let ordinal_resolution = resolve_pin_identities("U1", &[from_ordinal]);
+        assert_eq!(ordinal_resolution.pins[0].key, "1");
+        assert_eq!(
+            ordinal_resolution.pins[0].source,
+            PinIdentitySource::InsertionOrdinal
+        );
+        assert_eq!(
+            ordinal_resolution
+                .diagnostics
+                .iter()
+                .filter(|d| d.code == "PIN:MISSING_NUMBER")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn repeated_names_resolve_to_distinct_identities() {
+        let pins = [
+            Pin::build("AVDD")
+                .pad(numbered_pad("4"))
+                .pwr_fixed(1.8.volt(), 0.1.amp())
+                .pin(),
+            Pin::build("AVDD")
+                .pad(numbered_pad("8"))
+                .pwr_fixed(1.8.volt(), 0.1.amp())
+                .pin(),
+            Pin::build("AVDD")
+                .pad(numbered_pad("11"))
+                .pwr_fixed(1.8.volt(), 0.1.amp())
+                .pin(),
+        ];
+        let resolution = resolve_pin_identities("U1", &pins);
+        let keys: Vec<_> = resolution.pins.iter().map(|pin| pin.key.as_str()).collect();
+        assert_eq!(keys, ["4", "8", "11"]);
+        assert!(
+            !resolution
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "PIN:DUPLICATE_IDENTITY")
+        );
+    }
+
+    #[test]
+    fn missing_number_uses_stable_ordinal_and_warns() {
+        let resolution =
+            resolve_pin_identities("U1", &[Pin::build("A").gnd(), Pin::build("B").dio()]);
+        assert_eq!(resolution.pins[0].key, "1");
+        assert_eq!(resolution.pins[1].key, "2");
+        let warning = resolution
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "PIN:MISSING_NUMBER")
+            .expect("missing-number warning");
+        assert_eq!(warning.severity, Severity::Warning);
+        assert!(warning.message.contains("U1"));
+        assert!(warning.message.contains('A'));
+    }
+
+    #[test]
+    fn conflicting_pin_and_pad_numbers_are_errors() {
+        let pins = [Pin::build("GND").number("3").pad(numbered_pad("29")).gnd()];
+        let resolution = resolve_pin_identities("U1", &pins);
+        assert_eq!(resolution.pins[0].key, "29");
+        let error = resolution
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "PIN:CONFLICTING_NUMBER")
+            .expect("conflicting-number diagnostic");
+        assert_eq!(error.severity, Severity::Error);
+        assert!(error.message.contains("29"));
+        assert!(error.message.contains('3'));
+    }
+
+    #[test]
+    fn duplicate_identities_are_rejected() {
+        let pins = [
+            Pin::build("GND").pad(numbered_pad("7")).gnd(),
+            Pin::build("VSS").pad(numbered_pad("7")).gnd(),
+        ];
+        let resolution = resolve_pin_identities("U1", &pins);
+        let error = resolution
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "PIN:DUPLICATE_IDENTITY")
+            .expect("duplicate-identity diagnostic");
+        assert_eq!(error.severity, Severity::Error);
+        assert_eq!(error.entities.len(), 2);
+        assert!(error.message.contains("GND"));
+        assert!(error.message.contains("VSS"));
+        assert!(error.message.contains('7'));
     }
 }

@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "Compilation pipeline for copperleaf boards"
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 copperleaf.workspace = true

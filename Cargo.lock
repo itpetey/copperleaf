@@ -168,6 +168,7 @@ name = "copperleaf"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tempfile",
  "thiserror",
  "uom",
 ]
@@ -235,7 +236,10 @@ version = "0.1.0"
 dependencies = [
  "copperleaf",
  "mustache2",
+ "proc-macro2",
  "serde",
+ "syn",
+ "tempfile",
  "thiserror",
  "toml",
 ]

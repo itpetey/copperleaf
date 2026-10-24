@@ -265,26 +265,26 @@
       (xy 33.02 45.72))
     (stroke
       (width 0))
-    (uuid "412d89b9-920a-58b0-3682-a36282c8c232"))
+    (uuid "4fc68e7d-32b8-e8ea-b0ef-c15a81f35198"))
   (label "NET_U1_PGND"
     (at 33.02 45.72 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "1632ac1b-9dca-e9d7-aae5-77d7194984f1"))
+    (uuid "0b4356b4-460a-f352-663c-d838b3b315a0"))
   (wire
     (pts
       (xy 35.56 43.18)
       (xy 35.56 45.72))
     (stroke
       (width 0))
-    (uuid "9b5d88f7-b057-fdf0-3f07-1071145accf2"))
+    (uuid "3da3aba1-9231-be84-7390-e98970ca5b3e"))
   (label "NET_U1_PGND"
     (at 35.56 45.72 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "78d13c2d-b59f-1084-657c-838a8aedf32a"))
+    (uuid "ccc02f29-8de6-baab-ddd2-e0475774c119"))
   (sheet_instances
     (path "/"
       (page "1"))))

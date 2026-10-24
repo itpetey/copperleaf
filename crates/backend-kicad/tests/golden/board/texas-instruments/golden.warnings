@@ -1,0 +1,12 @@
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VIN is not connected to a net|U1.VIN|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VINA is not connected to a net|U1.VINA|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VOUT is not connected to a net|U1.VOUT|connect the pin to a power net
+Warning|ERC:FLOATING_INPUT|Input pin U1.EN is floating|U1.EN|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.EXP is floating|U1.EXP|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.FB is floating|U1.FB|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.L1 is floating|U1.L1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.L2 is floating|U1.L2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.PS/SYNC is floating|U1.PS/SYNC|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VIN is unconnected|U1.VIN|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VINA is unconnected|U1.VINA|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VOUT is unconnected|U1.VOUT|Connect the pin to a power net

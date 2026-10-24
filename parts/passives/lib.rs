@@ -58,6 +58,7 @@ impl Capacitor {
             lp.pitch / 2.0
         };
         Pin::build(name)
+            .number(name)
             .role(Role::DigitalIO)
             .power_spec(PowerSpec {
                 v_min: 0.0.volt(),
@@ -93,6 +94,7 @@ impl Capacitor {
             ],
             meta: ComponentMeta {
                 footprint: Some(package.capacitor_footprint_name().to_string()),
+                model_3d: Some(package.capacitor_model_path()),
                 symbol: Some("copperleaf:Capacitor".to_string()),
                 capacitance: Some(format_capacitance(value)),
                 ..ComponentMeta::default()
@@ -105,6 +107,7 @@ impl Capacitor {
         let x = lp.pitch / 2.0;
         vec![
             Pin::build("1")
+                .number("1")
                 .role(Role::PowerIn)
                 .power_spec(PowerSpec {
                     v_min: 0.0.volt(),
@@ -120,6 +123,7 @@ impl Capacitor {
                 .layers("F.Cu F.Mask F.Paste")
                 .pin(),
             Pin::build("2")
+                .number("2")
                 .role(Role::Gnd)
                 .power_spec(PowerSpec {
                     v_min: 0.0.volt(),
@@ -144,6 +148,7 @@ impl Capacitor {
             pins: Self::decoupling_pins(package),
             meta: ComponentMeta {
                 footprint: Some(package.capacitor_footprint_name().to_string()),
+                model_3d: Some(package.capacitor_model_path()),
                 symbol: Some("copperleaf:Capacitor".to_string()),
                 capacitance: Some(format_capacitance(value)),
                 is_bypass: true,
@@ -183,6 +188,7 @@ impl Resistor {
             lp.pitch / 2.0
         };
         Pin::build(name)
+            .number(name)
             .role(Role::DigitalIO)
             .power_spec(PowerSpec {
                 v_min: 0.0.volt(),
@@ -210,6 +216,7 @@ impl Resistor {
             ],
             meta: ComponentMeta {
                 footprint: Some(package.resistor_footprint_name().to_string()),
+                model_3d: Some(package.resistor_model_path()),
                 ..ComponentMeta::default()
             },
         }
@@ -226,6 +233,7 @@ impl Resistor {
             ],
             meta: ComponentMeta {
                 footprint: Some(package.resistor_footprint_name().to_string()),
+                model_3d: Some(package.resistor_model_path()),
                 ..ComponentMeta::default()
             },
         }
@@ -261,6 +269,7 @@ impl Crystal {
             frequency,
             pins: vec![
                 Pin::build("1")
+                    .number("1")
                     .role(Role::AnalogIn)
                     .power_spec(PowerSpec {
                         v_min: 0.0.volt(),
@@ -270,6 +279,7 @@ impl Crystal {
                     })
                     .pin(),
                 Pin::build("2")
+                    .number("2")
                     .role(Role::AnalogIn)
                     .power_spec(PowerSpec {
                         v_min: 0.0.volt(),
@@ -427,6 +437,30 @@ mod tests {
         let x1 = c.pins()[1].pos().unwrap().0;
         assert!(x0 < 0.0, "pad 1 should be left of origin");
         assert!(x1 > 0.0, "pad 2 should be right of origin");
+    }
+
+    #[test]
+    fn passive_footprint_and_model_references_are_separate() {
+        let c = Capacitor::new(100.0.nf(), Package::M1608);
+        let r = Resistor::new(10.0.kohm(), Package::M1608);
+
+        for (label, meta) in [("capacitor", c.meta()), ("resistor", r.meta())] {
+            let footprint = meta.footprint.as_deref().expect("footprint reference");
+            assert!(
+                footprint.contains(':'),
+                "{label} footprint must be a Library:Footprint identifier: {footprint}"
+            );
+            assert!(
+                !footprint.contains(".3dshapes"),
+                "{label} footprint must not be a 3D-model path: {footprint}"
+            );
+            let model = meta.model_3d.as_deref().expect("model path");
+            assert!(
+                model.ends_with(".step") || model.ends_with(".wrl"),
+                "{label} model must be a 3D-model path: {model}"
+            );
+            assert_ne!(footprint, model);
+        }
     }
 
     #[test]

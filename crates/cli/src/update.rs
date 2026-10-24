@@ -137,6 +137,7 @@ pub fn run(args: UpdateArgs) -> Result<(), CliError> {
     }
 
     manifest::embed_model_data(&mut manifest);
+    copperleaf_part_codegen::validate_structure_or_error(&manifest)?;
 
     let output = manifest::serialise(&manifest);
     let out_path = args

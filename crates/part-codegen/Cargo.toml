@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "TOML-to-Rust generator for Copperleaf component definitions"
 license.workspace = true
+publish.workspace = true
 
 [package.metadata.cargo-shear]
 ignored-paths = ["tests/golden/render/**/*.rs"]
@@ -11,6 +12,11 @@ ignored-paths = ["tests/golden/render/**/*.rs"]
 [dependencies]
 copperleaf.workspace = true
 mustache2 = { workspace = true, features = ["serde"] }
+proc-macro2.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 toml = { workspace = true, features = ["display", "parse", "serde"] }
+
+[dev-dependencies]
+syn = { workspace = true, features = ["full", "parsing"] }
+tempfile.workspace = true

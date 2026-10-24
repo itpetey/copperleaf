@@ -43,6 +43,7 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
         net_conns.entry(conn.net).or_default().push(conn);
     }
 
+    let mut object_ordinal = 0usize;
     for (net_idx, conns) in &net_conns {
         let net = board.net(*net_idx);
         let net_name = net.name.as_str();
@@ -62,17 +63,25 @@ pub fn emit_schematic(board: &CompiledBoard) -> String {
                 if !seen.insert(key) {
                     continue;
                 }
-                children.push(wire_seg((*tip_x, *tip_y), end, net_name));
-                children.push(label_at(net_name, end.0, end.1));
+                children.push(wire_seg((*tip_x, *tip_y), end, net_name, object_ordinal));
+                object_ordinal += 1;
+                children.push(label_at(net_name, end.0, end.1, object_ordinal));
+                object_ordinal += 1;
             }
         } else {
             let positions: Vec<(f64, f64)> = tips.iter().map(|(p, _)| *p).collect();
             for pair in positions.windows(2) {
-                for wire in manhattan_wires(pair[0], pair[1], net_name) {
+                for wire in manhattan_wires(pair[0], pair[1], net_name, &mut object_ordinal) {
                     children.push(wire);
                 }
             }
-            children.push(label_at(net_name, positions[0].0, positions[0].1));
+            children.push(label_at(
+                net_name,
+                positions[0].0,
+                positions[0].1,
+                object_ordinal,
+            ));
+            object_ordinal += 1;
         }
     }
 
@@ -86,14 +95,14 @@ fn is_power_net(board: &CompiledBoard, net_idx: NetIdx) -> bool {
     matches!(board.net(net_idx).kind, NetKind::Power { .. })
 }
 
-fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
+fn label_at(name: &str, x: f64, y: f64, ordinal: usize) -> Sexpr {
     Sexpr::list([
         Sexpr::atom("label"),
         Sexpr::str(name),
         Sexpr::list([
             Sexpr::atom("at"),
-            Sexpr::atom(format_float(x, 2)),
-            Sexpr::atom(format_float(y, 2)),
+            Sexpr::atom(format_float(x, 6)),
+            Sexpr::atom(format_float(y, 6)),
             Sexpr::atom("0"),
         ]),
         Sexpr::list([
@@ -110,8 +119,8 @@ fn label_at(name: &str, x: f64, y: f64) -> Sexpr {
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_id(&format!(
-                "sch:label:{}:{:.2}:{:.2}",
-                name, x, y
+                "sch:label:{}:{:.6}:{:.6}:{}",
+                name, x, y, ordinal
             ))),
         ]),
     ])
@@ -162,15 +171,22 @@ fn lib_symbols_node(board: &CompiledBoard) -> Sexpr {
     Sexpr::list(std::iter::once(Sexpr::atom("lib_symbols")).chain(symbols))
 }
 
-fn manhattan_wires(from: (f64, f64), to: (f64, f64), net_name: &str) -> Vec<Sexpr> {
+fn manhattan_wires(
+    from: (f64, f64),
+    to: (f64, f64),
+    net_name: &str,
+    ordinal: &mut usize,
+) -> Vec<Sexpr> {
+    let mut wire = |from, to| {
+        let current = *ordinal;
+        *ordinal += 1;
+        wire_seg(from, to, net_name, current)
+    };
     if (from.0 - to.0).abs() < 0.01 || (from.1 - to.1).abs() < 0.01 {
-        vec![wire_seg(from, to, net_name)]
+        vec![wire(from, to)]
     } else {
         let corner = (to.0, from.1);
-        vec![
-            wire_seg(from, corner, net_name),
-            wire_seg(corner, to, net_name),
-        ]
+        vec![wire(from, corner), wire(corner, to)]
     }
 }
 
@@ -185,7 +201,7 @@ fn pin_tip_and_label(
     let layout = layouts.get(conn.component)?;
     let (sym_x, sym_y) = positions.get(conn.component)?;
     let _ = board;
-    let pin = layout.pins.iter().find(|p| p.name == conn.pin)?;
+    let pin = layout.pins.iter().find(|p| p.index == conn.pin_index)?;
     // Symbol coordinates have Y up; the sheet has Y down.
     Some(((sym_x + pin.x, sym_y - pin.y), pin.rotation))
 }
@@ -241,8 +257,8 @@ fn symbol_instance_node(comp: &CompiledComponent, layout: &SymbolLayout, pos: (f
             ])))
             .chain(std::iter::once(Sexpr::list([
                 Sexpr::atom("at"),
-                Sexpr::atom(format_float(x, 2)),
-                Sexpr::atom(format_float(y, 2)),
+                Sexpr::atom(format_float(x, 6)),
+                Sexpr::atom(format_float(y, 6)),
                 Sexpr::atom("0"),
             ])))
             .chain(std::iter::once(Sexpr::list([
@@ -328,20 +344,20 @@ fn title_block_node() -> Sexpr {
     ])
 }
 
-fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
+fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str, ordinal: usize) -> Sexpr {
     Sexpr::list([
         Sexpr::atom("wire"),
         Sexpr::list([
             Sexpr::atom("pts"),
             Sexpr::list([
                 Sexpr::atom("xy"),
-                Sexpr::atom(format_float(from.0, 2)),
-                Sexpr::atom(format_float(from.1, 2)),
+                Sexpr::atom(format_float(from.0, 6)),
+                Sexpr::atom(format_float(from.1, 6)),
             ]),
             Sexpr::list([
                 Sexpr::atom("xy"),
-                Sexpr::atom(format_float(to.0, 2)),
-                Sexpr::atom(format_float(to.1, 2)),
+                Sexpr::atom(format_float(to.0, 6)),
+                Sexpr::atom(format_float(to.1, 6)),
             ]),
         ]),
         Sexpr::list([
@@ -351,8 +367,8 @@ fn wire_seg(from: (f64, f64), to: (f64, f64), net_name: &str) -> Sexpr {
         Sexpr::list([
             Sexpr::atom("uuid"),
             Sexpr::str(deterministic_id(&format!(
-                "sch:wire:{}:{:.2}:{:.2}:{:.2}:{:.2}",
-                net_name, from.0, from.1, to.0, to.1
+                "sch:wire:{}:{:.6}:{:.6}:{:.6}:{:.6}:{}",
+                net_name, from.0, from.1, to.0, to.1, ordinal
             ))),
         ]),
     ])
@@ -394,7 +410,8 @@ mod tests {
             }],
             connections: vec![Connection {
                 component: 0,
-                pin: "VDD".into(),
+                pin: copperleaf::PinId("VDD".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             }],
             constraints: vec![],

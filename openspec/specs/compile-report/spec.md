@@ -1,7 +1,7 @@
 # compile-report Specification
 
 ## Purpose
-TBD - created by archiving change core-redesign. Update Purpose after archive.
+Define the compiler's auditable output: the compiled board, non-blocking warnings, and the summary of inferred nets, synthesised parts, and counts.
 ## Requirements
 ### Requirement: CompileReport contains the compiled board and warnings
 `Board::compile()` SHALL return `Result<CompileReport, CompileError>` on success. `CompileReport` SHALL contain `board: CompiledBoard`, `warnings: Vec<Diagnostic>`, and `summary: CompileSummary`. Warnings SHALL NOT block compilation.

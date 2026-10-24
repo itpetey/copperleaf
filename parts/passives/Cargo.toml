@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "Passive electronics components"
 license.workspace = true
+publish.workspace = true
 
 [lib]
 path = "lib.rs"

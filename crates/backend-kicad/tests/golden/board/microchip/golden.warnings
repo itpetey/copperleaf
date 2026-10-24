@@ -1,0 +1,3 @@
+Warning|ERC:FLOATING_INPUT|Input pin U1.PROG is floating|U1.PROG|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.STAT is floating|U1.STAT|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VDD is unconnected|U1.VDD|Connect the pin to a power net

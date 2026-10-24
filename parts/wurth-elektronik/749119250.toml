@@ -3,8 +3,7 @@ name = "749119250"
 title = "Würth Elektronik 749119250 — Power Over Ethernet (PoE) For For DC/DC Converters SMPS Transformer 1.5kVAC Isolation 200 ~ 500kHz Surface Mount (ER14.5/6)"
 datasheet = "https://www.we-online.com/components/products/datasheet/749119250.pdf"
 lib_id = "749119250"
-model_3d = "/Users/pete/Downloads/749119250/749119250.step"
-model_3d_data = ""
+model_3d = "749119250.step"
 
 [[pin]]
 num = 1

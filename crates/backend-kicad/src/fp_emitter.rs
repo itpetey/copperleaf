@@ -27,6 +27,9 @@ pub enum EmitError {
         path: std::path::PathBuf,
         source: std::io::Error,
     },
+    /// A generated filename escapes the intended output directory.
+    #[error("path containment error: {0}")]
+    PathContainment(String),
 }
 
 /// Generate a `.kicad_mod` S-expression string from a component manifest.
@@ -56,33 +59,41 @@ pub fn emit_footprint_to(
 
     // Determine the model path for the S-expression.  If we have embedded data
     // and an output directory, write the file into models/ and use that path.
-    let model_path_for_sexpr = if let (Some(dir), Some(data)) =
-        (output_dir, manifest.component.model_3d_data.as_deref())
-    {
+    let embedded_model = manifest
+        .component
+        .model_3d_data
+        .as_deref()
+        .filter(|data| !data.trim().is_empty());
+    let model_path_for_sexpr = if let (Some(dir), Some(data)) = (output_dir, embedded_model) {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(data)
             .map_err(|e| EmitError::Base64Decode(e.to_string()))?;
-        // Extract filename from the original model path, or default to
-        // <name>.step.
-        let default_name = format!("{}.step", name);
-        let filename = manifest
-            .component
-            .model_3d
-            .as_deref()
-            .and_then(|p| std::path::Path::new(p).file_name())
-            .and_then(|s| s.to_str())
-            .unwrap_or(&default_name);
-        let models_dir = dir.join("models");
-        std::fs::create_dir_all(&models_dir).map_err(|source| EmitError::ModelWrite {
-            path: models_dir.clone(),
-            source,
-        })?;
-        let out_path = models_dir.join(filename);
-        std::fs::write(&out_path, &bytes).map_err(|source| EmitError::ModelWrite {
-            path: out_path.clone(),
-            source,
-        })?;
-        Some(format!("models/{}", filename))
+        if bytes.is_empty() {
+            manifest.component.model_3d.clone()
+        } else {
+            // Extract filename from the original model path, or default to
+            // <name>.step.
+            let default_name = format!("{}.step", name);
+            let filename = manifest
+                .component
+                .model_3d
+                .as_deref()
+                .and_then(|p| std::path::Path::new(p).file_name())
+                .and_then(|s| s.to_str())
+                .unwrap_or(&default_name);
+            let models_dir = dir.join("models");
+            std::fs::create_dir_all(&models_dir).map_err(|source| EmitError::ModelWrite {
+                path: models_dir.clone(),
+                source,
+            })?;
+            let out_path = copperleaf::safe_join(&models_dir, filename)
+                .map_err(|error| EmitError::PathContainment(error.to_string()))?;
+            std::fs::write(&out_path, &bytes).map_err(|source| EmitError::ModelWrite {
+                path: out_path.clone(),
+                source,
+            })?;
+            Some(format!("models/{}", filename))
+        }
     } else {
         manifest.component.model_3d.clone()
     };
@@ -166,7 +177,7 @@ pub fn emit_footprint_to(
 
 /// Collect all pads for a manifest: electrical pins (with thermal vias)
 /// followed by mechanical pads.  Pin pads are resolved via
-/// [`resolve_pin_def_pad`], which implements the same defaulting rules as
+/// `resolve_pin_def_pad`, which implements the same defaulting rules as
 /// [`copperleaf::resolve_pad`] (design D2) so the generate and board pipelines
 /// are always consistent.
 pub fn pads_from_manifest(manifest: &Manifest) -> Vec<Pad> {
@@ -719,6 +730,71 @@ mod tests {
             constraints: vec![],
             layout: Default::default(),
             mechanical: vec![],
+        }
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    use copperleaf_part_codegen::{ComponentMeta, ElectricalFields};
+
+    fn manifest_with_lib_id(lib_id: &str) -> Manifest {
+        Manifest {
+            component: ComponentMeta {
+                name: "Test".into(),
+                title: "Test".into(),
+                description: None,
+                datasheet: None,
+                lib_id: Some(lib_id.into()),
+                model_3d: None,
+                model_3d_data: Some("eA==".into()),
+                model_3d_rotation: None,
+                model_3d_offset: None,
+                fab_extent: None,
+            },
+            pins: vec![PinDef {
+                num: 1,
+                number: "1".into(),
+                name: "IO".into(),
+                purpose: "IO".into(),
+                notes: String::new(),
+                electrical: ElectricalFields {
+                    kind: "dio".into(),
+                    ..Default::default()
+                },
+                pos: None,
+                rotation: None,
+                length: None,
+                width: None,
+                height: None,
+                pad_type: None,
+                pad_shape: None,
+                roundrect_rratio: None,
+                solder_mask_margin: None,
+                layers: None,
+                drill: None,
+                thermal_vias: vec![],
+            }],
+            constraints: vec![],
+            layout: Default::default(),
+            mechanical: vec![],
+        }
+    }
+
+    #[test]
+    fn model_filename_cannot_escape_the_output_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = manifest_with_lib_id("../escape");
+        let result = emit_footprint_to(&manifest, Some(dir.path()));
+        assert!(result.is_err(), "traversal lib_id must be rejected");
+        for entry in std::fs::read_dir(dir.path()).unwrap() {
+            let entry = entry.unwrap();
+            assert!(
+                !entry.path().is_file(),
+                "no file may be written on failure: {:?}",
+                entry.path()
+            );
         }
     }
 }

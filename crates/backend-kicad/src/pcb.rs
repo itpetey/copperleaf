@@ -3,7 +3,8 @@
 use std::{collections::HashMap, path::Path};
 
 use copperleaf::{
-    BoardSide, CompiledBoard, Layout, NetClass, NetIdx, Placement, Stackup, StackupLayer,
+    BoardSide, CompiledBoard, CopperLayer, Layout, NetClass, NetIdx, Placement, Stackup,
+    StackupLayer,
 };
 
 use crate::{
@@ -26,10 +27,10 @@ pub fn emit_pcb(board: &CompiledBoard, project_name: &str) -> String {
         .map(|(idx, (_, code))| (idx, *code))
         .collect();
 
-    let pin_to_net: HashMap<(usize, &str), NetIdx> = board
+    let pin_to_net: HashMap<(usize, usize), NetIdx> = board
         .connections
         .iter()
-        .map(|c| ((c.component, c.pin.as_str()), c.net))
+        .map(|c| ((c.component, c.pin_index), c.net))
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
@@ -104,10 +105,10 @@ pub fn emit_pcb_with_layout(
         .map(|(idx, (_, code))| (idx, *code))
         .collect();
 
-    let pin_to_net: HashMap<(usize, &str), NetIdx> = board
+    let pin_to_net: HashMap<(usize, usize), NetIdx> = board
         .connections
         .iter()
-        .map(|c| ((c.component, c.pin.as_str()), c.net))
+        .map(|c| ((c.component, c.pin_index), c.net))
         .collect();
 
     let mut children: Vec<Sexpr> = vec![
@@ -355,7 +356,7 @@ fn emit_tracks(
 ) -> Vec<Sexpr> {
     let layer_t = board.stackup.copper_layer_count();
     let mut nodes = Vec::new();
-    for track in &layout.tracks {
+    for (track_ordinal, track) in layout.tracks.iter().enumerate() {
         let Some(&net_code) = net_to_code.get(&track.net.0) else {
             continue;
         };
@@ -367,24 +368,31 @@ fn emit_tracks(
             continue;
         }
 
-        for w in path.windows(2) {
+        for (segment_ordinal, w) in path.windows(2).enumerate() {
             let seg_uuid = deterministic_id(&format!(
-                "pcb:segment:{}:{}:{:.3}:{:.3}",
-                track.net.0, track.layer, w[0].0, w[0].1
+                "pcb:segment:{}:{}:{}:{}:{:.6}:{:.6}:{:.6}:{:.6}",
+                track.net.0,
+                track.layer.0,
+                track_ordinal,
+                segment_ordinal,
+                w[0].0,
+                w[0].1,
+                w[1].0,
+                w[1].1
             ));
             nodes.push(Sexpr::list([
                 Sexpr::atom("segment"),
                 Sexpr::list([
                     Sexpr::atom("start"),
-                    Sexpr::atom(format_grid_float(w[0].0)),
-                    Sexpr::atom(format_grid_float(w[0].1)),
+                    Sexpr::atom(format_float(w[0].0, 6)),
+                    Sexpr::atom(format_float(w[0].1, 6)),
                 ]),
                 Sexpr::list([
                     Sexpr::atom("end"),
-                    Sexpr::atom(format_grid_float(w[1].0)),
-                    Sexpr::atom(format_grid_float(w[1].1)),
+                    Sexpr::atom(format_float(w[1].0, 6)),
+                    Sexpr::atom(format_float(w[1].1, 6)),
                 ]),
-                Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_grid_float(width))]),
+                Sexpr::list([Sexpr::atom("width"), Sexpr::atom(format_float(width, 6))]),
                 Sexpr::list([Sexpr::atom("layer"), Sexpr::str(&layer)]),
                 Sexpr::list([Sexpr::atom("net"), Sexpr::atom(net_code.to_string())]),
                 Sexpr::list([Sexpr::atom("uuid"), Sexpr::str(&seg_uuid)]),
@@ -401,13 +409,13 @@ fn emit_vias(
 ) -> Vec<Sexpr> {
     let mut nodes = Vec::new();
     let layer_t = board.stackup.copper_layer_count();
-    for via in &layout.vias {
+    for (via_ordinal, via) in layout.vias.iter().enumerate() {
         let Some(&net_code) = net_to_code.get(&via.net.0) else {
             continue;
         };
         let via_uuid = deterministic_id(&format!(
-            "pcb:via:{}:{}:{:.3}:{:.3}",
-            via.net.0, via.layers.0, via.at.0, via.at.1
+            "pcb:via:{}:{}:{}:{}:{:.6}:{:.6}",
+            via.net.0, via.layers.0.0, via.layers.1.0, via_ordinal, via.at.0, via.at.1
         ));
         let diam = via.diameter.as_base() * 1000.0;
         let drill = via.drill.as_base() * 1000.0;
@@ -418,11 +426,11 @@ fn emit_vias(
             Sexpr::atom("via"),
             Sexpr::list([
                 Sexpr::atom("at"),
-                Sexpr::atom(format_grid_float(via.at.0)),
-                Sexpr::atom(format_grid_float(via.at.1)),
+                Sexpr::atom(format_float(via.at.0, 6)),
+                Sexpr::atom(format_float(via.at.1, 6)),
             ]),
-            Sexpr::list([Sexpr::atom("size"), Sexpr::atom(format_grid_float(diam))]),
-            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_grid_float(drill))]),
+            Sexpr::list([Sexpr::atom("size"), Sexpr::atom(format_float(diam, 6))]),
+            Sexpr::list([Sexpr::atom("drill"), Sexpr::atom(format_float(drill, 6))]),
             Sexpr::list([
                 Sexpr::atom("layers"),
                 Sexpr::str(layer_start),
@@ -442,11 +450,14 @@ fn emit_zones(
 ) -> Vec<Sexpr> {
     let mut nodes = Vec::new();
     let layer_t = board.stackup.copper_layer_count();
-    for zone in &layout.zones {
+    for (zone_ordinal, zone) in layout.zones.iter().enumerate() {
         let Some(&net_code) = net_to_code.get(&zone.net.0) else {
             continue;
         };
-        let zone_uuid = deterministic_id(&format!("pcb:zone:{}:{}", zone.net.0, zone.layer));
+        let zone_uuid = deterministic_id(&format!(
+            "pcb:zone:{}:{}:{}",
+            zone.net.0, zone.layer.0, zone_ordinal
+        ));
         let layer = normalised_layer_name(zone.layer, layer_t);
         let net_name = &board.nets[zone.net.0].name;
 
@@ -456,8 +467,8 @@ fn emit_zones(
             .map(|&(x, y)| {
                 Sexpr::list([
                     Sexpr::atom("xy"),
-                    Sexpr::atom(format_grid_float(x)),
-                    Sexpr::atom(format_grid_float(y)),
+                    Sexpr::atom(format_float(x, 6)),
+                    Sexpr::atom(format_float(y, 6)),
                 ])
             })
             .collect();
@@ -466,8 +477,8 @@ fn emit_zones(
         if let Some(&first) = zone.outline.first() {
             poly_pts.push(Sexpr::list([
                 Sexpr::atom("xy"),
-                Sexpr::atom(format_grid_float(first.0)),
-                Sexpr::atom(format_grid_float(first.1)),
+                Sexpr::atom(format_float(first.0, 6)),
+                Sexpr::atom(format_float(first.1, 6)),
             ]));
         }
 
@@ -490,7 +501,7 @@ fn footprint_node(
     idx: usize,
     comp: &copperleaf::CompiledComponent,
     at: (f64, f64),
-    pin_to_net: &HashMap<(usize, &str), NetIdx>,
+    pin_to_net: &HashMap<(usize, usize), NetIdx>,
     net_to_code: &HashMap<usize, usize>,
     board: &CompiledBoard,
     project_name: &str,
@@ -527,13 +538,23 @@ fn footprint_node(
         // The Reference property is visible on F.SilkS; the Value property
         // is hidden here and re-emitted as fp_text user on F.Fab so it
         // doesn't conflict with the Reference on the same layer.
-        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
+        footprint_property(
+            "Reference",
+            &comp.refdes,
+            0.0,
+            ref_y,
+            false,
+            &comp.refdes,
+            0,
+        ),
         footprint_property(
             "Value",
             &crate::common::refdes_prefix(&comp.refdes),
             0.0,
             val_y,
             true,
+            &comp.refdes,
+            1,
         ),
         // Visible value text on F.Fab using a KiCad variable.
         fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
@@ -563,11 +584,10 @@ fn footprint_node(
     }
 
     // Pads with net associations.
-    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
-        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
+    for (pad_ordinal, (pad, pin_index)) in pads.iter().zip(pin_indices.iter()).enumerate() {
+        let pad_uuid = deterministic_id(&format!("{}:pad:{pad_ordinal}:{}", seed, pad.number));
         let net = pin_index.and_then(|i| {
-            let pin = &comp.pins[i];
-            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
+            pin_to_net.get(&(idx, i)).and_then(|&net_idx| {
                 net_to_code
                     .get(&net_idx.0)
                     .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
@@ -578,12 +598,22 @@ fn footprint_node(
 
     // 3D model reference (KLC F9.3; missing files are ignored by KiCad).
     // The .step files live in a models/ subdirectory next to the project.
-    let model_path_for_pcb = match comp.meta.model_3d {
-        Some(ref path) => Path::new(path)
-            .file_name()
-            .map(|s| format!("models/{}", s.to_str().unwrap())),
-        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
-        None => None,
+    let model_path_for_pcb = if comp
+        .meta
+        .model_3d_data
+        .as_deref()
+        .is_some_and(|data| !data.trim().is_empty())
+    {
+        // Embedded payloads are written next to the project.
+        match comp.meta.model_3d.as_deref() {
+            Some(path) => Path::new(path)
+                .file_name()
+                .map(|name| format!("models/{}", name.to_str().unwrap())),
+            None => Some(format!("models/{}.step", comp.refdes)),
+        }
+    } else {
+        // A library reference is already a complete model path.
+        comp.meta.model_3d.clone()
     };
     children.push(fp_geom::model_sexpr(
         &fp_name,
@@ -602,12 +632,18 @@ fn footprint_node_with_placement(
     idx: usize,
     comp: &copperleaf::CompiledComponent,
     placement: Option<&copperleaf::Placement>,
-    pin_to_net: &HashMap<(usize, &str), NetIdx>,
+    pin_to_net: &HashMap<(usize, usize), NetIdx>,
     net_to_code: &HashMap<usize, usize>,
     board: &CompiledBoard,
     project_name: &str,
 ) -> Sexpr {
-    let (pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
+    let (mut pads, pin_indices) = fp_geom::pads_from_component_with_indices(comp);
+    let is_back = placement.is_some_and(|p| p.side == BoardSide::Back);
+    if is_back {
+        for pad in &mut pads {
+            mirror_pad(pad);
+        }
+    }
     let extent = fp_geom::pads_extent(&pads);
 
     let fp_uuid = deterministic_id(&format!("pcb:{}", comp.refdes));
@@ -650,13 +686,23 @@ fn footprint_node_with_placement(
             Sexpr::atom(format_float(at_y, 6)),
             Sexpr::atom(format_grid_float(rotation)),
         ]),
-        footprint_property("Reference", &comp.refdes, 0.0, ref_y, false),
+        footprint_property(
+            "Reference",
+            &comp.refdes,
+            0.0,
+            ref_y,
+            false,
+            &comp.refdes,
+            0,
+        ),
         footprint_property(
             "Value",
             &crate::common::refdes_prefix(&comp.refdes),
             0.0,
             val_y,
             true,
+            &comp.refdes,
+            1,
         ),
         fp_geom::fp_text("user", "${VALUE}", (0.0, val_y), "F.Fab"),
         Sexpr::list([Sexpr::atom("path"), Sexpr::str(format!("/{}", fp_uuid))]),
@@ -671,22 +717,35 @@ fn footprint_node_with_placement(
         ]),
     ];
 
+    if is_back {
+        for child in &mut children {
+            if let Sexpr::List(fields) = child
+                && let Some(Sexpr::Atom(head)) = fields.first()
+                && matches!(head.as_str(), "property" | "fp_text")
+            {
+                mirror_footprint_node(child);
+            }
+        }
+    }
+
     if let Some(ext) = extent {
-        for node in fp_geom::outline_sexprs(
+        for mut node in fp_geom::outline_sexprs(
             ext,
             fp_geom::pin1_pos(&pads),
             Some(&seed),
             comp.meta.fab_extent,
         ) {
+            if is_back {
+                mirror_footprint_node(&mut node);
+            }
             children.push(node);
         }
     }
 
-    for (pad, pin_index) in pads.iter().zip(pin_indices.iter()) {
-        let pad_uuid = deterministic_id(&format!("{}:pad:{}", seed, pad.number));
+    for (pad_ordinal, (pad, pin_index)) in pads.iter().zip(pin_indices.iter()).enumerate() {
+        let pad_uuid = deterministic_id(&format!("{}:pad:{pad_ordinal}:{}", seed, pad.number));
         let net = pin_index.and_then(|i| {
-            let pin = &comp.pins[i];
-            pin_to_net.get(&(idx, pin.name())).and_then(|&net_idx| {
+            pin_to_net.get(&(idx, i)).and_then(|&net_idx| {
                 net_to_code
                     .get(&net_idx.0)
                     .map(|&code| (code, board.nets[net_idx.0].name.as_str()))
@@ -695,26 +754,48 @@ fn footprint_node_with_placement(
         children.push(fp_geom::pad_sexpr(pad, Some(&pad_uuid), net));
     }
 
-    let model_path_for_pcb = match comp.meta.model_3d {
-        Some(ref path) => Path::new(path)
-            .file_name()
-            .map(|s| format!("models/{}", s.to_str().unwrap())),
-        None if comp.meta.model_3d_data.is_some() => Some(format!("models/{}.step", comp.refdes)),
-        None => None,
+    let model_path_for_pcb = if comp
+        .meta
+        .model_3d_data
+        .as_deref()
+        .is_some_and(|data| !data.trim().is_empty())
+    {
+        // Embedded payloads are written next to the project.
+        match comp.meta.model_3d.as_deref() {
+            Some(path) => Path::new(path)
+                .file_name()
+                .map(|name| format!("models/{}", name.to_str().unwrap())),
+            None => Some(format!("models/{}.step", comp.refdes)),
+        }
+    } else {
+        // A library reference is already a complete model path.
+        comp.meta.model_3d.clone()
     };
-    children.push(fp_geom::model_sexpr(
+    let mut model = fp_geom::model_sexpr(
         &fp_name,
         model_path_for_pcb.as_deref(),
         comp.meta.model_3d_offset,
         comp.meta.model_3d_rotation,
-    ));
+    );
+    if is_back {
+        mirror_footprint_node(&mut model);
+    }
+    children.push(model);
 
     Sexpr::list(children)
 }
 
 /// Hidden footprint property node for KiCad 9+ metadata (Reference, Value, etc.).
-fn footprint_property(name: &str, value: &str, x: f64, y: f64, hide: bool) -> Sexpr {
-    let prop_uuid = deterministic_id(&format!("pcb:prop:{}:{}", name, value));
+fn footprint_property(
+    name: &str,
+    value: &str,
+    x: f64,
+    y: f64,
+    hide: bool,
+    owner: &str,
+    ordinal: usize,
+) -> Sexpr {
+    let prop_uuid = deterministic_id(&format!("pcb:prop:{owner}:{name}:{value}:{ordinal}"));
     let mut prop = vec![
         Sexpr::atom("property"),
         Sexpr::str(name),
@@ -882,12 +963,191 @@ fn net_class_nodes(board: &CompiledBoard, net_codes: &[(String, usize)]) -> Vec<
     nodes
 }
 
-fn normalised_layer_name(idx: usize, total: usize) -> String {
-    match idx {
+fn normalised_layer_name(layer: CopperLayer, total: usize) -> String {
+    match layer.0 {
         0 => "F.Cu".into(),
         i if i == total - 1 => "B.Cu".into(),
         i => format!("In{i}.Cu"),
     }
+}
+
+/// Map one footprint-side layer name to its mirror.
+fn mirrored_layer_name(name: &str) -> &str {
+    match name {
+        "F.Cu" => "B.Cu",
+        "B.Cu" => "F.Cu",
+        "F.Mask" => "B.Mask",
+        "B.Mask" => "F.Mask",
+        "F.Paste" => "B.Paste",
+        "B.Paste" => "F.Paste",
+        "F.SilkS" => "B.SilkS",
+        "B.SilkS" => "F.SilkS",
+        "F.Fab" => "B.Fab",
+        "B.Fab" => "F.Fab",
+        "F.CrtYd" => "B.CrtYd",
+        "B.CrtYd" => "F.CrtYd",
+        // Wildcards such as `*.Cu` and `*.Mask` are side-independent.
+        other => other,
+    }
+}
+
+fn mirrored_layer_field(field: &str) -> String {
+    field
+        .split_whitespace()
+        .map(mirrored_layer_name)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Mirror a pad across the footprint Y axis for back-side emission.
+fn mirror_pad(pad: &mut copperleaf::Pad) {
+    pad.pos.0 = -pad.pos.0;
+    pad.rotation = -pad.rotation;
+    if let Some(layers) = &pad.layers {
+        pad.layers = Some(mirrored_layer_field(layers));
+    }
+}
+
+fn negate_atom(atom: &mut Sexpr) {
+    if let Sexpr::Atom(text) = atom
+        && let Ok(value) = text.parse::<f64>()
+    {
+        let mirrored = if value == 0.0 { 0.0 } else { -value };
+        *text = format_float(mirrored, 4);
+    }
+}
+
+fn mirror_coordinate(parts: &mut [Sexpr], index: usize) {
+    if let Some(atom) = parts.get_mut(index) {
+        negate_atom(atom);
+    }
+}
+
+fn mirror_layer_atom(atom: &mut String) {
+    let quoted = atom.starts_with('"') && atom.ends_with('"');
+    let mapped = mirrored_layer_name(atom.trim_matches('"'));
+    *atom = if quoted {
+        format!("\"{mapped}\"")
+    } else {
+        mapped.to_string()
+    };
+}
+
+fn mirror_layers(node: &mut Sexpr) {
+    let Sexpr::List(parts) = node else {
+        return;
+    };
+    let head = match parts.first() {
+        Some(Sexpr::Atom(head)) => head.clone(),
+        _ => return,
+    };
+    match head.as_str() {
+        "layer" => {
+            if let Some(Sexpr::Atom(layer)) = parts.get_mut(1) {
+                mirror_layer_atom(layer);
+            }
+        }
+        "layers" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::Atom(layer) = part {
+                    mirror_layer_atom(layer);
+                }
+            }
+        }
+        _ => {
+            for part in parts.iter_mut().skip(1) {
+                mirror_layers(part);
+            }
+        }
+    }
+}
+
+/// Apply the single back-side geometric transform to a footprint child node.
+fn mirror_footprint_node(node: &mut Sexpr) {
+    let Sexpr::List(parts) = node else {
+        return;
+    };
+    let head = match parts.first() {
+        Some(Sexpr::Atom(head)) => head.clone(),
+        _ => return,
+    };
+    match head.as_str() {
+        "fp_line" | "fp_rect" | "fp_arc" | "fp_poly" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && matches!(field.as_str(), "start" | "end" | "xy")
+                {
+                    mirror_coordinate(fields, 1);
+                }
+            }
+        }
+        "fp_circle" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && matches!(field.as_str(), "center" | "end")
+                {
+                    mirror_coordinate(fields, 1);
+                }
+            }
+        }
+        "fp_text" | "property" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && field == "at"
+                {
+                    mirror_coordinate(fields, 1);
+                    // Rotate the opposite way on the mirrored side.
+                    if fields.len() > 3 {
+                        negate_atom(&mut fields[3]);
+                    }
+                }
+            }
+            // Back-side text is mirrored so it reads correctly through the board.
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && field == "effects"
+                {
+                    fields.push(Sexpr::list([Sexpr::atom("justify"), Sexpr::atom("mirror")]));
+                }
+            }
+        }
+        "model" => {
+            for part in parts.iter_mut().skip(1) {
+                if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && field == "offset"
+                {
+                    for xyz in fields.iter_mut().skip(1) {
+                        if let Sexpr::List(values) = xyz
+                            && let Some(Sexpr::Atom(kind)) = values.first()
+                            && kind == "xyz"
+                        {
+                            mirror_coordinate(values, 1);
+                        }
+                    }
+                } else if let Sexpr::List(fields) = part
+                    && let Some(Sexpr::Atom(field)) = fields.first()
+                    && field == "rotate"
+                {
+                    for xyz in fields.iter_mut().skip(1) {
+                        if let Sexpr::List(values) = xyz
+                            && let Some(Sexpr::Atom(kind)) = values.first()
+                            && kind == "xyz"
+                        {
+                            negate_atom(&mut values[2]);
+                            negate_atom(&mut values[3]);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    mirror_layers(node);
 }
 
 /// Walk a footprint S-expression and update `(net ...)` references inside
@@ -911,7 +1171,10 @@ fn remap_footprint_nets(
         if props[0].as_string() != "pad" {
             continue;
         }
-        // Within a pad, find and update the (net ...) node.
+        // Within a pad, find and update the (net ...) node. A net that no
+        // longer exists is removed entirely so a reused numeric code cannot
+        // alias old copper onto a different net.
+        let mut clear_net = false;
         for prop in props.iter_mut() {
             let Sexpr::List(net_props) = prop else {
                 continue;
@@ -922,35 +1185,41 @@ fn remap_footprint_nets(
             if net_props.len() < 2 {
                 continue;
             }
-            remap_net_node(net_props, old_name_to_new, old_code_to_new);
+            match remap_net_node(net_props, old_name_to_new, old_code_to_new) {
+                Some(updated) => *net_props = updated,
+                None => clear_net = true,
+            }
+        }
+        if clear_net {
+            props.retain(|prop| {
+                !matches!(prop, Sexpr::List(fields) if fields.first().is_some_and(|head| head.as_string() == "net"))
+            });
         }
     }
 }
 
 /// Update a single `(net ...)` node inside a pad.
+///
+/// Returns `Some(updated)` when the old net maps to a net in the new board,
+/// and `None` when the old net no longer exists.
 fn remap_net_node(
-    props: &mut Vec<Sexpr>,
+    props: &[Sexpr],
     old_name_to_new: &HashMap<String, (usize, String)>,
     old_code_to_new: &HashMap<usize, (usize, String)>,
-) {
+) -> Option<Vec<Sexpr>> {
     let s = props[1].as_string();
-    // Try numeric code first: (net 1) or (net 1 "NAME")
-    if let Ok(old_code) = s.parse::<usize>() {
-        if let Some(&(new_code, ref new_name)) = old_code_to_new.get(&old_code) {
-            *props = vec![
-                Sexpr::atom("net"),
-                Sexpr::atom(new_code.to_string()),
-                Sexpr::str(new_name),
-            ];
-        }
-    } else if let Some(&(new_code, ref new_name)) = old_name_to_new.get(&s) {
-        // Try string name: (net "NAME")
-        *props = vec![
+    let mapped = if let Ok(old_code) = s.parse::<usize>() {
+        old_code_to_new.get(&old_code).cloned()
+    } else {
+        old_name_to_new.get(&s).cloned()
+    };
+    mapped.map(|(new_code, new_name)| {
+        vec![
             Sexpr::atom("net"),
             Sexpr::atom(new_code.to_string()),
             Sexpr::str(new_name),
-        ];
-    }
+        ]
+    })
 }
 
 fn setup_node(stackup: &Stackup) -> Sexpr {
@@ -1034,7 +1303,7 @@ fn stackup_node(stackup: &Stackup) -> Sexpr {
     for layer in stackup.layers.iter() {
         match layer {
             StackupLayer::Copper { thickness_mm, .. } => {
-                let name = normalised_layer_name(copper_counter, copper_total);
+                let name = normalised_layer_name(CopperLayer::new(copper_counter), copper_total);
                 copper_counter += 1;
                 let thickness_str = format_float(*thickness_mm, 3);
                 entries.push(stackup_layer(
@@ -1138,7 +1407,8 @@ mod tests {
             }],
             connections: vec![Connection {
                 component: 0,
-                pin: "VDD".into(),
+                pin: copperleaf::PinId("VDD".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             }],
             constraints: vec![],
@@ -1213,7 +1483,7 @@ mod tests {
             }],
             tracks: vec![Track {
                 net: NetIdx(0),
-                layer: 0, // F.Cu
+                layer: copperleaf::CopperLayer(0), // F.Cu
                 width: 0.25.mm(),
                 path: vec![(5.0, 5.0), (15.0, 5.0)],
             }],
@@ -1222,11 +1492,11 @@ mod tests {
                 at: (15.0, 5.0),
                 drill: 0.4.mm(),
                 diameter: 0.8.mm(),
-                layers: (0, 1), // F.Cu to B.Cu
+                layers: (copperleaf::CopperLayer(0), copperleaf::CopperLayer(1)), // F.Cu to B.Cu
             }],
             zones: vec![Zone {
                 net: NetIdx(0),
-                layer: 1, // B.Cu
+                layer: copperleaf::CopperLayer(1), // B.Cu
                 outline: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 80.0), (0.0, 80.0)],
             }],
         }
@@ -1306,5 +1576,108 @@ mod tests {
         // "via (" — the copper element, not via_dia/via_drill properties.
         assert!(!out.contains("(via "));
         assert!(!out.contains("(via\n"));
+    }
+
+    #[test]
+    fn copper_geometry_keeps_six_decimal_millimetre_precision() {
+        let board = test_board();
+        let mut layout = test_layout();
+        layout.tracks[0].path = vec![(1.234567, 2.345678), (3.456789, 4.567891)];
+        layout.tracks[0].width = 0.123456.mm();
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        assert!(out.contains("(start 1.234567 2.345678)"), "{out}");
+        assert!(out.contains("(end 3.456789 4.567891)"), "{out}");
+        assert!(out.contains("(width 0.123456)"), "{out}");
+    }
+
+    #[test]
+    fn back_side_footprint_uses_only_back_side_layers() {
+        use copperleaf::BoardSide;
+
+        let board = test_board();
+        let mut layout = test_layout();
+        layout.placements[0].side = BoardSide::Back;
+        let out = emit_pcb_with_layout(&board, "test", Some(&layout), None, None, &HashMap::new());
+        let footprint = out
+            .split_once("(footprint")
+            .map(|(_, rest)| rest)
+            .and_then(|rest| rest.split("\n  (segment").next())
+            .expect("footprint emitted");
+
+        assert!(footprint.contains("(layer \"B.Cu\")"), "{footprint}");
+        assert!(
+            footprint.contains("(layers B.Cu B.Mask B.Paste)"),
+            "back-side pad layers missing: {footprint}"
+        );
+        assert!(footprint.contains("B.SilkS"), "{footprint}");
+        assert!(footprint.contains("B.Fab"), "{footprint}");
+        assert!(footprint.contains("B.CrtYd"), "{footprint}");
+        assert!(footprint.contains("(justify mirror)"), "{footprint}");
+        for front in ["F.Cu", "F.Mask", "F.Paste", "F.SilkS", "F.Fab", "F.CrtYd"] {
+            assert!(
+                !footprint.contains(front),
+                "front-side layer {front} survived in a back-side footprint:\n{footprint}"
+            );
+        }
+    }
+
+    fn preserved_footprint(net_code: usize, net_name: &str) -> Sexpr {
+        crate::sexpr::parse(&format!(
+            "(footprint \"X\" (layer \"F.Cu\") (property \"Reference\" \"U1\") (pad \"1\" smd rect (at 0 0) (size 1 1) (layers F.Cu) (net {net_code} \"{net_name}\")))"
+        ))
+        .unwrap()
+    }
+
+    fn emitted_preserved_pad(board: &CompiledBoard, old_name: &str, old_code: usize) -> String {
+        let layout = test_layout();
+        let fp = preserved_footprint(old_code, old_name);
+        let mut old_names = HashMap::new();
+        old_names.insert(old_code, old_name.to_string());
+        let out = emit_pcb_with_layout(board, "test", Some(&layout), None, Some(&[fp]), &old_names);
+        out.split_once("(footprint \"X\"")
+            .map(|(_, rest)| rest)
+            .and_then(|rest| rest.split("(segment").next())
+            .expect("preserved footprint")
+            .to_string()
+    }
+
+    #[test]
+    fn deleted_net_is_cleared_from_preserved_pad() {
+        let block = emitted_preserved_pad(&test_board(), "OLD_NET", 5);
+        assert!(
+            !block.contains("(net"),
+            "deleted net survived on a preserved pad: {block}"
+        );
+    }
+
+    #[test]
+    fn reused_net_code_does_not_alias_old_copper() {
+        // Old code 1 was OLD_NET; the new board assigns code 1 to V3V3.
+        let block = emitted_preserved_pad(&test_board(), "OLD_NET", 1);
+        assert!(
+            !block.contains("(net"),
+            "reused net code aliased old copper: {block}"
+        );
+        assert!(!block.contains("V3V3"), "{block}");
+    }
+
+    #[test]
+    fn renamed_net_preserves_preserved_pad_association() {
+        // The old code maps by name, so the pad survives with the new code.
+        let block = emitted_preserved_pad(&test_board(), "V3V3", 7);
+        assert!(block.contains("(net 1 \"V3V3\")"), "{block}");
+    }
+
+    #[test]
+    fn canonical_ordinals_map_to_kicad_copper_layers() {
+        // Two-layer: ordinal 1 is the back, and no inner layer exists.
+        assert_eq!(normalised_layer_name(CopperLayer(0), 2), "F.Cu");
+        assert_eq!(normalised_layer_name(CopperLayer(1), 2), "B.Cu");
+
+        // Four-layer: ordinal 1 and 2 are inner copper, 3 is the back.
+        assert_eq!(normalised_layer_name(CopperLayer(0), 4), "F.Cu");
+        assert_eq!(normalised_layer_name(CopperLayer(1), 4), "In1.Cu");
+        assert_eq!(normalised_layer_name(CopperLayer(2), 4), "In2.Cu");
+        assert_eq!(normalised_layer_name(CopperLayer(3), 4), "B.Cu");
     }
 }

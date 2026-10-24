@@ -28,18 +28,22 @@ pub struct Arjm11d7502AbEw2 {
 }
 
 impl Arjm11d7502AbEw2 {
-    pub const TD2_: copperleaf::PinRef = copperleaf::PinRef("TD2+");
-    pub const TD1_: copperleaf::PinRef = copperleaf::PinRef("TD1+");
-    pub const TD3_: copperleaf::PinRef = copperleaf::PinRef("TD3-");
-    pub const CT_1: copperleaf::PinRef = copperleaf::PinRef("CT_1");
-    pub const _PIN: copperleaf::PinRef = copperleaf::PinRef("~");
-    pub const TD1__7: copperleaf::PinRef = copperleaf::PinRef("TD1-");
-    pub const SHIELD: copperleaf::PinRef = copperleaf::PinRef("SHIELD");
-    pub const TD3__10: copperleaf::PinRef = copperleaf::PinRef("TD3+");
-    pub const TD4_: copperleaf::PinRef = copperleaf::PinRef("TD4+");
-    pub const TD4__14: copperleaf::PinRef = copperleaf::PinRef("TD4-");
-    pub const TD2__15: copperleaf::PinRef = copperleaf::PinRef("TD2-");
-    pub const CT_2: copperleaf::PinRef = copperleaf::PinRef("CT_2");
+    pub const TD2_: copperleaf::PinRef = copperleaf::PinRef("P3");
+    pub const TD1_: copperleaf::PinRef = copperleaf::PinRef("P1");
+    pub const TD3_: copperleaf::PinRef = copperleaf::PinRef("P8");
+    pub const CT_1: copperleaf::PinRef = copperleaf::PinRef("P5");
+    pub const _PIN_P12: copperleaf::PinRef = copperleaf::PinRef("P12");
+    pub const _PIN_P11: copperleaf::PinRef = copperleaf::PinRef("P11");
+    pub const TD1__7: copperleaf::PinRef = copperleaf::PinRef("P2");
+    pub const SHIELD_S1: copperleaf::PinRef = copperleaf::PinRef("S1");
+    pub const SHIELD_S2: copperleaf::PinRef = copperleaf::PinRef("S2");
+    pub const TD3__10: copperleaf::PinRef = copperleaf::PinRef("P7");
+    pub const _PIN_P14: copperleaf::PinRef = copperleaf::PinRef("P14");
+    pub const _PIN_P13: copperleaf::PinRef = copperleaf::PinRef("P13");
+    pub const TD4_: copperleaf::PinRef = copperleaf::PinRef("P9");
+    pub const TD4__14: copperleaf::PinRef = copperleaf::PinRef("P10");
+    pub const TD2__15: copperleaf::PinRef = copperleaf::PinRef("P4");
+    pub const CT_2: copperleaf::PinRef = copperleaf::PinRef("P6");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

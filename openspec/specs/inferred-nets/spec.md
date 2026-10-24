@@ -1,7 +1,7 @@
 # inferred-nets Specification
 
 ## Purpose
-TBD - created by archiving change core-redesign. Update Purpose after archive.
+Define how compilation groups connected pins into nets and assigns deterministic, meaningful names without requiring explicit net declarations.
 ## Requirements
 ### Requirement: Nets are inferred from connectivity
 During `Board::compile()`, the compiler SHALL identify nets as connected components of pins in the connection graph. Each connected component SHALL become a `Net` with an auto-generated name (deterministic, derived from the first connected pin's component and pin name) unless explicitly named.

@@ -1,0 +1,28 @@
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VBAT is not connected to a net|U1.VBAT|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VBAT_TX is not connected to a net|U1.VBAT_TX|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VDDIO is not connected to a net|U1.VDDIO|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VDD_USB is not connected to a net|U1.VDD_USB|connect the pin to a power net
+Warning|ERC:FLOATING_INPUT|Input pin U1.ANT is floating|U1.ANT|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.BUSY is floating|U1.BUSY|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO0 is floating|U1.GPIO0|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO1 is floating|U1.GPIO1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO10 is floating|U1.GPIO10|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO3 is floating|U1.GPIO3|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO4 is floating|U1.GPIO4|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO5 is floating|U1.GPIO5|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO6 is floating|U1.GPIO6|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO7 is floating|U1.GPIO7|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO8 is floating|U1.GPIO8|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO9 is floating|U1.GPIO9|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.JTAG_TDI is floating|U1.JTAG_TDI|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.JTAG_TDO is floating|U1.JTAG_TDO|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.JTAG_TMS is floating|U1.JTAG_TMS|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RESET_N is floating|U1.RESET_N|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.SDIO_D2 is floating|U1.SDIO_D2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.USB_D_N is floating|U1.USB_D_N|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.USB_D_P is floating|U1.USB_D_P|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.WAKE is floating|U1.WAKE|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VBAT is unconnected|U1.VBAT|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VBAT_TX is unconnected|U1.VBAT_TX|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VDDIO is unconnected|U1.VDDIO|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VDD_USB is unconnected|U1.VDD_USB|Connect the pin to a power net

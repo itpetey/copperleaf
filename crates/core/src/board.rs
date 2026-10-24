@@ -7,7 +7,7 @@
 use crate::{
     CompileError, Component, ComponentMeta, Constraint, LayoutConstraint, Net, NetIdx, Pad, Pin,
     design_rules::DesignRules,
-    layout::{BoardSide, LayerSet, PlaceTarget, Region},
+    layout::{BoardSide, CopperLayer, LayerSet, PlaceTarget, Region},
     net::NetHandle,
     pin::{PinHandle, PinId, PinRef, RawConnection},
     stackup::Stackup,
@@ -29,11 +29,14 @@ pub struct CompiledComponent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Connection {
     pub component: usize,
-    pub pin: String,
+    /// Canonical identity of the connected physical pin.
+    pub pin: PinId,
+    /// Component-local index of the pin this connection resolves to.
+    pub pin_index: usize,
     pub net: NetIdx,
 }
 
-/// An immutable structure representing a finished [`Board`](crate::Board) that is ready for export.
+/// An immutable structure representing a finished [`Board`] that is ready for export.
 #[derive(Clone, Debug)]
 pub struct CompiledBoard {
     pub components: Vec<CompiledComponent>,
@@ -63,6 +66,8 @@ pub struct BoardView<'a> {
     pub net_of: std::collections::HashMap<(usize, usize), NetIdx>,
     /// Set of (component_index, pin_index) pairs that are connected to a net.
     pub connected: std::collections::HashSet<(usize, usize)>,
+    /// Map from component-local canonical pin identity to its index.
+    pub pin_index: std::collections::HashMap<(usize, PinId), usize>,
 }
 
 /// Handle to a component instance on a [`Board`].
@@ -108,14 +113,16 @@ pub struct Board {
 
 impl CompiledComponent {
     /// Build a compiled component from a refdes and any [`Component`] impl,
-    /// assigning deterministic pin IDs.
+    /// assigning deterministic pin IDs from the canonical physical identity.
     pub fn from_component(refdes: &str, component: &dyn Component) -> Self {
+        let resolution = crate::pin::resolve_pin_identities(refdes, component.pins());
         let pins: Vec<Pin> = component
             .pins()
             .iter()
-            .map(|p| {
-                let seed = format!("{}:{}", refdes, p.name());
-                p.clone().with_id(PinId(deterministic_id(&seed)))
+            .zip(resolution.pins.iter())
+            .map(|(pin, canonical)| {
+                let seed = format!("{}:{}", refdes, canonical.key);
+                pin.clone().with_id(PinId(deterministic_id(&seed)))
             })
             .collect();
         Self {
@@ -171,18 +178,32 @@ impl<'a> BoardView<'a> {
     pub fn new(board: &'a CompiledBoard) -> Self {
         let mut net_of = std::collections::HashMap::new();
         let mut connected = std::collections::HashSet::new();
-        for conn in &board.connections {
-            let comp = &board.components[conn.component];
-            if let Some(pin_idx) = comp.pins.iter().position(|p| p.name() == conn.pin) {
-                net_of.insert((conn.component, pin_idx), conn.net);
-                connected.insert((conn.component, pin_idx));
+        let mut pin_index = std::collections::HashMap::new();
+        for (comp_idx, comp) in board.components.iter().enumerate() {
+            for (idx, pin) in comp.pins.iter().enumerate() {
+                pin_index.insert((comp_idx, pin.id().clone()), idx);
             }
+        }
+        for conn in &board.connections {
+            net_of.insert((conn.component, conn.pin_index), conn.net);
+            connected.insert((conn.component, conn.pin_index));
         }
         Self {
             board,
             net_of,
             connected,
+            pin_index,
         }
+    }
+
+    /// Resolve a component-local canonical identity to its pin index.
+    pub fn index_of(&self, component: usize, pin: &PinId) -> Option<usize> {
+        self.pin_index.get(&(component, pin.clone())).copied()
+    }
+
+    /// Borrow the pin behind a component-local index.
+    pub fn pin(&self, component: usize, index: usize) -> Option<&'a Pin> {
+        self.board.components.get(component)?.pins.get(index)
     }
 }
 
@@ -368,7 +389,7 @@ impl Board {
     pub fn assign_plane(
         &mut self,
         net_handle: NetHandle,
-        layer: usize,
+        layer: CopperLayer,
     ) -> Result<(), CompileError> {
         self.net_layouts
             .entry(net_handle.id)
@@ -400,19 +421,56 @@ impl Board {
                 hint: None,
             });
         };
-        if entry.component.pin_name(handle.pin).is_none() {
-            return Some(Diagnostic {
-                code: "BOARD:INVALID_PIN".into(),
+        let resolution = crate::pin::resolve_pin_identities(&entry.name, entry.component.pins());
+        let matches: Vec<usize> = resolution
+            .pins
+            .iter()
+            .enumerate()
+            .filter(|(_, canonical)| canonical.key == handle.pin)
+            .map(|(index, _)| index)
+            .collect();
+        match matches.len() {
+            1 => None,
+            0 => {
+                let named: Vec<&str> = entry
+                    .component
+                    .pins()
+                    .iter()
+                    .filter(|pin| pin.name() == handle.pin)
+                    .map(|pin| pin.name())
+                    .collect();
+                let hint = if named.is_empty() {
+                    Some("Use a generated pin constant, which carries the canonical physical identity.".into())
+                } else {
+                    Some(format!(
+                        "'{}' is a display name; use the pin constant that identifies a physical pad instead.",
+                        handle.pin
+                    ))
+                };
+                Some(Diagnostic {
+                    code: "BOARD:INVALID_PIN".into(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "pin identity '{}' does not match exactly one physical pin on component '{}'",
+                        handle.pin, entry.name
+                    ),
+                    entities: vec![format!("{}.{}", entry.name, handle.pin)],
+                    hint,
+                })
+            }
+            _ => Some(Diagnostic {
+                code: "BOARD:AMBIGUOUS_PIN".into(),
                 severity: Severity::Error,
                 message: format!(
-                    "pin '{}' does not exist on component '{}'",
-                    handle.pin, entry.name
+                    "pin identity '{}' matches {} physical pins on component '{}'",
+                    handle.pin,
+                    matches.len(),
+                    entry.name
                 ),
                 entities: vec![format!("{}.{}", entry.name, handle.pin)],
-                hint: None,
-            });
+                hint: Some("Every electrical pin needs a distinct pad number.".into()),
+            }),
         }
-        None
     }
 
     /// Validate that every [`PinHandle`] in a connection refers to an existing

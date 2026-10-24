@@ -28,22 +28,22 @@ pub struct UsbC23409011 {
 }
 
 impl UsbC23409011 {
-    pub const GND_A: copperleaf::PinRef = copperleaf::PinRef("GND_A");
-    pub const VBUS_A: copperleaf::PinRef = copperleaf::PinRef("VBUS_A");
-    pub const DP1: copperleaf::PinRef = copperleaf::PinRef("DP1");
-    pub const CC1: copperleaf::PinRef = copperleaf::PinRef("CC1");
-    pub const SBU1: copperleaf::PinRef = copperleaf::PinRef("SBU1");
-    pub const DN1: copperleaf::PinRef = copperleaf::PinRef("DN1");
-    pub const SHIELD_1: copperleaf::PinRef = copperleaf::PinRef("SHIELD_1");
-    pub const SHIELD_2: copperleaf::PinRef = copperleaf::PinRef("SHIELD_2");
-    pub const SHIELD_3: copperleaf::PinRef = copperleaf::PinRef("SHIELD_3");
-    pub const SHIELD_4: copperleaf::PinRef = copperleaf::PinRef("SHIELD_4");
-    pub const GND_B: copperleaf::PinRef = copperleaf::PinRef("GND_B");
-    pub const VBUS_B: copperleaf::PinRef = copperleaf::PinRef("VBUS_B");
-    pub const DP2: copperleaf::PinRef = copperleaf::PinRef("DP2");
-    pub const CC2: copperleaf::PinRef = copperleaf::PinRef("CC2");
-    pub const SBU2: copperleaf::PinRef = copperleaf::PinRef("SBU2");
-    pub const DN2: copperleaf::PinRef = copperleaf::PinRef("DN2");
+    pub const GND_A: copperleaf::PinRef = copperleaf::PinRef("A1/B12");
+    pub const VBUS_A: copperleaf::PinRef = copperleaf::PinRef("A4/B9");
+    pub const DP1: copperleaf::PinRef = copperleaf::PinRef("A6");
+    pub const CC1: copperleaf::PinRef = copperleaf::PinRef("A5");
+    pub const SBU1: copperleaf::PinRef = copperleaf::PinRef("A8");
+    pub const DN1: copperleaf::PinRef = copperleaf::PinRef("A7");
+    pub const SHIELD_1: copperleaf::PinRef = copperleaf::PinRef("SH1");
+    pub const SHIELD_2: copperleaf::PinRef = copperleaf::PinRef("SH2");
+    pub const SHIELD_3: copperleaf::PinRef = copperleaf::PinRef("SH3");
+    pub const SHIELD_4: copperleaf::PinRef = copperleaf::PinRef("SH4");
+    pub const GND_B: copperleaf::PinRef = copperleaf::PinRef("B1/A12");
+    pub const VBUS_B: copperleaf::PinRef = copperleaf::PinRef("B4/AP");
+    pub const DP2: copperleaf::PinRef = copperleaf::PinRef("B6");
+    pub const CC2: copperleaf::PinRef = copperleaf::PinRef("B5");
+    pub const SBU2: copperleaf::PinRef = copperleaf::PinRef("B8");
+    pub const DN2: copperleaf::PinRef = copperleaf::PinRef("B7");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

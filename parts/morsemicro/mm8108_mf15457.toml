@@ -656,7 +656,7 @@ layers = "F.Cu F.Mask F.Paste"
 
 [[constraint]]
 type = "Decoupling"
-values = ["100.0.nf()", "10.0.uf()"]
+values = ["100nF", "10uF"]
 per_pin = false
 
 [[constraint]]
@@ -666,4 +666,4 @@ skew_ps = 200.0
 
 [[constraint]]
 type = "MaxJunction"
-temp = "85.0.celsius()"
+temp = "85C"

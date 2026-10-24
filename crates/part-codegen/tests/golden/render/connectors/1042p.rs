@@ -12,8 +12,8 @@ pub struct Comp1042p {
 }
 
 impl Comp1042p {
-    pub const POSITIVE: copperleaf::PinRef = copperleaf::PinRef("POSITIVE");
-    pub const NEGATIVE: copperleaf::PinRef = copperleaf::PinRef("NEGATIVE");
+    pub const POSITIVE: copperleaf::PinRef = copperleaf::PinRef("P");
+    pub const NEGATIVE: copperleaf::PinRef = copperleaf::PinRef("N");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

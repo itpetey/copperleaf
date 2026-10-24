@@ -7,13 +7,16 @@ pub use board::{
 };
 pub use design_rules::DesignRules;
 pub use layout::{
-    BoardSide, LayerSet, Layout, LayoutConstraint, PlaceTarget, Placement, Region, Track, Via, Zone,
+    BoardSide, CopperLayer, LayerSet, Layout, LayoutConstraint, PlaceTarget, Placement, Region,
+    Track, Via, Zone,
 };
 pub use net::{Constraint, Net, NetClass, NetHandle, NetIdx, NetKind};
+pub use path::{PathContainmentError, safe_join, validate_path_component};
 pub use pin::{
-    DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad, PadShape, PadType, Pin, PinBuilder,
-    PinHandle, PinId, PinRef, PowerSpec, RawConnection, Role, SMD_LAYERS, SigKind, SigSpec, SymPin,
-    ThermalVia, auto_pad_pos, normalise_anchor, pad_extent, resolve_mech_pad, resolve_pad,
+    CanonicalPin, ComponentPinResolution, DEFAULT_DRILL, DEFAULT_PAD_SIZE, PTH_LAYERS, Pad,
+    PadShape, PadType, Pin, PinBuilder, PinHandle, PinId, PinIdentitySource, PinRef, PowerSpec,
+    RawConnection, Role, SMD_LAYERS, SigKind, SigSpec, SymPin, ThermalVia, auto_pad_pos,
+    normalise_anchor, pad_extent, resolve_mech_pad, resolve_pad, resolve_pin_identities,
 };
 pub use stackup::{Dielectric, LayerRole, Stackup, StackupLayer};
 pub use units::{
@@ -27,10 +30,14 @@ pub mod erc;
 pub mod helpers;
 pub mod layout;
 pub mod net;
+pub mod path;
 pub mod pin;
 pub mod stackup;
 pub mod units;
 pub mod util;
+pub mod validation;
+
+pub use validation::validate_compiled_board;
 
 /// Trait implemented by backends that emit a [`CompiledBoard`] to a target format.
 pub trait Backend {
@@ -269,8 +276,8 @@ mod tests {
             }
         }
         impl TwoPins {
-            pub const A: PinRef = PinRef("A");
-            pub const B: PinRef = PinRef("B");
+            pub const A: PinRef = PinRef("1");
+            pub const B: PinRef = PinRef("2");
         }
 
         let mut board = Board::new("test");

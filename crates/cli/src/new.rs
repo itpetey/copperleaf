@@ -119,7 +119,7 @@ fn run_datasheet(path: &str, args: &NewArgs) -> Result<(), CliError> {
     }
 
     let output = crate::manifest::serialise(&manifest);
-    write_output(args, &lib_id, &output, &[])?;
+    write_output(args, &lib_id, &manifest, &output, &[])?;
     Ok(())
 }
 
@@ -240,7 +240,7 @@ fn run_dir(dir: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError>
             );
             manifest::embed_model_data(&mut m);
             let output = manifest::serialise(&m);
-            write_output(args, &lib_id, &output, &diags)?;
+            write_output(args, &lib_id, &m, &output, &diags)?;
             return Ok(());
         }
 
@@ -251,7 +251,7 @@ fn run_dir(dir: &str, args: &NewArgs, kindmap: &KindMap) -> Result<(), CliError>
     // ── Finalise ────────────────────────────────────────────────────
     manifest::embed_model_data(&mut manifest);
     let output = manifest::serialise(&manifest);
-    write_output(args, &lib_id, &output, &diags)?;
+    write_output(args, &lib_id, &manifest, &output, &diags)?;
     Ok(())
 }
 
@@ -320,7 +320,7 @@ fn run_footprint(footprint_path: &str, args: &NewArgs, _kindmap: &KindMap) -> Re
         entities: vec![],
         hint: Some("Run update --symbol to replace placeholder names".into()),
     }];
-    write_output(args, &lib_id, &output, &diags)?;
+    write_output(args, &lib_id, &manifest, &output, &diags)?;
     Ok(())
 }
 
@@ -380,28 +380,33 @@ fn run_symbol(symbol_path: &str, args: &NewArgs, kindmap: &KindMap) -> Result<()
     let diags = manifest::merge_symbol(&mut manifest, &symbol.pins, kindmap, &args.default_kind);
 
     let output = manifest::serialise(&manifest);
-    write_output(args, &lib_id, &output, &diags)?;
+    write_output(args, &lib_id, &manifest, &output, &diags)?;
     Ok(())
 }
 
 fn write_output(
     args: &NewArgs,
     lib_id: &str,
+    manifest: &Manifest,
     output: &str,
     diags: &[Diagnostic],
 ) -> Result<(), CliError> {
     for d in diags {
         crate::print_diagnostic(d);
     }
+    copperleaf_part_codegen::validate_structure_or_error(manifest)?;
 
     let out_path = if let Some(path) = &args.out {
         PathBuf::from(path)
     } else if let Some(vendor) = &args.crate_ {
         let root = std::env::current_dir()?;
         vendor::scaffold(&root, vendor, lib_id)?;
-        PathBuf::from("parts")
-            .join(vendor)
-            .join(format!("{}.toml", manifest::toml_stem(lib_id)))
+        let parts = copperleaf::safe_join(&root, "parts")?;
+        let vendor_dir = copperleaf::safe_join(&parts, vendor)?;
+        copperleaf::safe_join(
+            &vendor_dir,
+            &format!("{}.toml", manifest::toml_stem(lib_id)),
+        )?
     } else {
         print!("{}", output);
         return Ok(());

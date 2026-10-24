@@ -17,11 +17,11 @@ pub struct Mcp73831t2atiOt {
 }
 
 impl Mcp73831t2atiOt {
-    pub const STAT: copperleaf::PinRef = copperleaf::PinRef("STAT");
-    pub const VSS: copperleaf::PinRef = copperleaf::PinRef("VSS");
-    pub const VBAT: copperleaf::PinRef = copperleaf::PinRef("VBAT");
-    pub const VDD: copperleaf::PinRef = copperleaf::PinRef("VDD");
-    pub const PROG: copperleaf::PinRef = copperleaf::PinRef("PROG");
+    pub const STAT: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const VSS: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const VBAT: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const VDD: copperleaf::PinRef = copperleaf::PinRef("4");
+    pub const PROG: copperleaf::PinRef = copperleaf::PinRef("5");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

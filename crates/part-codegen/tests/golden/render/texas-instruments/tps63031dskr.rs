@@ -23,17 +23,17 @@ pub struct Tps63031dskr {
 }
 
 impl Tps63031dskr {
-    pub const VOUT: copperleaf::PinRef = copperleaf::PinRef("VOUT");
-    pub const L2: copperleaf::PinRef = copperleaf::PinRef("L2");
-    pub const PGND: copperleaf::PinRef = copperleaf::PinRef("PGND");
-    pub const L1: copperleaf::PinRef = copperleaf::PinRef("L1");
-    pub const VIN: copperleaf::PinRef = copperleaf::PinRef("VIN");
-    pub const EN: copperleaf::PinRef = copperleaf::PinRef("EN");
-    pub const PS_SYNC: copperleaf::PinRef = copperleaf::PinRef("PS/SYNC");
-    pub const VINA: copperleaf::PinRef = copperleaf::PinRef("VINA");
-    pub const GND: copperleaf::PinRef = copperleaf::PinRef("GND");
-    pub const FB: copperleaf::PinRef = copperleaf::PinRef("FB");
-    pub const EXP: copperleaf::PinRef = copperleaf::PinRef("EXP");
+    pub const VOUT: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const L2: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const PGND: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const L1: copperleaf::PinRef = copperleaf::PinRef("4");
+    pub const VIN: copperleaf::PinRef = copperleaf::PinRef("5");
+    pub const EN: copperleaf::PinRef = copperleaf::PinRef("6");
+    pub const PS_SYNC: copperleaf::PinRef = copperleaf::PinRef("7");
+    pub const VINA: copperleaf::PinRef = copperleaf::PinRef("8");
+    pub const GND: copperleaf::PinRef = copperleaf::PinRef("9");
+    pub const FB: copperleaf::PinRef = copperleaf::PinRef("10");
+    pub const EXP: copperleaf::PinRef = copperleaf::PinRef("11");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

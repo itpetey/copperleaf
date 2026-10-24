@@ -17,11 +17,11 @@ pub struct Tlv75518pdbvr {
 }
 
 impl Tlv75518pdbvr {
-    pub const IN: copperleaf::PinRef = copperleaf::PinRef("IN");
-    pub const GND: copperleaf::PinRef = copperleaf::PinRef("GND");
-    pub const EN: copperleaf::PinRef = copperleaf::PinRef("EN");
-    pub const NC: copperleaf::PinRef = copperleaf::PinRef("NC");
-    pub const OUT: copperleaf::PinRef = copperleaf::PinRef("OUT");
+    pub const IN: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const GND: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const EN: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const NC: copperleaf::PinRef = copperleaf::PinRef("4");
+    pub const OUT: copperleaf::PinRef = copperleaf::PinRef("5");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

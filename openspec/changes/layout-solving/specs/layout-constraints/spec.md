@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: LayoutConstraint enum carries physical directives
-A `LayoutConstraint` enum SHALL be defined in the core crate as the only representation of physical layout directives. It SHALL include variants: `NetClass { min_width, clearance }`, `Creepage { min, voltage }` (both moved from the `Constraint` enum), `PlaceAt { pos, rotation, side }`, `PlaceNear { target, max_radius }`, `SameSide { group }`, `Keepout { region, layers }`, and `Plane { layer }`. The `Constraint` enum SHALL NOT contain these variants. Supporting vocabulary types `BoardSide` (front/back), `Region` (rect/circle), and `LayerSet` SHALL be defined once in core and shared by the variants.
+A `LayoutConstraint` enum SHALL be defined in the core crate as the only representation of physical layout directives. It SHALL include variants: `NetClass { min_width, clearance }`, `Creepage { min, voltage }` (both moved from the `Constraint` enum), `PlaceAt { pos, rotation, side }`, `PlaceNear { target, max_radius }`, `SameSide { group }`, `Keepout { region, layers }`, and `Plane { layer }`. The `Constraint` enum SHALL NOT contain these variants.
 
 #### Scenario: NetClass moves out of Constraint
 - **WHEN** a component author writes `LayoutConstraint::NetClass { min_width: 0.5.mm(), clearance: 0.2.mm() }`
@@ -10,7 +10,14 @@ A `LayoutConstraint` enum SHALL be defined in the core crate as the only represe
 
 #### Scenario: Placement directive is expressible
 - **WHEN** a board author constrains a connector with `PlaceAt { pos: (10.0, 40.0), rotation: 90.0, side: BoardSide::Front }`
-- **THEN** the directive is stored on the component's layout constraint list for the solver to honour as a fixed placement
+- **THEN** the directive is stored on the component's layout constraint list for the solver
+
+### Requirement: Layout vocabulary types are shared in core
+Supporting vocabulary types `BoardSide` (front/back), `Region` (rect/circle), and `LayerSet` SHALL be defined once in core and shared by layout directives. Copper layers SHALL be referenced by a zero-based `CopperLayer` ordinal.
+
+#### Scenario: Shared vocabulary is used by directives
+- **WHEN** a directive references a board side, region, layer set, or copper layer
+- **THEN** it uses the core `BoardSide`, `Region`, `LayerSet`, or `CopperLayer` type rather than a format-specific value
 
 ### Requirement: Layout constraints attach at component, net, and board level
 `LayoutConstraint` values SHALL attach at three levels, mirroring the existing `constraints` fields: `CompiledComponent.layout`, `Net.layout`, and `CompiledBoard.layout`. The `Component` trait SHALL expose `fn layout_constraints(&self) -> Vec<LayoutConstraint>` with a default implementation returning an empty vector. `CompiledComponent::from_component` SHALL carry the trait's layout constraints into the compiled component.
@@ -27,8 +34,8 @@ A `LayoutConstraint` enum SHALL be defined in the core crate as the only represe
 The `Board` builder SHALL provide typed methods for board-level directives: `place_at(handle, pos, rotation, side)`, `place_near(handle, target, max_radius)`, `keepout(region, layers)`, and `assign_plane(net_handle, layer)`. These SHALL validate their component/net handles the same way `connect()` does and store the directives on the corresponding component, net, or board constraint lists during lowering.
 
 #### Scenario: Plane assignment reaches the net
-- **WHEN** `board.assign_plane(gnd_handle, 31)` is called for the ground net on B.Cu
-- **THEN** the compiled `Net` for GND carries `LayoutConstraint::Plane { layer: 31 }` in its `layout` field
+- **WHEN** `board.assign_plane(gnd_handle, CopperLayer(1))` is called for the ground net on B.Cu of a two-layer board
+- **THEN** the compiled `Net` for GND carries `LayoutConstraint::Plane { layer: CopperLayer(1) }` in its `layout` field
 
 #### Scenario: Invalid handle is rejected
 - **WHEN** `place_at` is called with a component handle that does not exist

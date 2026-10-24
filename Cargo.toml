@@ -21,7 +21,9 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 license = "MPL-2.0"
+publish = false
 
 [workspace.dependencies]
 anyhow = { version = "1.0", default-features = false }

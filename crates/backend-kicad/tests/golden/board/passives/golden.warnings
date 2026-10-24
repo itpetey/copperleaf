@@ -1,0 +1,10 @@
+Warning|ERC:FLOATING_INPUT|Input pin C1.1 is floating|C1.1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin C1.2 is floating|C1.2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin L1.1 is floating|L1.1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin L1.2 is floating|L1.2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin L2.1 is floating|L2.1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin L2.2 is floating|L2.2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin R1.1 is floating|R1.1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin R1.2 is floating|R1.2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin Y1.1 is floating|Y1.1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin Y1.2 is floating|Y1.2|Connect the pin or assign a signal specification

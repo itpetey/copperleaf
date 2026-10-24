@@ -1,7 +1,12 @@
-## ADDED Requirements
+# pad-model Specification
+
+## Purpose
+Define one typed pad-geometry model used by component definitions, manifest parsing, code generation, and backend emission, so physical pad data has a single representation across the workspace.
+
+## Requirements
 
 ### Requirement: Pad is the single pad-geometry model
-A `Pad` struct SHALL be defined in the core crate as the only representation of footprint pad geometry in the workspace. It SHALL carry: `number`, `pos`, `rotation`, `width`, `height`, `pad_type`, `shape`, `roundrect_rratio`, `solder_mask_margin`, `layers`, and `drill`. The structs `MechanicalPad` (core), `fp_geom::PadGeom` (backend), and `MechanicalDef`/`ThermalViaDef` (codegen) SHALL be removed and replaced by `Pad` (and `ThermalVia` for via-in-pad data). No other struct in the workspace SHALL re-declare pad geometry fields.
+A `Pad` struct SHALL be defined in the core crate as the only representation of footprint pad geometry. It SHALL carry `number`, `pos`, `rotation`, `width`, `height`, `pad_type`, `shape`, `roundrect_rratio`, `solder_mask_margin`, `layers`, and `drill`.
 
 #### Scenario: Mechanical pads use the same type as electrical pads
 - **WHEN** a component declares a mounting hole or paste aperture
@@ -10,6 +15,13 @@ A `Pad` struct SHALL be defined in the core crate as the only representation of 
 #### Scenario: Codegen pin definition embeds Pad
 - **WHEN** a parts TOML describes a pin with pad geometry
 - **THEN** the geometry deserialises directly into a core `Pad` — no field-by-field mapping code exists between the TOML schema and the core type
+
+### Requirement: No parallel pad-geometry structs exist
+The structs `MechanicalPad` (core), `fp_geom::PadGeom` (backend), and `MechanicalDef`/`ThermalViaDef` (codegen) SHALL be removed and replaced by `Pad` (and `ThermalVia` for via-in-pad data). No other struct in the workspace SHALL re-declare pad geometry fields.
+
+#### Scenario: Physical geometry has one owner
+- **WHEN** the workspace is searched for pad-geometry field declarations
+- **THEN** only the core `Pad` type declares them
 
 ### Requirement: Pad type and shape are typed enums
 `Pad` SHALL use a `PadType` enum (`Smd`, `ThruHole`, `NpThruHole`, `Connect`) and a `PadShape` enum (`Rect`, `RoundRect`, `Circle`, `Oval`) instead of free-form strings. KiCad string representations SHALL be parsed/serialised at the format boundary (parsers and emitters) only. An unrecognised string SHALL produce a parse error naming the offending value.
@@ -37,12 +49,15 @@ A `Pin` SHALL carry electrical identity and specification (`id`, `name`, `number
 - **THEN** `pin.pad()` returns the pad and the pin exposes no standalone `pos()`/`width()` accessors
 
 ### Requirement: resolve_pad owns all pad defaulting rules
-A single `resolve_pad(pin, index) -> Pad` function SHALL resolve a pin's pad to fully-populated geometry for emission, and SHALL be the only place the following defaults are applied: auto-row position fallback (2.54 mm pitch, pad 1 at origin), pad-type default (explicit `pad_type` wins; otherwise SMD iff the pin has an explicit position, else through-hole), width/height fallback, layer defaults by pad type, drill default for through-hole pads, shape default (pad 1 rectangular, others circular, for auto through-hole rows), and anchor normalisation (SMD footprints recentred on the pad bounding box; through-hole footprints anchored on pad 1). Both the CLI `generate` pipeline and board emission SHALL use this function.
-
-#### Scenario: Both pipelines produce identical pads
-- **WHEN** the same part is emitted as a standalone `.kicad_mod` via `generate footprint` and embedded in a `.kicad_pcb` via board emission
-- **THEN** the pad `(at ...)` `(size ...)` `(layers ...)` and `(drill ...)` values are identical
+A single `resolve_pad(pin, index) -> Pad` function SHALL resolve a pin's pad to fully-populated geometry for emission. It SHALL be the only place these defaults are applied: auto-row position (2.54 mm pitch, pad 1 at origin), pad-type (explicit wins, otherwise SMD iff the pin has an explicit position, else through-hole), width/height fallback, layers by pad type, drill for through-hole pads, and shape (pad 1 rectangular, others circular, for auto through-hole rows).
 
 #### Scenario: Missing geometry falls back to auto-row
 - **WHEN** a pin has no pad data
 - **THEN** `resolve_pad` places a through-hole pad at `index * 2.54 mm` on the X axis with the documented default size, drill, and layers
+
+### Requirement: resolve_pad normalises footprint anchors for both pipelines
+`resolve_pad` SHALL normalise the footprint anchor: SMD footprints are recentred on the pad bounding box, and through-hole footprints are anchored on pad 1. Both the CLI `generate` pipeline and board emission SHALL use this function.
+
+#### Scenario: Both pipelines produce identical pads
+- **WHEN** the same part is emitted as a standalone `.kicad_mod` via `generate footprint` and embedded in a `.kicad_pcb` via board emission
+- **THEN** the pad `(at ...)` `(size ...)` `(layers ...)` and `(drill ...)` values are identical

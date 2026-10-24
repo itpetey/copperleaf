@@ -8,6 +8,10 @@ The PCB emitter SHALL produce a `(kicad_pcb ...)` S-expression with layer table,
 - **THEN** the `.kicad_pcb` file starts with `(kicad_pcb (version`
 - **AND** contains a `layers` section, `setup` section, and at least one `footprint` entry
 
+#### Scenario: Net classes derived from constraints
+- **WHEN** a net has `LayoutConstraint::NetClass { min_width: 0.5.mm(), clearance: 0.2.mm() }`
+- **THEN** the `.kicad_pcb` file contains a net class with those dimensions
+
 #### Scenario: Net classes derived from resolved net class
 - **WHEN** a net carries `LayoutConstraint::NetClass { min_width: 0.5.mm(), clearance: 0.2.mm() }` and is compiled
 - **THEN** the `.kicad_pcb` file contains a net class with those dimensions
@@ -23,18 +27,18 @@ The PCB emitter SHALL produce a `(kicad_pcb ...)` S-expression with layer table,
 
 ## ADDED Requirements
 
-### Requirement: PCB emitter emits copper geometry from Layout
-When a `Layout` is supplied, the PCB emitter SHALL emit `(segment …)` nodes for layout tracks, `(via …)` nodes for layout vias, and `(zone …)` nodes for layout zones. Each copper element SHALL carry its net's KiCad net code, layer, and a deterministic UUID seeded from net, layer, and ordinal. Nets present in `LayoutReport.unrouted` SHALL remain as ratsnest airwires (no copper), and their absence SHALL NOT fail emission.
+### Requirement: PCB emitter emits layout geometry when supplied
+When a `Layout` is supplied, the PCB emitter SHALL emit `(segment …)` nodes for layout tracks, `(via …)` nodes for layout vias, and `(zone …)` nodes for layout zones. Each copper element SHALL carry its net's KiCad net code, canonical copper layer, and a deterministic UUID seeded from net, layer, and ordinal. Emitting a layout SHALL NOT invent tracks or vias.
 
 #### Scenario: Tracks become segments
-- **WHEN** the layout contains a track on net `V3V3`, layer F.Cu, width 0.25 mm
+- **WHEN** the layout contains a track on net `V3V3`, front copper, width 0.25 mm
 - **THEN** the `.kicad_pcb` contains `(segment (start …) (end …) (width 0.25) (layer "F.Cu") (net <code for V3V3>))` entries covering the track path
 
 #### Scenario: Plane net becomes a zone
-- **WHEN** the layout contains a zone for GND on layer 31 covering the board outline
+- **WHEN** the layout contains a zone for GND on `CopperLayer(1)` covering the board outline
 - **THEN** the `.kicad_pcb` contains a `(zone (net <code for GND>) (layer "B.Cu") …)` whose polygon matches the board outline
 
-#### Scenario: Unrouted net emits no copper
-- **WHEN** a net is listed in `LayoutReport.unrouted`
-- **THEN** the `.kicad_pcb` contains no segments or vias for that net
-- **AND** emission succeeds
+#### Scenario: Canonical layer maps to KiCad copper
+- **WHEN** a layout track uses `CopperLayer(1)` on a two-layer board
+- **THEN** it is emitted on `B.Cu`
+- **AND** no `In1.Cu` layer appears

@@ -1,0 +1,563 @@
+{
+  "$schema": "https://schemas.kicad.org/drc.v1.json",
+  "coordinate_units": "mm",
+  "ignored_checks": [
+    {
+      "description": "Footprint component type doesn't match footprint pads",
+      "key": "footprint_type_mismatch"
+    },
+    {
+      "description": "Footprint doesn't match symbol's footprint filters",
+      "key": "footprint_filters_mismatch"
+    },
+    {
+      "description": "Footprint has no courtyard defined",
+      "key": "missing_courtyard"
+    },
+    {
+      "description": "Track endpoint not centered on via",
+      "key": "track_not_centered_on_via"
+    },
+    {
+      "description": "Tuning profile track geometries",
+      "key": "tuning_profile_track_geometries"
+    }
+  ],
+  "included_severities": [
+    "error",
+    "exclusion",
+    "warning"
+  ],
+  "kicad_version": "10.0.7",
+  "schematic_parity": [],
+  "source": "w5500.kicad_pcb",
+  "unconnected_items": [
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "PTH pad N [GND] of J1",
+          "pos": {
+            "x": 1.015,
+            "y": 25.0
+          }
+        },
+        {
+          "description": "Pad 3 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 43.25
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 1 [SPI_SCLK] of R1 on B.Cu",
+          "pos": {
+            "x": 82.0,
+            "y": 54.175
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 14.8661 mm",
+          "pos": {
+            "x": 68.0,
+            "y": 50.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 1 [V3V3] of C1 on F.Cu",
+          "pos": {
+            "x": 81.5725,
+            "y": 10.975
+          }
+        },
+        {
+          "description": "Pad 1 [V3V3] of C2 on F.Cu",
+          "pos": {
+            "x": 90.0225,
+            "y": 10.975
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 1 [V3V3] of C1 on F.Cu",
+          "pos": {
+            "x": 81.5725,
+            "y": 10.975
+          }
+        },
+        {
+          "description": "Pad 4 [V3V3] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 43.75
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 14 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 52.75,
+            "y": 49.18
+          }
+        },
+        {
+          "description": "Pad 16 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 53.75,
+            "y": 49.18
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 14 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 52.75,
+            "y": 49.18
+          }
+        },
+        {
+          "description": "Pad 9 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 46.25
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 16 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 53.75,
+            "y": 49.18
+          }
+        },
+        {
+          "description": "Pad 19 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 55.25,
+            "y": 49.18
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 19 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 55.25,
+            "y": 49.18
+          }
+        },
+        {
+          "description": "Pad 29 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 45.75
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 2 [GND] of C1 on F.Cu",
+          "pos": {
+            "x": 83.2225,
+            "y": 10.975
+          }
+        },
+        {
+          "description": "Pad 2 [GND] of C2 on F.Cu",
+          "pos": {
+            "x": 91.6725,
+            "y": 10.975
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 2 [GND] of C1 on F.Cu",
+          "pos": {
+            "x": 83.2225,
+            "y": 10.975
+          }
+        },
+        {
+          "description": "Pad 29 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 45.75
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 3 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 43.25
+          }
+        },
+        {
+          "description": "Pad 48 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 52.25,
+            "y": 40.82
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 3 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 43.25
+          }
+        },
+        {
+          "description": "Pad 9 [GND] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 46.25
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 33 [SPI_SCLK] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 43.75
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    },
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 4 [V3V3] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 43.75
+          }
+        },
+        {
+          "description": "Pad 8 [V3V3] of U1 on F.Cu",
+          "pos": {
+            "x": 50.82,
+            "y": 45.75
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    }
+  ],
+  "violations": [
+    {
+      "description": "Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)",
+      "items": [
+        {
+          "description": "PTH pad N [GND] of J1",
+          "pos": {
+            "x": 1.015,
+            "y": 25.0
+          }
+        },
+        {
+          "description": "Segment on Edge.Cuts",
+          "pos": {
+            "x": 0.0,
+            "y": 80.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "copper_edge_clearance"
+    },
+    {
+      "description": "Clearance violation ( clearance 0.2000 mm; actual 0.0638 mm)",
+      "items": [
+        {
+          "description": "Pad 26 [<no net>] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 47.25
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "clearance"
+    },
+    {
+      "description": "Footprint 'C_0603_1608Metric' does not match copy in library 'Capacitor_SMD'",
+      "items": [
+        {
+          "description": "Footprint C1",
+          "pos": {
+            "x": 82.3975,
+            "y": 10.975
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "lib_footprint_mismatch"
+    },
+    {
+      "description": "Footprint 'C_0603_1608Metric' does not match copy in library 'Capacitor_SMD'",
+      "items": [
+        {
+          "description": "Footprint C2",
+          "pos": {
+            "x": 90.8475,
+            "y": 10.975
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "lib_footprint_mismatch"
+    },
+    {
+      "description": "Footprint 'R_0603_1608Metric' does not match copy in library 'Resistor_SMD'",
+      "items": [
+        {
+          "description": "Footprint R1",
+          "pos": {
+            "x": 82.0,
+            "y": 55.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "lib_footprint_mismatch"
+    },
+    {
+      "description": "Front solder mask aperture bridges items with different nets",
+      "items": [
+        {
+          "description": "Pad 26 [<no net>] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 47.25
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "solder_mask_bridge"
+    },
+    {
+      "description": "Front solder mask aperture bridges items with different nets",
+      "items": [
+        {
+          "description": "Pad 27 [<no net>] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 46.75
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "solder_mask_bridge"
+    },
+    {
+      "description": "Front solder mask aperture bridges items with different nets",
+      "items": [
+        {
+          "description": "Pad 28 [<no net>] of U1 on F.Cu",
+          "pos": {
+            "x": 59.18,
+            "y": 46.25
+          }
+        },
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "error",
+      "type": "solder_mask_bridge"
+    },
+    {
+      "description": "Silkscreen clipped by board edge",
+      "items": [
+        {
+          "description": "Segment of J1 on F.Silkscreen",
+          "pos": {
+            "x": -1.61,
+            "y": 16.0
+          }
+        },
+        {
+          "description": "Segment on Edge.Cuts",
+          "pos": {
+            "x": 0.0,
+            "y": 80.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "silk_edge_clearance"
+    },
+    {
+      "description": "Silkscreen clipped by board edge",
+      "items": [
+        {
+          "description": "Segment of J1 on F.Silkscreen",
+          "pos": {
+            "x": 41.61,
+            "y": 34.0
+          }
+        },
+        {
+          "description": "Segment on Edge.Cuts",
+          "pos": {
+            "x": 0.0,
+            "y": 80.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "silk_edge_clearance"
+    },
+    {
+      "description": "Track has unconnected end",
+      "items": [
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 13.9284 mm",
+          "pos": {
+            "x": 55.0,
+            "y": 45.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "track_dangling"
+    },
+    {
+      "description": "Track has unconnected end",
+      "items": [
+        {
+          "description": "Track [SPI_SCLK] on F.Cu, length 14.8661 mm",
+          "pos": {
+            "x": 68.0,
+            "y": 50.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "track_dangling"
+    },
+    {
+      "description": "Via is not connected or connected on only one layer",
+      "items": [
+        {
+          "description": "Via [SPI_SCLK] on F.Cu - B.Cu",
+          "pos": {
+            "x": 68.0,
+            "y": 50.0
+          }
+        }
+      ],
+      "severity": "warning",
+      "type": "via_dangling"
+    }
+  ]
+}

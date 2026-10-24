@@ -12,8 +12,8 @@ pub struct Bh123a {
 }
 
 impl Bh123a {
-    pub const POSITIVE: copperleaf::PinRef = copperleaf::PinRef("POSITIVE");
-    pub const NEGATIVE: copperleaf::PinRef = copperleaf::PinRef("NEGATIVE");
+    pub const POSITIVE: copperleaf::PinRef = copperleaf::PinRef("P");
+    pub const NEGATIVE: copperleaf::PinRef = copperleaf::PinRef("N");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

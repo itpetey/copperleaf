@@ -116,7 +116,7 @@ fn check_track_clearances(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Group tracks by layer.
-    let mut by_layer: std::collections::BTreeMap<usize, Vec<usize>> =
+    let mut by_layer: std::collections::BTreeMap<copperleaf::CopperLayer, Vec<usize>> =
         std::collections::BTreeMap::new();
     for (i, track) in layout.tracks.iter().enumerate() {
         by_layer.entry(track.layer).or_default().push(i);
@@ -217,7 +217,7 @@ fn check_zone_min_width(layout: &Layout, board: &CompiledBoard, diagnostics: &mu
                 severity: Severity::Warning,
                 message: format!(
                     "zone for net '{}' on layer {} has fewer than 3 outline vertices",
-                    net.name, zone.layer,
+                    net.name, zone.layer.0,
                 ),
                 entities: vec![net.name.clone()],
                 hint: Some("check the board outline definition".into()),

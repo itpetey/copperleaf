@@ -29,7 +29,7 @@ struct OpencodeEvent {
 pub fn new_from_datasheet(path: &str, args: &NewArgs) -> Result<Manifest, CliError> {
     let text = extract_pdf_text(path)?;
     let prompt = new_prompt(args.title.as_deref(), args.description.as_deref());
-    let raw = call_opencode(&prompt, &[&text], &args.model)?;
+    let raw = call_opencode(&prompt, &[("datasheet.txt", text.as_str())], &args.model)?;
     let toml = extract_toml(&raw, path)?;
     let mut manifest = crate::manifest::deserialise(&toml)?;
     // `model_3d_data` is only ever produced from a real 3D model file via
@@ -57,13 +57,48 @@ pub fn update_from_datasheet(
     let existing_toml = crate::manifest::serialise(&stripped);
 
     let prompt = update_prompt();
-    let raw = call_opencode(&prompt, &[&existing_toml, &text], &args.model)?;
+    let raw = call_opencode(
+        &prompt,
+        &[
+            ("existing.toml", existing_toml.as_str()),
+            ("datasheet.txt", text.as_str()),
+        ],
+        &args.model,
+    )?;
     let toml = extract_toml(&raw, path)?;
-    let mut manifest = crate::manifest::deserialise(&toml)?;
+    let manifest = crate::manifest::deserialise(&toml)?;
     // Restore deterministically: whatever the model emitted (or omitted),
     // `model_3d_data` always comes back as the original value.
-    manifest.component.model_3d_data = preserved_model_3d_data;
-    Ok(manifest)
+    Ok(restore_model_payload(manifest, preserved_model_3d_data))
+}
+
+/// Restore a reviewed model payload after an untrusted LLM round-trip.
+fn restore_model_payload(mut manifest: Manifest, payload: Option<String>) -> Manifest {
+    manifest.component.model_3d_data = payload;
+    manifest
+}
+
+/// Write named attachments into the temporary provider working directory.
+fn write_attachments(
+    dir: &std::path::Path,
+    attachments: &[(&str, &str)],
+) -> Result<Vec<std::path::PathBuf>, CliError> {
+    let mut paths = Vec::with_capacity(attachments.len());
+    for (name, content) in attachments {
+        if name.is_empty() || name.contains('/') || name.contains('\\') {
+            return Err(CliError::Diagnostic(copperleaf::Diagnostic {
+                code: "CLI:INVALID_ATTACHMENT".into(),
+                severity: copperleaf::Severity::Error,
+                message: format!("invalid datasheet workflow attachment name '{name}'"),
+                entities: vec![name.to_string()],
+                hint: None,
+            }));
+        }
+        let path = dir.join(name);
+        std::fs::write(&path, content)?;
+        paths.push(path);
+    }
+    Ok(paths)
 }
 
 /// Invoke `opencode run` with the supplied prompt and file attachments.
@@ -74,20 +109,13 @@ pub fn update_from_datasheet(
 /// produces noisy progress output and can be slow). OpenCode v2 dropped the
 /// `run --dir` flag in favour of a top-level directory argument, so setting
 /// the process working directory is the portable equivalent.
-fn call_opencode(prompt: &str, file_contents: &[&str], model: &str) -> Result<String, CliError> {
+fn call_opencode(
+    prompt: &str,
+    attachments: &[(&str, &str)],
+    model: &str,
+) -> Result<String, CliError> {
     let dir = tempfile::tempdir()?;
-
-    let mut file_paths = Vec::new();
-    for (i, content) in file_contents.iter().enumerate() {
-        let name = match i {
-            0 => "existing.toml",
-            1 => "datasheet.txt",
-            _ => "extra.txt",
-        };
-        let path = dir.path().join(name);
-        std::fs::write(&path, content)?;
-        file_paths.push(path);
-    }
+    let file_paths = write_attachments(dir.path(), attachments)?;
 
     let mut cmd = std::process::Command::new("opencode");
     cmd.arg("run")
@@ -396,5 +424,53 @@ kind = "dio""#;
             }
         }
         text
+    }
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+
+    #[test]
+    fn attachments_keep_their_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = write_attachments(
+            dir.path(),
+            &[("existing.toml", "a = 1\n"), ("datasheet.txt", "datasheet")],
+        )
+        .unwrap();
+        assert_eq!(paths[0].file_name().unwrap(), "existing.toml");
+        assert_eq!(paths[1].file_name().unwrap(), "datasheet.txt");
+        assert_eq!(std::fs::read_to_string(&paths[0]).unwrap(), "a = 1\n");
+        assert_eq!(std::fs::read_to_string(&paths[1]).unwrap(), "datasheet");
+    }
+
+    #[test]
+    fn attachment_names_cannot_escape_the_temporary_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(write_attachments(dir.path(), &[("../escape.txt", "x")]).is_err());
+        assert!(write_attachments(dir.path(), &[("", "x")]).is_err());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn prompts_name_the_attachments() {
+        let new = new_prompt(None, None);
+        assert!(new.contains("datasheet.txt"), "{new}");
+        assert!(!new.contains("existing.toml"));
+
+        let update = update_prompt();
+        assert!(update.contains("existing.toml"), "{update}");
+        assert!(update.contains("datasheet.txt"), "{update}");
+    }
+
+    #[test]
+    fn update_restores_the_reviewed_model_payload() {
+        let manifest = crate::manifest::deserialise(
+            "[component]\nname = \"Test\"\ntitle = \"Test\"\n[[pin]]\nnum = 1\nname = \"IO\"\npurpose = \"IO\"\nkind = \"dio\"\n",
+        )
+        .unwrap();
+        let restored = restore_model_payload(manifest, Some("payload".into()));
+        assert_eq!(restored.component.model_3d_data.as_deref(), Some("payload"));
     }
 }

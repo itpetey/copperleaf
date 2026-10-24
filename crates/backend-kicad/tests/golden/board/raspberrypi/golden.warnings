@@ -1,0 +1,66 @@
+Info|DECOUPLE:SUMMARY|placed 2 decoupling capacitor(s)|C1,C2|
+Warning|DECOUPLE:UNCONNECTED|power pin U1.DVDD_1 is not connected to a net|U1.DVDD_1|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.DVDD_2 is not connected to a net|U1.DVDD_2|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.DVDD_3 is not connected to a net|U1.DVDD_3|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_1 is not connected to a net|U1.IOVDD_1|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_2 is not connected to a net|U1.IOVDD_2|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_3 is not connected to a net|U1.IOVDD_3|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_4 is not connected to a net|U1.IOVDD_4|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_5 is not connected to a net|U1.IOVDD_5|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.IOVDD_6 is not connected to a net|U1.IOVDD_6|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.QSPI_IOVDD is not connected to a net|U1.QSPI_IOVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VREG_AVDD is not connected to a net|U1.VREG_AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VREG_VIN is not connected to a net|U1.VREG_VIN|connect the pin to a power net
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO0 is floating|U1.GPIO0|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO1 is floating|U1.GPIO1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO10 is floating|U1.GPIO10|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO11 is floating|U1.GPIO11|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO12 is floating|U1.GPIO12|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO13 is floating|U1.GPIO13|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO14 is floating|U1.GPIO14|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO15 is floating|U1.GPIO15|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO16 is floating|U1.GPIO16|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO17 is floating|U1.GPIO17|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO18 is floating|U1.GPIO18|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO19 is floating|U1.GPIO19|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO2 is floating|U1.GPIO2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO20 is floating|U1.GPIO20|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO21 is floating|U1.GPIO21|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO22 is floating|U1.GPIO22|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO23 is floating|U1.GPIO23|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO24 is floating|U1.GPIO24|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO25 is floating|U1.GPIO25|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO26_ADC0 is floating|U1.GPIO26_ADC0|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO27_ADC1 is floating|U1.GPIO27_ADC1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO28_ADC2 is floating|U1.GPIO28_ADC2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO29_ADC3 is floating|U1.GPIO29_ADC3|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO3 is floating|U1.GPIO3|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO4 is floating|U1.GPIO4|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO5 is floating|U1.GPIO5|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO6 is floating|U1.GPIO6|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO7 is floating|U1.GPIO7|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO8 is floating|U1.GPIO8|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.GPIO9 is floating|U1.GPIO9|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.QSPI_SD0 is floating|U1.QSPI_SD0|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.QSPI_SD1 is floating|U1.QSPI_SD1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.QSPI_SD2 is floating|U1.QSPI_SD2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.QSPI_SD3 is floating|U1.QSPI_SD3|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.QSPI_SS is floating|U1.QSPI_SS|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RUN is floating|U1.RUN|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.SWDIO is floating|U1.SWDIO|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.USB_DM is floating|U1.USB_DM|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.USB_DP is floating|U1.USB_DP|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.VREG_FB is floating|U1.VREG_FB|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.VREG_LX is floating|U1.VREG_LX|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.DVDD_1 is unconnected|U1.DVDD_1|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.DVDD_2 is unconnected|U1.DVDD_2|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.DVDD_3 is unconnected|U1.DVDD_3|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_1 is unconnected|U1.IOVDD_1|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_2 is unconnected|U1.IOVDD_2|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_3 is unconnected|U1.IOVDD_3|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_4 is unconnected|U1.IOVDD_4|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_5 is unconnected|U1.IOVDD_5|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.IOVDD_6 is unconnected|U1.IOVDD_6|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.QSPI_IOVDD is unconnected|U1.QSPI_IOVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VREG_AVDD is unconnected|U1.VREG_AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VREG_VIN is unconnected|U1.VREG_VIN|Connect the pin to a power net

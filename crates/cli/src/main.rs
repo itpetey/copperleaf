@@ -32,6 +32,8 @@ pub enum CliError {
     Parse(#[from] copperleaf_backend_kicad::ParseError),
     #[error("emit error: {0}")]
     Emit(#[from] copperleaf_backend_kicad::fp_emitter::EmitError),
+    #[error("path containment error: {0}")]
+    PathContainment(#[from] copperleaf::PathContainmentError),
 }
 
 #[derive(Parser)]
@@ -159,6 +161,14 @@ enum Command {
 #[derive(Parser)]
 #[command(name = "copperleaf")]
 #[command(version, about = "Parts-creation CLI for Copperleaf")]
+#[command(long_about = "\
+Parts-creation CLI for Copperleaf.
+
+Datasheet mode sends extracted PDF text to the configured model provider via
+the local `opencode` CLI. The provider may retain or log that text, and model
+output is untrusted draft input that can be influenced by prompt injection in
+the datasheet. Review every generated manifest before use. Generated manifests
+are never compiled or executed automatically.")]
 struct Cli {
     #[command(subcommand)]
     command: Command,

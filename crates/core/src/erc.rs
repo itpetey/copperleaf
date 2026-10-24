@@ -3,7 +3,7 @@
 //! Every function in this module inspects an immutable [`CompiledBoard`] and
 //! returns [`Diagnostic`]s.  None of them mutate the board or produce new
 //! components — that is the job of the compilation pipeline in
-//! [`copperleaf_compile`].
+//! `copperleaf_compile`.
 //!
 //! [`run_erc`] is the single entry point used by the compilation pipeline;
 //! the individual rule functions are kept `pub` so they can be unit-tested
@@ -176,7 +176,8 @@ mod tests {
             }],
             connections: vec![Connection {
                 component: 0,
-                pin: "VDD".into(),
+                pin: crate::PinId("VDD".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             }],
             constraints: vec![],
@@ -208,7 +209,8 @@ mod tests {
             }],
             connections: vec![Connection {
                 component: 0,
-                pin: "NC".into(),
+                pin: crate::PinId("NC".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             }],
             constraints: vec![],

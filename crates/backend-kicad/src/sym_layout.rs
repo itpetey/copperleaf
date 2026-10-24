@@ -25,6 +25,8 @@ pub struct LayoutPin {
 /// A fully placed symbol pin.
 #[derive(Clone, Debug)]
 pub struct PlacedPin {
+    /// Component-local index of this pin in the source pin list.
+    pub index: usize,
     pub name: String,
     pub number: String,
     /// KiCad electrical type string (e.g. `"power_in"`).
@@ -144,6 +146,7 @@ pub fn layout_symbol(pins: &[LayoutPin]) -> SymbolLayout {
     for (row, &i) in left.iter().enumerate() {
         let p = &pins[i];
         placed.push(PlacedPin {
+            index: i,
             name: p.name.clone(),
             number: p.number.clone(),
             etype: role_to_pin_type(p.role),
@@ -156,6 +159,7 @@ pub fn layout_symbol(pins: &[LayoutPin]) -> SymbolLayout {
     for (row, &i) in right.iter().enumerate() {
         let p = &pins[i];
         placed.push(PlacedPin {
+            index: i,
             name: p.name.clone(),
             number: p.number.clone(),
             etype: role_to_pin_type(p.role),
@@ -168,6 +172,7 @@ pub fn layout_symbol(pins: &[LayoutPin]) -> SymbolLayout {
     for (col, &i) in top.iter().enumerate() {
         let p = &pins[i];
         placed.push(PlacedPin {
+            index: i,
             name: p.name.clone(),
             number: p.number.clone(),
             etype: role_to_pin_type(p.role),
@@ -180,6 +185,7 @@ pub fn layout_symbol(pins: &[LayoutPin]) -> SymbolLayout {
     for (col, &i) in bottom.iter().enumerate() {
         let p = &pins[i];
         placed.push(PlacedPin {
+            index: i,
             name: p.name.clone(),
             number: p.number.clone(),
             etype: role_to_pin_type(p.role),

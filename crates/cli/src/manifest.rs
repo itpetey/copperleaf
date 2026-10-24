@@ -12,10 +12,12 @@ use crate::kindmap::{KindEntry, KindMap};
 
 /// Deserialise a TOML string into a manifest.
 pub fn deserialise(input: &str) -> Result<Manifest, CodegenError> {
-    toml::from_str(input).map_err(|e| CodegenError::Toml {
+    let manifest: Manifest = toml::from_str(input).map_err(|e| CodegenError::Toml {
         path: "<string>".into(),
         source: e,
-    })
+    })?;
+    copperleaf_part_codegen::validate_structure_or_error(&manifest)?;
+    Ok(manifest)
 }
 
 /// Build a manifest from footprint pads alone.
@@ -294,42 +296,26 @@ pub fn pin_number(number: &str, counter: &mut usize) -> usize {
 /// drift apart.  The only manual step is injecting `# TODO: fill …` advice
 /// after power pins that still lack required fields.
 pub fn serialise(manifest: &Manifest) -> String {
-    let mut out = String::new();
+    // Serialise the complete manifest value so layout, metadata, constraints,
+    // thermal vias, and mechanical pads all round-trip. Comments are a
+    // post-pass rather than a second serialisation implementation.
+    let body = toml::to_string(manifest).expect("Manifest serialisation is infallible");
 
-    // ── [component] ────────────────────────────────────────────────
-    out.push_str("[component]\n");
-    out.push_str(
-        &toml::to_string(&manifest.component).expect("ComponentMeta serialisation is infallible"),
-    );
-    out.push('\n');
-
-    // ── [[pin]] ────────────────────────────────────────────────────
-    for pin in &manifest.pins {
-        out.push_str("[[pin]]\n");
-        out.push_str(&toml::to_string(pin).expect("PinDef serialisation is infallible"));
-        let missing = missing_power_fields(pin);
-        if !missing.is_empty() {
-            out.push_str(&format!("# TODO: fill {}\n", missing.join(", ")));
+    let mut out = String::with_capacity(body.len() + 128);
+    let mut pin_index = 0usize;
+    for line in body.lines() {
+        out.push_str(line);
+        out.push('\n');
+        if line.trim() == "[[pin]]" {
+            if let Some(pin) = manifest.pins.get(pin_index) {
+                let missing = missing_power_fields(pin);
+                if !missing.is_empty() {
+                    out.push_str(&format!("# TODO: fill {}\n", missing.join(", ")));
+                }
+            }
+            pin_index += 1;
         }
-        out.push('\n');
     }
-
-    // ── [[constraint]] ─────────────────────────────────────────────
-    for constraint in &manifest.constraints {
-        out.push_str("[[constraint]]\n");
-        out.push_str(
-            &toml::to_string(constraint).expect("ConstraintDef serialisation is infallible"),
-        );
-        out.push('\n');
-    }
-
-    // ── [[mechanical]] ─────────────────────────────────────────────
-    for mech in &manifest.mechanical {
-        out.push_str("[[mechanical]]\n");
-        out.push_str(&toml::to_string(mech).expect("MechanicalDef serialisation is infallible"));
-        out.push('\n');
-    }
-
     out
 }
 
@@ -916,5 +902,252 @@ mod tests {
             new_pin_diags2.is_empty(),
             "re-merge should produce no NEW_PIN diagnostics"
         );
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn deserialise_rejects_unknown_fields_with_the_field_name() {
+        let error = deserialise("[component]\nname = \"Test\"\ntitle = \"Test\"\nsurprise = 1\n")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unknown field"), "{error}");
+        assert!(error.contains("surprise"), "{error}");
+    }
+
+    #[test]
+    fn deserialise_rejects_duplicate_pad_numbers() {
+        let error = deserialise(
+            "[component]\nname = \"Test\"\ntitle = \"Test\"\n\
+             [[pin]]\nnum = 1\nnumber = \"7\"\nname = \"A\"\npurpose = \"IO\"\nkind = \"dio\"\n\
+             [[pin]]\nnum = 2\nnumber = \"7\"\nname = \"B\"\npurpose = \"IO\"\nkind = \"dio\"\n",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("VALIDATE:DUPLICATE_PAD"), "{error}");
+    }
+}
+
+#[cfg(test)]
+mod round_trip_tests {
+    use super::*;
+    use copperleaf_part_codegen::{Quantity, QuantityUnit};
+
+    const FIXTURE: &str = r#"
+[component]
+name = "LayoutPart"
+title = "Layout fixture"
+description = "A part with every manifest feature"
+datasheet = "https://example.test/layout.pdf"
+lib_id = "LayoutPart"
+model_3d = "models/layout.step"
+model_3d_rotation = [0.0, 0.0, 90.0]
+model_3d_offset = [1.0, 2.0, 3.0]
+fab_extent = [-1.0, -2.0, 3.0, 4.0]
+
+[[pin]]
+num = 1
+number = "A1"
+name = "VDD"
+purpose = "Supply"
+notes = "main rail"
+kind = "pwr_fixed"
+v = 3.3
+i = 0.1
+pos = [1.0, 2.0]
+rotation = 90.0
+length = 2.54
+width = 0.6
+height = 1.2
+pad_type = "smd"
+pad_shape = "roundrect"
+roundrect_rratio = 0.25
+solder_mask_margin = 0.05
+layers = "F.Cu F.Mask F.Paste"
+thermal_vias = [{ pos = [0.0, 0.0], drill = 0.2, size = 0.3 }]
+
+[[constraint]]
+type = "Decoupling"
+values = ["100nF", "10uF"]
+per_pin = true
+
+[[constraint]]
+type = "MaxJunction"
+temp = "125C"
+
+[[constraint]]
+type = "LengthMatch"
+group = "USB"
+skew_ps = 50.0
+
+[layout.net_class]
+min_width = "0.2mm"
+clearance = "0.15mm"
+
+[layout.creepage]
+min = "0.5mm"
+voltage = "50V"
+
+[[mechanical]]
+number = "None"
+pos = [0.0, 0.0]
+width = 3.2
+height = 3.2
+pad_type = "np_thru_hole"
+pad_shape = "circle"
+layers = "*.Cu *.Mask"
+drill = 3.2
+"#;
+
+    #[test]
+    fn layout_bearing_manifest_round_trips_every_field() {
+        let manifest = deserialise(FIXTURE).expect("fixture parses");
+        let serialised = serialise(&manifest);
+        assert!(serialised.contains("[layout.net_class]"), "{serialised}");
+        assert!(serialised.contains("[layout.creepage]"), "{serialised}");
+        assert!(serialised.contains("[[mechanical]]"), "{serialised}");
+        assert!(serialised.contains("min_width = \"0.2mm\""), "{serialised}");
+
+        let parsed = deserialise(&serialised).expect("round-trip parses");
+        assert_eq!(parsed.component.name, manifest.component.name);
+        assert_eq!(parsed.component.title, manifest.component.title);
+        assert_eq!(parsed.component.description, manifest.component.description);
+        assert_eq!(parsed.component.datasheet, manifest.component.datasheet);
+        assert_eq!(parsed.component.model_3d, manifest.component.model_3d);
+        assert_eq!(
+            parsed.component.model_3d_rotation,
+            manifest.component.model_3d_rotation
+        );
+        assert_eq!(parsed.constraints.len(), manifest.constraints.len());
+        assert_eq!(parsed.pins.len(), manifest.pins.len());
+        assert_eq!(parsed.pins[0].number, manifest.pins[0].number);
+        assert_eq!(parsed.pins[0].pos, manifest.pins[0].pos);
+        assert_eq!(parsed.pins[0].thermal_vias.len(), 1);
+        assert_eq!(parsed.mechanical.len(), 1);
+
+        let layout = parsed.layout.net_class.as_ref().expect("net class");
+        assert_eq!(
+            layout.min_width,
+            Quantity::new(0.2, QuantityUnit::Millimetre)
+        );
+        assert_eq!(
+            layout.clearance,
+            Quantity::new(0.15, QuantityUnit::Millimetre)
+        );
+        let creepage = parsed.layout.creepage.as_ref().expect("creepage");
+        assert_eq!(creepage.voltage, Quantity::new(50.0, QuantityUnit::Volt));
+
+        let decoupling = &parsed.constraints[0];
+        assert_eq!(decoupling.values.as_ref().unwrap().len(), 2);
+        assert_eq!(
+            decoupling.values.as_ref().unwrap()[0],
+            Quantity::new(100.0, QuantityUnit::Nanofarad)
+        );
+        assert_eq!(
+            parsed.constraints[1].temp,
+            Some(Quantity::new(125.0, QuantityUnit::Celsius))
+        );
+
+        // The serialised form is semantically stable across another cycle.
+        let second = serialise(&parsed);
+        let first_value: toml::Value = toml::from_str(&serialised).unwrap();
+        let second_value: toml::Value = toml::from_str(&second).unwrap();
+        assert_eq!(first_value, second_value);
+    }
+
+    #[test]
+    fn every_part_manifest_serialisation_is_semantically_lossless() {
+        let parts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parts");
+        let mut checked = 0;
+        for vendor in std::fs::read_dir(&parts).unwrap() {
+            let vendor = vendor.unwrap();
+            let Ok(entries) = std::fs::read_dir(vendor.path()) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("toml")
+                    || path.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml")
+                {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).unwrap();
+                let manifest: Manifest = toml::from_str(&source)
+                    .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+                let first = serialise(&manifest);
+                let reparsed: Manifest = toml::from_str(&first)
+                    .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+                let second = serialise(&reparsed);
+                let first_value: toml::Value = toml::from_str(&first).unwrap();
+                let second_value: toml::Value = toml::from_str(&second).unwrap();
+                assert_eq!(
+                    first_value,
+                    second_value,
+                    "{} lost fields through serialisation",
+                    path.display()
+                );
+                checked += 1;
+            }
+        }
+        assert!(
+            checked >= 27,
+            "expected every part manifest, found {checked}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod asset_tests {
+    use super::*;
+
+    fn repo_root() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
+    #[test]
+    fn embedded_models_have_provenance_and_no_local_paths() {
+        let root = repo_root();
+        let register = std::fs::read_to_string(root.join("docs/THIRD_PARTY_ASSETS.md")).unwrap();
+        let parts = root.join("parts");
+        let mut embedded = 0;
+        for vendor in std::fs::read_dir(&parts).unwrap() {
+            let vendor = vendor.unwrap();
+            let Ok(entries) = std::fs::read_dir(vendor.path()) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("toml")
+                    || path.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml")
+                {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).unwrap();
+                assert!(
+                    !source.contains("/Users/"),
+                    "{} contains a developer-local path",
+                    path.display()
+                );
+                let manifest: Manifest = toml::from_str(&source).unwrap();
+                if let Some(payload) = manifest.component.model_3d_data.as_deref() {
+                    assert!(
+                        !payload.trim().is_empty(),
+                        "{} has an empty model payload",
+                        path.display()
+                    );
+                    let relative = path.strip_prefix(&root).unwrap().display().to_string();
+                    assert!(
+                        register.contains(&relative),
+                        "{} lacks a provenance entry in docs/THIRD_PARTY_ASSETS.md",
+                        path.display()
+                    );
+                    embedded += 1;
+                }
+            }
+        }
+        assert!(embedded >= 26, "expected embedded models, found {embedded}");
     }
 }

@@ -16,7 +16,7 @@ struct DecoupledPart {
 }
 
 impl PwrSource {
-    const VCC: PinRef = PinRef("VCC");
+    const VCC: PinRef = PinRef("1");
     fn new(v: f64) -> Self {
         Self {
             pins: vec![Pin::build("VCC").pwr_fixed(v.volt(), 1.0.amp()).pin()],
@@ -31,7 +31,7 @@ impl Component for PwrSource {
 }
 
 impl Load {
-    const VDD: PinRef = PinRef("VDD");
+    const VDD: PinRef = PinRef("1");
     fn new(v_max: f64) -> Self {
         Self {
             pins: vec![
@@ -50,7 +50,7 @@ impl Component for Load {
 }
 
 impl DecoupledPart {
-    const VDD: PinRef = PinRef("VDD");
+    const VDD: PinRef = PinRef("1");
     fn new() -> Self {
         Self {
             pins: vec![Pin::build("VDD").pwr_fixed(3.3.volt(), 0.1.amp()).pin()],

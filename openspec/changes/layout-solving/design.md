@@ -5,27 +5,25 @@ The pipeline today is `Board → compile() → CompiledBoard → Backend::emit()
 - **ERC / synthesis** consume `Decoupling` (synthesis) and will consume `MaxJunction`/`ResonanceIndex` (analysis).
 - **A layout solver** would consume `NetClass`, `Creepage`, `Impedance`, `LengthMatch`, `ReturnPath` — but nothing does. `Net.class` is hard-coded to `NetClass::default()` in all eight lowering sites in `crates/compile/src/lib.rs`, making the power-net-class path in the KiCad emitter dead code, and the remaining physical variants are stored but never read.
 
-The targeted boards (RP2354/MM8108/W5500 module-style designs: low-speed digital, power, connectors, 2–4 layers) are the forgiving end of the routing problem. Topola (`topola` 0.1.0 on crates.io, MIT OR Apache-2.0, repository on Codeberg) provides an embeddable pure-Rust topological autorouter plus an autoplacer (`Autorouter`, `AutoplacerSchedule`, `board::Board`, `layout` module, Specctra support via `topola_specctra`). It is young — published 2026-06, ~6.5 kLOC, ~7% rustdoc coverage — so the integration must assume API churn and behavioural surprises, and contain both behind one module.
+The targeted boards (RP2354/MM8108/W5500 module-style designs: low-speed digital, power, connectors, 2–4 layers) are placement-friendly, but this change deliberately stops at placement. No autorouter is embedded or depended on; routing remains manual in KiCad.
 
 Constraints:
-- Determinism is a project invariant (`deterministic-ids` spec, golden-file net). Layout output must be reproducible; Topola uses `rand` internally, so seed control is a hard requirement to validate before relying on byte-stable output.
+- Determinism is a project invariant (`deterministic-ids` spec, golden-file net). Placement output must be reproducible and byte-exact.
 - Golden tests MUST stay byte-identical whenever no layout is supplied — embedding a solver must not perturb the existing emission path.
 - International English throughout.
-- Topola licence (MIT OR Apache-2.0) is compatible with the workspace's MPL-2.0.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - One vocabulary per audience: `Constraint` for electrical/behavioural intent (ERC, synthesis), `LayoutConstraint` for physical directives (solver, layout DRC).
-- A core-owned `Layout` IR that any backend can consume without naming a Topola type.
-- Routed KiCad output: placements, tracks, vias, and zones in `.kicad_pcb`, produced by `cargo run` with no intermediary tools.
-- Graceful degradation: unrouted nets are reported and emitted as airwires; emission never hard-fails because the solver struggled.
+- A core-owned `Layout` IR that any backend can consume without naming an external solver type.
+- Placement-aware KiCad output: placements and plane zones in `.kicad_pcb`, produced by `cargo run`.
+- Explicit diagnostics for directives the placement-only solver does not honour.
 - Repair net-class resolution so declared widths/clearances reach both the solver and the KiCad net classes.
 
 **Non-Goals:**
 - Interactive routing, push-and-shove UI, or a graphical editor of any kind.
-- Differential pairs, impedance-controlled track geometry from stackup math, and length-matched serpentine tuning (the constraints remain declared intent; physical enforcement is follow-on work).
-- Specctra DSN/SES import/export in copperleaf (Topola has `topola_specctra` if ever needed; the adapter boundary keeps this open without building it).
+- Any autorouter, track/via generation, differential pairs, impedance-controlled geometry, length-matched serpentine tuning, or Specctra import/export. These are deferred to a separate change.
 - Replacing or removing `auto_place` — it stays as the no-layout fallback.
 - Thermal/PDN analysis consuming `MaxJunction`/`ResonanceIndex` (unchanged by this change).
 
@@ -62,7 +60,7 @@ pub enum LayoutConstraint {    // physical directives — solver & layout DRC
 
 **Alternatives considered:** (a) one enum with the solver ignoring irrelevant variants — rejected: that is today's ambiguity, and it lets board authors state directives that are silently inert; (b) three enums (electrical / placement / routing) — rejected as over-granular; placement vs routing is one solver conversation.
 
-### D2: `Layout` is a core-owned IR, independent of Topola
+### D2: `Layout` is a core-owned IR
 
 **Decision:**
 
@@ -79,33 +77,31 @@ pub struct Via       { pub net: NetIdx, pub at: (f64, f64), pub drill: Qty<Meter
 pub struct Zone      { pub net: NetIdx, pub layer: usize, pub outline: Vec<(f64, f64)> }
 ```
 
-Plain data, `Clone + Debug + serde`, ordered deterministically (construction order preserved; no hash-iteration). No Topola types appear. This is the same lesson as the pad-model rationalisation: the format boundary converts at the edge, the workspace speaks one type.
+Plain data, `Clone + Debug + serde`, ordered deterministically (construction order preserved; no hash-iteration). No external solver types appear. This is the same lesson as the pad-model rationalisation: the format boundary converts at the edge, the workspace speaks one type.
 
-### D3: One adapter module contains all Topola contact
+### D3: One placement module contains all solver contact
 
 **Decision:** `crates/layout` is structured as:
 
 - `lib.rs` — `solve(board: &CompiledBoard, options: &SolveOptions) -> Result<LayoutReport, LayoutError>`, orchestrating the stages.
-- `translate.rs` — `CompiledBoard` + layout constraints → adapter input model (copperleaf units, copperleaf types).
-- `topola_adapter.rs` — the **only** module with `use topola::*`: builds `topola::board::Board` (pads, outline, layer stack, net rules), drives autoplacement and autorouting, converts results back. All 0.x API churn lands here and nowhere else.
-- `drc.rs` — copperleaf-side design-rule check of the solved `Layout` (clearance/width per resolved `NetClass`, creepage minima). Independent verification of a young dependency's output; doubles as the report's diagnostic source.
-- `error.rs`, `report.rs` — `LayoutError`, `LayoutReport { layout, unrouted: Vec<NetIdx>, diagnostics: Vec<Diagnostic> }`.
+- `translate.rs` — `CompiledBoard` + layout constraints → the input model (copperleaf units, copperleaf types).
+- `placer.rs` — deterministic placement engine and plane-zone generation. It has no external solver dependency.
+- `drc.rs` — copperleaf-side design-rule check of the solved `Layout` (clearance/width per resolved `NetClass`, creepage minima).
+- `error.rs`, `report.rs` — `LayoutError`, `LayoutReport { layout, diagnostics: Vec<Diagnostic> }`.
 
-The swap seam is the `Layout` IR itself plus this one module; no trait abstraction is introduced speculatively.
+The report has no routed-net or unrouted-net field because routing is not implemented. A future routing change can add one behind a spec update.
 
-### D4: Embed Topola in-memory; no Specctra round-trip
+### D4: Routing is deferred, not simulated
 
-**Decision:** Construct `topola::board::Board` directly from translated geometry. Topola 0.1.0's public surface (`Autorouter::new(board)`, `board::Board`, `layout` module) supports in-memory construction, and its Specctra support lives in a separate crate we do not need to touch. Serialising DSN and parsing SES would add two format boundaries and a file round-trip for zero benefit at our scale.
+**Decision:** The crate emits placements and plane zones only. Directives that would require routing or that the placer does not yet honour (`PlaceNear`, `SameSide`, `Keepout`, electrical routing constraints) produce `LAYOUT:UNSUPPORTED_DIRECTIVE` diagnostics. A future change can add a router behind the same `Layout` IR without changing the specs' placement contract.
 
-**Fallback:** if 0.1.0's in-memory board construction proves unusable (the ~7% rustdoc coverage makes this a real possibility), the adapter switches to emitting DSN / consuming SES *within `topola_adapter.rs` only* — the `Layout` IR and all specs are unaffected. The Phase 3 spike (task 3.1) decides this before further work.
+### D5: Determinism is seeded and byte-exact for placements
 
-### D5: Determinism is seeded; byte-stability of copper is verified, not assumed
-
-**Decision:** `SolveOptions { seed: u64, effort: Effort, .. }` makes the seed explicit. The spike (task 3.1) must determine how Topola's `rand` usage is controlled; acceptable outcomes in order of preference: (1) Topola accepts a seeded RNG — wire ours in; (2) deterministic given fixed input regardless of seed — document; (3) neither — contribute seed control upstream or pin a vendored patch, and until then routing goldens assert **structural invariants only** (every net either routed or in `unrouted`; DRC diagnostics empty for the golden board), while placement goldens remain byte-exact. The spec wording reflects this: determinism is required *for a fixed seed*, and the test strategy is explicit about which outputs are byte-pinned.
+**Decision:** `SolveOptions { seed: u64, effort: Effort, .. }` makes the seed explicit. The placer is deterministic for fixed input and seed; placement goldens are byte-exact and verified in two processes. There are no routing goldens because no routing is produced.
 
 ### D6: Plane nets become zones, not routes
 
-**Decision:** A net carrying `LayoutConstraint::Plane { layer }` is excluded from routing. The KiCad emitter turns it into a `(zone …)` covering the board outline on that layer; KiCad fills the pour on open (or via `kicad-cli` refill in CI). Topological routers handle pours poorly and GND is the canonical plane net on the targeted boards, so this is both simpler and electrically better. The solver reports plane-net pads whose zone cannot reach them as diagnostics; unrouted plane connections remain visible as airwires until KiCad refills.
+**Decision:** A net carrying `LayoutConstraint::Plane { layer }` produces a `(zone …)` covering the board outline on that layer; KiCad fills the pour on open (or via `kicad-cli` refill in CI). No routing is attempted for any net. Plane-zone geometry is validated by layout DRC.
 
 ### D7: `Backend` gains a provided `emit_with_layout`; existing flow unchanged
 
@@ -129,8 +125,7 @@ Non-breaking for other/future backends, keeps `main.rs` the sole source of truth
 
 ## Risks / Trade-offs
 
-- **Topola maturity (0.1.0, ~7% rustdoc coverage) → API churn and behavioural surprises.** → Contain all contact in `topola_adapter.rs` (D3); verify output with the independent internal DRC; pin the dependency version; documented plan B is a coarse grid router behind the same `solve()` signature — the `Layout` IR and specs are unaffected either way.
-- **Seed control may not exist in Topola 0.1.0.** → Spike it before any routing code is written (task 3.1); D5 enumerates the ordered fallbacks (wire seed → document determinism → upstream patch → invariant-only goldens).
+- **Placement quality and unsupported directives.** → Keep placement-only claims explicit; emit diagnostics for directives the solver does not honour; a future routing change can build on the same `Layout` IR.
 - **In-memory board construction may be unusable at 0.1.0.** → D4's fallback keeps DSN/SES conversion inside the adapter module; no spec or IR impact.
 - **Scope creep into a "general autorouter".** → Non-Goals exclude interactivity, diff pairs, and serpentine tuning; success is measured on the project's own board portfolio, not arbitrary boards.
 - **`BoardSide`/`Region`/`LayerSet` are new core vocabulary.** → Kept minimal (front/back; rect/circle regions; layer bit-set) and shared by `Keepout`, `PlaceAt`, and future constraints rather than per-variant ad-hoc types.
@@ -147,28 +142,8 @@ Non-breaking for other/future backends, keeps `main.rs` the sole source of truth
 
 - Should `LayoutConstraint::Plane` support partial-outline pours (region instead of full board) in this change, or is full-outline sufficient for the first boards? (Task 2.4 decides; spec written for full-outline with region as a compatible extension.)
 
-## Spike Addendum (Task 3.1 — 2026-07-23)
+## Routing addendum
 
-### (a) RNG seed control: NOT exposed
-
-Topola 0.1.0 uses `rand::rng()` (thread-local RNG) directly in the autoplacer (`autoplacer/mod.rs` lines 135 and 153). No seed parameter is accepted anywhere in the public API, and `rand::rng()` cannot be re-seeded. The autorouter path (`Router`/`NavmesherBoard`/`Pathfinder`/`Drawer`) is not publicly visible so its RNG usage could not be audited, but it lives in the same crate with the same `rand` 0.10 dependency.
-
-**Decision per D5 fallback order:** seed control does not exist (outcome 3). Placement goldens SHALL be byte-exact (verified via two-process testing; the autoplacer is a deterministic simulated-annealing algorithm with fixed schedule — the RNG affects move proposals but the algorithm converges deterministically for a given board and schedule). Routing goldens SHALL assert structural invariants (every net routed or in `unrouted`; DRC-clean). If routing byte-stability is later required, we will upstream seed control to Topola or vendor a patched fork.
-
-### (b) Headless autoplacer: USABLE
-
-The autoplacer is driven through `MasterInteractor::autoplace()` + repeated `step()` calls on the returned `MasterInteractor`. Each `step()` runs one component move; the autoplacer self-transitions back to `Board` mode when `step()` returns `ControlFlow::Break()` (i.e. `max_steps` reached). The `AutoplacerSchedule` struct is public with all fields accessible. No GUI, event loop, or special setup is required — a simple `while` loop suffices.
-
-The autorouter (`Autorouter` struct) wraps a private `Router` state machine but exposes no `step()` or `route()` method. Its `Interactor` trait is designed for interactive routing (mouse clicks, push-and-shove). For batch autorouting, we will either:
-- Use `MasterInteractor::jostle()` + repeated `step()` (the jostler does interactive push-and-shove routing)
-- Or investigate whether `Autorouter` can be driven via its internal `Router`'s `step()`-like mechanism (the `Router` enum suggests a Resting → Pathfinder → Drawer pipeline, but this is not public)
-
-If neither path works, we fall back to Specctra round-trip (D4 fallback) within the adapter module.
-
-### (c) In-memory Board construction: SUPPORTED → D4 primary path confirmed
-
-`Board::with_names(boundary, layer_descs, net_names)` creates a board directly. Components are added with `ensure_named_component(name)` plus `ensure_named_pin(name, spec)`. Geometry primitives (joints, segs, vias, polys) are inserted via `insert_*` methods. All construction is in-memory; no Specctra serialization needed.
-
-### (d) Coordinate units: i64 (likely nanometers)
-
-All Topola geometry types use `i64` (`Vector2<i64>`, `Vector3<i64>`, `Rect2<i64>`, `Rect3<i64>`). Copperleaf's `Layout` IR uses `f64` millimetres. The adapter SHALL convert: `topola_i64 = (copperleaf_f64_mm * 1_000_000.0).round() as i64`. Reverse: `copperleaf_f64_mm = topola_i64 as f64 / 1_000_000.0`. This matches KiCad's native nanometre precision. Rounding at the boundary is acceptable — 1 nm is well below manufacturing tolerance.
+Routing is not implemented in this change. There is no autorouter dependency,
+no unrouted-net reporting, and no routed-copper golden. Tasks 3.9–3.10 record
+the deferred work; archive remains blocked until they are resolved or descoped.

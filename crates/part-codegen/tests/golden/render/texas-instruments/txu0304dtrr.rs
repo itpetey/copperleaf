@@ -24,18 +24,18 @@ pub struct Txu0304dtr {
 }
 
 impl Txu0304dtr {
-    pub const VCCA: copperleaf::PinRef = copperleaf::PinRef("VCCA");
-    pub const A1: copperleaf::PinRef = copperleaf::PinRef("A1");
-    pub const A2: copperleaf::PinRef = copperleaf::PinRef("A2");
-    pub const A3: copperleaf::PinRef = copperleaf::PinRef("A3");
-    pub const A4Y: copperleaf::PinRef = copperleaf::PinRef("A4Y");
-    pub const GND: copperleaf::PinRef = copperleaf::PinRef("GND");
-    pub const B4: copperleaf::PinRef = copperleaf::PinRef("B4");
-    pub const B3Y: copperleaf::PinRef = copperleaf::PinRef("B3Y");
-    pub const B2Y: copperleaf::PinRef = copperleaf::PinRef("B2Y");
-    pub const B1Y: copperleaf::PinRef = copperleaf::PinRef("B1Y");
-    pub const VCCB: copperleaf::PinRef = copperleaf::PinRef("VCCB");
-    pub const OE: copperleaf::PinRef = copperleaf::PinRef("OE");
+    pub const VCCA: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const A1: copperleaf::PinRef = copperleaf::PinRef("2");
+    pub const A2: copperleaf::PinRef = copperleaf::PinRef("3");
+    pub const A3: copperleaf::PinRef = copperleaf::PinRef("4");
+    pub const A4Y: copperleaf::PinRef = copperleaf::PinRef("5");
+    pub const GND: copperleaf::PinRef = copperleaf::PinRef("6");
+    pub const B4: copperleaf::PinRef = copperleaf::PinRef("7");
+    pub const B3Y: copperleaf::PinRef = copperleaf::PinRef("8");
+    pub const B2Y: copperleaf::PinRef = copperleaf::PinRef("9");
+    pub const B1Y: copperleaf::PinRef = copperleaf::PinRef("10");
+    pub const VCCB: copperleaf::PinRef = copperleaf::PinRef("11");
+    pub const OE: copperleaf::PinRef = copperleaf::PinRef("12");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};
@@ -101,7 +101,7 @@ impl copperleaf::Component for Txu0304dtr {
             
             
             description: None,
-            model_3d: Some("/Users/pete/Downloads/TXU0304DTR/TXU0304DTR.step".into()),
+            model_3d: Some("TXU0304DTR.step".into()),
             
             model_3d_data: Some("<elided:794240:98068830d8f0ad96>".into()),
             

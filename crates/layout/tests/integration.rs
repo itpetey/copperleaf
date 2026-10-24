@@ -160,28 +160,34 @@ fn make_test_board() -> CompiledBoard {
                 },
                 class: NetClass::default(),
                 constraints: vec![],
-                layout: vec![LayoutConstraint::Plane { layer: 3 }], // B.Cu
+                layout: vec![LayoutConstraint::Plane {
+                    layer: copperleaf::CopperLayer(1),
+                }], // B.Cu on a two-layer board
             },
         ],
         connections: vec![
             Connection {
                 component: 0,
-                pin: "1".into(),
+                pin: copperleaf::PinId("1".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             },
             Connection {
                 component: 0,
-                pin: "2".into(),
+                pin: copperleaf::PinId("2".into()),
+                pin_index: 1,
                 net: NetIdx(1),
             },
             Connection {
                 component: 1,
-                pin: "1".into(),
+                pin: copperleaf::PinId("1".into()),
+                pin_index: 0,
                 net: NetIdx(0),
             },
             Connection {
                 component: 1,
-                pin: "2".into(),
+                pin: copperleaf::PinId("2".into()),
+                pin_index: 1,
                 net: NetIdx(1),
             },
         ],

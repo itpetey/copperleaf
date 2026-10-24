@@ -15,11 +15,11 @@ pub struct ConSmaEdgeS {
 }
 
 impl ConSmaEdgeS {
-    pub const Signal: copperleaf::PinRef = copperleaf::PinRef("Signal");
-    pub const GND1: copperleaf::PinRef = copperleaf::PinRef("GND1");
-    pub const GND2: copperleaf::PinRef = copperleaf::PinRef("GND2");
-    pub const GND3: copperleaf::PinRef = copperleaf::PinRef("GND3");
-    pub const GND4: copperleaf::PinRef = copperleaf::PinRef("GND4");
+    pub const Signal: copperleaf::PinRef = copperleaf::PinRef("1");
+    pub const GND1: copperleaf::PinRef = copperleaf::PinRef("G1");
+    pub const GND2: copperleaf::PinRef = copperleaf::PinRef("G2");
+    pub const GND3: copperleaf::PinRef = copperleaf::PinRef("G3");
+    pub const GND4: copperleaf::PinRef = copperleaf::PinRef("G4");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

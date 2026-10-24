@@ -7,7 +7,9 @@
 use std::{fs, path::Path};
 
 use base64::Engine as _;
-use copperleaf::{Backend, BackendError, CompiledBoard, Layout};
+use copperleaf::{
+    Backend, BackendError, CompiledBoard, Layout, Severity, safe_join, validate_compiled_board,
+};
 
 pub use copperleaf::deterministic_id;
 pub use fp_emitter::{EmitError, emit_footprint, emit_footprint_to};
@@ -71,17 +73,27 @@ impl KiCad {
         output_dir: impl AsRef<Path>,
         board: &CompiledBoard,
     ) -> Result<(), BackendError> {
+        ensure_valid(board, None)?;
         let out = output_dir.as_ref().to_owned();
+        validate_output_names(&out, board, &self.project_name)?;
         fs::create_dir_all(&out)?;
 
         let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
-        fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_pro", self.project_name),
+            &pro,
+        )?;
 
         let sch = schematic::emit_schematic(board);
-        fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_sch", self.project_name),
+            &sch,
+        )?;
 
         let net = netlist::emit_netlist(board);
-        fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+        write_contained(out.as_path(), &format!("{}.net", self.project_name), &net)?;
 
         emit_3d_models(&out, board)?;
 
@@ -93,20 +105,34 @@ impl Backend for KiCad {
     type Error = BackendError;
 
     fn emit(&self, output_dir: impl AsRef<Path>, board: &CompiledBoard) -> Result<(), Self::Error> {
+        ensure_valid(board, None)?;
         let out = output_dir.as_ref().to_owned();
+        validate_output_names(&out, board, &self.project_name)?;
         fs::create_dir_all(&out)?;
 
         let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
-        fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_pro", self.project_name),
+            &pro,
+        )?;
 
         let sch = schematic::emit_schematic(board);
-        fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_sch", self.project_name),
+            &sch,
+        )?;
 
         let pcb = pcb::emit_pcb(board, &self.project_name);
-        fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_pcb", self.project_name),
+            &pcb,
+        )?;
 
         let net = netlist::emit_netlist(board);
-        fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+        write_contained(out.as_path(), &format!("{}.net", self.project_name), &net)?;
 
         emit_local_footprints(&out, board)?;
         emit_3d_models(&out, board)?;
@@ -120,14 +146,24 @@ impl Backend for KiCad {
         board: &CompiledBoard,
         layout: &Layout,
     ) -> Result<(), Self::Error> {
+        ensure_valid(board, Some(layout))?;
         let out = output_dir.as_ref().to_owned();
+        validate_output_names(&out, board, &self.project_name)?;
         fs::create_dir_all(&out)?;
 
         let pro = project::emit_project(&self.project_name, Some(&board.design_rules));
-        fs::write(out.join(format!("{}.kicad_pro", self.project_name)), pro)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_pro", self.project_name),
+            &pro,
+        )?;
 
         let sch = schematic::emit_schematic(board);
-        fs::write(out.join(format!("{}.kicad_sch", self.project_name)), sch)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_sch", self.project_name),
+            &sch,
+        )?;
 
         let pcb = pcb::emit_pcb_with_layout(
             board,
@@ -137,10 +173,14 @@ impl Backend for KiCad {
             None,
             &std::collections::HashMap::new(),
         );
-        fs::write(out.join(format!("{}.kicad_pcb", self.project_name)), pcb)?;
+        write_contained(
+            out.as_path(),
+            &format!("{}.kicad_pcb", self.project_name),
+            &pcb,
+        )?;
 
         let net = netlist::emit_netlist(board);
-        fs::write(out.join(format!("{}.net", self.project_name)), net)?;
+        write_contained(out.as_path(), &format!("{}.net", self.project_name), &net)?;
 
         emit_local_footprints(&out, board)?;
         emit_3d_models(&out, board)?;
@@ -149,15 +189,90 @@ impl Backend for KiCad {
     }
 }
 
+/// Reject invalid boards before writing any file.
+fn ensure_valid(board: &CompiledBoard, layout: Option<&Layout>) -> Result<(), BackendError> {
+    let findings = validate_compiled_board(board, layout);
+    let errors: Vec<String> = findings
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == Severity::Error)
+        .map(|diagnostic| format!("[{}] {}", diagnostic.code, diagnostic.message))
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(BackendError::EmitError(format!(
+            "board validation failed:\n{}",
+            errors.join("\n")
+        )))
+    }
+}
+
+/// Validate every filename that emission plans to write before any file is
+/// created, so a traversal attempt cannot leave partial output behind.
+fn validate_output_names(
+    out: &Path,
+    board: &CompiledBoard,
+    project_name: &str,
+) -> Result<(), BackendError> {
+    for extension in ["kicad_pro", "kicad_sch", "kicad_pcb", "net"] {
+        let _ = contained(out, &format!("{project_name}.{extension}"))?;
+    }
+    let _ = contained(out, "fp-lib-table")?;
+
+    let footprints_dir = out.join("footprints");
+    let models_dir = out.join("models");
+    for comp in &board.components {
+        let fp_ref = common::footprint_ref(comp);
+        if let Some(fp_name) = fp_ref.strip_prefix("copperleaf:") {
+            let _ = contained(&footprints_dir, &format!("{fp_name}.kicad_mod"))?;
+        }
+        if comp
+            .meta
+            .model_3d_data
+            .as_deref()
+            .is_some_and(|data| !data.trim().is_empty())
+        {
+            let filename = comp
+                .meta
+                .model_3d
+                .as_deref()
+                .and_then(|path| Path::new(path).file_name())
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+                .unwrap_or_else(|| format!("{}.step", comp.refdes));
+            let _ = contained(&models_dir, &filename)?;
+        }
+    }
+    Ok(())
+}
+
+/// Join one untrusted filename beneath a trusted output directory.
+fn contained(root: &Path, component: &str) -> Result<std::path::PathBuf, BackendError> {
+    safe_join(root, component)
+        .map_err(|error| BackendError::EmitError(format!("path containment: {error}")))
+}
+
+/// Write one output file, refusing names that escape the destination.
+fn write_contained(root: &Path, component: &str, contents: &str) -> Result<(), BackendError> {
+    fs::write(contained(root, component)?, contents)?;
+    Ok(())
+}
+
 /// Write 3D model files from embedded base64 data into the `models/` subdir.
 fn emit_3d_models(out: &Path, board: &CompiledBoard) -> Result<(), BackendError> {
     let models_dir = out.join("models");
     for comp in &board.components {
         if let Some(ref data) = comp.meta.model_3d_data {
-            fs::create_dir_all(&models_dir)?;
+            if data.trim().is_empty() {
+                continue;
+            }
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(data)
                 .map_err(|e| BackendError::EmitError(format!("base64 decode: {e}")))?;
+            if bytes.is_empty() {
+                continue;
+            }
+            fs::create_dir_all(&models_dir)?;
             let fallback = format!("{}.step", comp.refdes);
             let filename = comp
                 .meta
@@ -166,7 +281,8 @@ fn emit_3d_models(out: &Path, board: &CompiledBoard) -> Result<(), BackendError>
                 .and_then(|p| Path::new(p).file_name())
                 .and_then(|s| s.to_str())
                 .unwrap_or(&fallback);
-            fs::write(models_dir.join(filename), &bytes)?;
+            let model_path = contained(&models_dir, filename)?;
+            fs::write(model_path, &bytes)?;
         }
     }
     Ok(())
@@ -192,16 +308,13 @@ fn emit_local_footprints(out: &Path, board: &CompiledBoard) -> Result<(), Backen
             let content = lib_emitter::emit_footprint_lib(comp, fp_name);
             let footprints_dir = out.join("footprints");
             fs::create_dir_all(&footprints_dir)?;
-            fs::write(
-                footprints_dir.join(format!("{}.kicad_mod", fp_name)),
-                content,
-            )?;
+            write_contained(&footprints_dir, &format!("{}.kicad_mod", fp_name), &content)?;
         }
     }
 
     if has_any {
         let fp_lib_table = project::emit_fp_lib_table("copperleaf");
-        fs::write(out.join("fp-lib-table"), fp_lib_table)?;
+        write_contained(out, "fp-lib-table", &fp_lib_table)?;
     }
 
     Ok(())
@@ -217,11 +330,14 @@ mod tests {
     }
 
     impl TwoPinPart {
-        const A: PinRef = PinRef("A");
-        const B: PinRef = PinRef("B");
+        const A: PinRef = PinRef("1");
+        const B: PinRef = PinRef("2");
         fn new() -> Self {
             Self {
-                pins: vec![Pin::build("A").dio(), Pin::build("B").dio()],
+                pins: vec![
+                    Pin::build("A").number("1").dio(),
+                    Pin::build("B").number("2").dio(),
+                ],
             }
         }
     }
@@ -259,5 +375,81 @@ mod tests {
         // and writes fp-lib-table.
         assert!(!names.contains(&"symbols".to_string()));
         assert!(names.contains(&"footprints".to_string()));
+    }
+
+    fn empty_valid_board() -> CompiledBoard {
+        CompiledBoard {
+            components: vec![copperleaf::CompiledComponent::test("U1", vec![])],
+            nets: vec![],
+            connections: vec![],
+            constraints: vec![],
+            layout: vec![],
+            width: 100.0,
+            height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
+        }
+    }
+
+    #[test]
+    fn traversal_in_project_name_writes_nothing() {
+        let board = empty_valid_board();
+        let dir = tempfile::tempdir().unwrap();
+        let result = KiCad::new()
+            .with_project_name("../escape")
+            .emit(dir.path(), &board);
+        assert!(result.is_err(), "traversal must be rejected");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn absolute_project_name_writes_nothing() {
+        let board = empty_valid_board();
+        let dir = tempfile::tempdir().unwrap();
+        let result = KiCad::new()
+            .with_project_name("/tmp/escape")
+            .emit(dir.path(), &board);
+        assert!(result.is_err(), "absolute path must be rejected");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn manifest_footprint_traversal_writes_nothing() {
+        let mut board = empty_valid_board();
+        board.components[0].meta.footprint = Some("copperleaf:../escape".into());
+        let dir = tempfile::tempdir().unwrap();
+        let result = KiCad::new().emit(dir.path(), &board);
+        assert!(result.is_err(), "footprint traversal must be rejected");
+        assert_eq!(
+            std::fs::read_dir(dir.path()).unwrap().count(),
+            0,
+            "no partial output may be written"
+        );
+    }
+
+    #[test]
+    fn invalid_board_cannot_be_emitted() {
+        let board = CompiledBoard {
+            components: vec![
+                copperleaf::CompiledComponent::test("U1", vec![]),
+                copperleaf::CompiledComponent::test("U1", vec![]),
+            ],
+            nets: vec![],
+            connections: vec![],
+            constraints: vec![],
+            layout: vec![],
+            width: 100.0,
+            height: 80.0,
+            stackup: copperleaf::Stackup::two_layer(),
+            design_rules: copperleaf::DesignRules::default(),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let result = KiCad::new().emit(dir.path(), &board);
+        assert!(result.is_err(), "invalid board must not emit");
+        assert_eq!(
+            fs::read_dir(dir.path()).unwrap().count(),
+            0,
+            "validation must fail before any file is written"
+        );
     }
 }

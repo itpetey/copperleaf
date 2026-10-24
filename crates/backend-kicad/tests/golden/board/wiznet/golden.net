@@ -168,6 +168,31 @@
         (pintype "power_in"))
       (node
         (ref "U1")
+        (pin "9")
+        (pinfunction "AGND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "14")
+        (pinfunction "AGND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "16")
+        (pinfunction "AGND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "19")
+        (pinfunction "AGND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
         (pin "29")
         (pinfunction "GND")
+        (pintype "power_in"))
+      (node
+        (ref "U1")
+        (pin "48")
+        (pinfunction "AGND")
         (pintype "power_in")))))

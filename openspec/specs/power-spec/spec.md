@@ -1,7 +1,7 @@
 # power-spec Specification
 
 ## Purpose
-TBD - created by archiving change core-redesign. Update Purpose after archive.
+Define the power-domain model attached to pins and nets, covering absolute voltage limits, nominal voltages, current limits, and flexible versus fixed supplies.
 ## Requirements
 ### Requirement: PowerSpec replaces PowerLimit with nominal voltage
 A `PowerSpec` struct SHALL replace `PowerLimit`. It SHALL contain `v_min: Qty<Volt>`, `v_max: Qty<Volt>`, `v_nom: Option<Qty<Volt>>`, and `i_max: Qty<Amp>`. The `v_nom` field represents the pin's nominal operating voltage, if fixed. For flexible pins, `v_nom` SHALL be `None`.

@@ -198,6 +198,41 @@ impl Stackup {
             .count()
     }
 
+    /// Returns the copper layer at the given canonical ordinal, if it exists.
+    ///
+    /// Ordinal `0` is the front copper layer; the last valid ordinal is the
+    /// back copper layer.
+    pub fn copper_layer(&self, layer: crate::layout::CopperLayer) -> Option<&StackupLayer> {
+        if layer.0 >= self.copper_layer_count() {
+            return None;
+        }
+        self.layers.get(layer.0 * 2)
+    }
+
+    /// Reject a canonical copper ordinal that this stackup does not define.
+    pub fn validate_copper_layer(
+        &self,
+        layer: crate::layout::CopperLayer,
+    ) -> Result<(), crate::units::Diagnostic> {
+        if self.copper_layer(layer).is_some() {
+            return Ok(());
+        }
+        Err(crate::units::Diagnostic {
+            code: "BOARD:LAYER_OUT_OF_RANGE".into(),
+            severity: crate::units::Severity::Error,
+            message: format!(
+                "copper layer ordinal {} is outside the stackup's {} copper layer(s)",
+                layer.0,
+                self.copper_layer_count()
+            ),
+            entities: vec![format!("layer:{}", layer.0)],
+            hint: Some(
+                "Use a zero-based copper ordinal between 0 and the last stackup copper layer."
+                    .into(),
+            ),
+        })
+    }
+
     /// Returns the nth copper layer, where i=1 is the *second* copper layer.
     ///
     /// # Panics
@@ -265,5 +300,36 @@ mod tests {
                 assert!(matches!(layer, StackupLayer::Dielectric { .. }));
             }
         }
+    }
+
+    #[test]
+    fn canonical_copper_ordinals_are_bounded_by_the_stackup() {
+        use crate::layout::CopperLayer;
+
+        let two = Stackup::two_layer();
+        assert!(CopperLayer(0).is_valid_in(&two));
+        assert!(
+            CopperLayer(1).is_valid_in(&two),
+            "two-layer back copper is ordinal 1"
+        );
+        assert!(!CopperLayer(2).is_valid_in(&two));
+
+        let four = Stackup::four_layer();
+        assert!(CopperLayer(0).is_valid_in(&four));
+        assert!(CopperLayer(1).is_valid_in(&four));
+        assert!(CopperLayer(2).is_valid_in(&four));
+        assert!(CopperLayer(3).is_valid_in(&four));
+        assert!(!CopperLayer(4).is_valid_in(&four));
+        assert_eq!(
+            four.copper_layer(CopperLayer(1)).map(StackupLayer::name),
+            Some("Gnd")
+        );
+        assert!(four.copper_layer(CopperLayer(4)).is_none());
+
+        let error = four
+            .validate_copper_layer(CopperLayer(4))
+            .expect_err("ordinal 4 is outside a four-layer stackup");
+        assert_eq!(error.code, "BOARD:LAYER_OUT_OF_RANGE");
+        assert!(four.validate_copper_layer(CopperLayer(3)).is_ok());
     }
 }

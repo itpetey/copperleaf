@@ -1,10 +1,10 @@
 # board-compile-pipeline Specification
 
 ## Purpose
-TBD - created by archiving change core-redesign. Update Purpose after archive.
+Describe the mutable-board to compiled-board pipeline: how components and typed connections are recorded, lowered into nets, validated, and synthesised before emission.
 ## Requirements
 ### Requirement: Board is the mutable design builder
-The `Board` struct SHALL be the mutable, in-progress design. It SHALL store components and connections. `Board::new()` SHALL create an empty board. `Board::add(name, component)` SHALL add a component and return a `ComponentHandle`. `Board::connect(from, to)` SHALL connect two `PinHandle`s and return a `NetHandle`. `Board::compile(self)` SHALL consume the board, run ERC and synthesis, and return `Result<CompileReport, CompileError>`.
+The `Board` struct SHALL be the mutable, in-progress design. It SHALL store components and connections. `Board::new()` SHALL create an empty board. `Board::add(name, component)` SHALL add a component and return a `ComponentHandle`. `Board::connect(from, to)` SHALL connect two `PinHandle`s and return a `NetHandle`. `copperleaf_compile::run(board, options)` SHALL consume the board, run ERC, validation, and synthesis, and return `Result<CompileReport, CompileError>`.
 
 #### Scenario: Create empty board
 - **WHEN** `Board::new()` is called
@@ -20,9 +20,9 @@ The `Board` struct SHALL be the mutable, in-progress design. It SHALL store comp
 - **AND** the connection is recorded for net inference during compilation
 
 #### Scenario: Compile consumes the board
-- **WHEN** `board.compile()` is called on a board with no errors
+- **WHEN** `copperleaf_compile::run(board, &CompileOptions::default())` is called on a board with no errors
 - **THEN** a `CompileReport` containing a `CompiledBoard` is returned
-- **AND** the original `Board` is no longer usable (consumed by `compile()`)
+- **AND** the original `Board` is no longer usable (consumed by `run()`)
 
 ### Requirement: CompiledBoard is the immutable verified artifact
 The `CompiledBoard` struct SHALL be immutable and contain all resolved data: components (original + synthesised) with deterministic refdes, inferred nets with properties, resolved connections, and all constraints.
@@ -43,14 +43,14 @@ A `Backend` trait SHALL define `fn emit(&self, output_dir: &str, board: &Compile
 - **THEN** `cargo run` produces the complete backend output with no intermediary files or CLI steps
 
 ### Requirement: Compile runs ERC and blocks on errors
-`Board::compile()` SHALL run all ERC rules before producing a `CompiledBoard`. If any ERC rule produces an error-severity diagnostic, `compile()` SHALL return `CompileError` with all errors. Warnings SHALL NOT block compilation and SHALL be included in `CompileReport`.
+`copperleaf_compile::run()` SHALL run all ERC rules before producing a `CompiledBoard`. If any ERC rule or central board validation produces an error-severity diagnostic, `run()` SHALL return `CompileError` with all errors. Warnings SHALL NOT block compilation and SHALL be included in `CompileReport`.
 
 #### Scenario: ERC error blocks compilation
 - **WHEN** a board has a pin connected to a net with voltage exceeding the pin's `v_max`
-- **THEN** `compile()` returns `CompileError` containing the overvoltage diagnostic
+- **THEN** `run()` returns `CompileError` containing the overvoltage diagnostic
 
 #### Scenario: ERC warning does not block
 - **WHEN** a board has a floating input pin (warning severity)
-- **THEN** `compile()` returns `CompileReport` with the warning in `report.warnings`
+- **THEN** `run()` returns `CompileReport` with the warning in `report.warnings`
 - **AND** the `CompiledBoard` is still produced
 

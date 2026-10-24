@@ -814,65 +814,65 @@
       (xy 66.04 40.64))
     (stroke
       (width 0))
-    (uuid "2cc73511-ca37-c3cf-783a-ad97bb8d1f2d"))
+    (uuid "c8cb5359-848f-fced-4b4b-9a1e20c43ddf"))
   (label "NET_J2_GND1"
     (at 66.04 40.64 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "5bfb6ccf-25cf-9612-e231-f4079516b0c4"))
+    (uuid "4201e657-3719-6f6b-096f-33d8c6f86331"))
   (wire
     (pts
       (xy 68.58 38.1)
       (xy 68.58 40.64))
     (stroke
       (width 0))
-    (uuid "802f5ce2-9ac5-73ff-a276-8315b1b89f25"))
+    (uuid "7f8b263c-67f7-6f57-bd0e-c1f1e661392d"))
   (label "NET_J2_GND1"
     (at 68.58 40.64 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "6a681c35-7dfd-77d1-db0e-1ff0d75aba87"))
+    (uuid "1b4c84cd-ed50-2786-a5a8-e89cd78c6cbc"))
   (wire
     (pts
       (xy 71.12 38.1)
       (xy 71.12 40.64))
     (stroke
       (width 0))
-    (uuid "7a01b740-0121-800b-0bb4-6f25450a5e89"))
+    (uuid "cb8b4bd7-67a5-1eb5-6c14-7dd13a146007"))
   (label "NET_J2_GND1"
     (at 71.12 40.64 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "9c338a9e-b492-44cd-d988-f6aa32784d37"))
+    (uuid "10b79266-defe-1a40-1167-e2d592c62c46"))
   (wire
     (pts
       (xy 134.62 53.34)
       (xy 134.62 55.88))
     (stroke
       (width 0))
-    (uuid "233a5adc-6575-1457-c940-100eb7472b01"))
+    (uuid "4026bf47-b6a1-c203-de87-335c218ff825"))
   (label "NET_J4_GND_A"
     (at 134.62 55.88 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "3b219caa-286b-35bf-7aa4-88b638c36411"))
+    (uuid "33629f13-00d9-cfb8-7b6d-24ed850af312"))
   (wire
     (pts
       (xy 137.16 53.34)
       (xy 137.16 55.88))
     (stroke
       (width 0))
-    (uuid "2aabdc89-6b50-2597-6a2d-a7d3bc43fc79"))
+    (uuid "6263e637-a1a1-1e6d-7c6c-fa36147bdda3"))
   (label "NET_J4_GND_A"
     (at 137.16 55.88 0)
     (effects
       (font
         (size 1.27 1.27)))
-    (uuid "1b616d51-8c88-721b-fbd3-34a48046f67d"))
+    (uuid "1a9df338-51f5-ed7e-b880-a9c65ac96e14"))
   (sheet_instances
     (path "/"
       (page "1"))))

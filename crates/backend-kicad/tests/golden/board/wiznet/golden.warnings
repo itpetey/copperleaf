@@ -1,0 +1,37 @@
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.AVDD is not connected to a net|U1.AVDD|connect the pin to a power net
+Warning|DECOUPLE:UNCONNECTED|power pin U1.VDD is not connected to a net|U1.VDD|connect the pin to a power net
+Warning|ERC:FLOATING_INPUT|Input pin U1.ACTLED is floating|U1.ACTLED|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.DNC is floating|U1.DNC|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.DUPLED is floating|U1.DUPLED|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.EXRES1 is floating|U1.EXRES1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.INTn is floating|U1.INTn|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.LINKLED is floating|U1.LINKLED|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.PMODE0 is floating|U1.PMODE0|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.PMODE1 is floating|U1.PMODE1|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.PMODE2 is floating|U1.PMODE2|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSTn is floating|U1.RSTn|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RSVD is floating|U1.RSVD|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RXN is floating|U1.RXN|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.RXP is floating|U1.RXP|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.SPDLED is floating|U1.SPDLED|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.TOCAP is floating|U1.TOCAP|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.TXN is floating|U1.TXN|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.TXP is floating|U1.TXP|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_INPUT|Input pin U1.VBG is floating|U1.VBG|Connect the pin or assign a signal specification
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.AVDD is unconnected|U1.AVDD|Connect the pin to a power net
+Warning|ERC:FLOATING_POWER_INPUT|Power input pin U1.VDD is unconnected|U1.VDD|Connect the pin to a power net

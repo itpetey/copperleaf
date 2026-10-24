@@ -29,9 +29,9 @@
 //!
 //! # Module layout
 //!
-//! - [`translate`] — `CompiledBoard` → placer input model.
-//! - [`placer`] — force-directed placement engine (no external deps).
-//! - [`drc`] — copperleaf-side design-rule check of the solved layout.
+//! - `translate` — `CompiledBoard` → placer input model.
+//! - `placer` — force-directed placement engine (no external deps).
+//! - `drc` — copperleaf-side design-rule check of the solved layout.
 //! - [`report`] — [`LayoutReport`] output type.
 //! - [`error`] — [`LayoutError`] error type.
 

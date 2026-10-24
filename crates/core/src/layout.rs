@@ -16,6 +16,53 @@ pub enum BoardSide {
     Back,
 }
 
+/// Zero-based copper-layer ordinal within a board's stackup.
+///
+/// Ordinal `0` is the front copper layer and the last valid ordinal is the
+/// back copper layer. Intermediate ordinals are inner copper layers. Core and
+/// solver code use this vocabulary; only a backend translates it to a
+/// format-specific layer name such as KiCad's `F.Cu`, `In1.Cu`, or `B.Cu`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CopperLayer(pub usize);
+
+impl CopperLayer {
+    /// Front copper layer.
+    pub const FRONT: Self = Self(0);
+
+    /// Construct an ordinal.
+    pub const fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    /// The zero-based ordinal.
+    pub const fn index(self) -> usize {
+        self.0
+    }
+
+    /// Whether this ordinal exists in the given stackup.
+    pub fn is_valid_in(self, stackup: &crate::Stackup) -> bool {
+        self.0 < stackup.copper_layer_count()
+    }
+}
+
+impl From<usize> for CopperLayer {
+    fn from(index: usize) -> Self {
+        Self(index)
+    }
+}
+
+impl From<CopperLayer> for usize {
+    fn from(layer: CopperLayer) -> Self {
+        layer.0
+    }
+}
+
+/// A set of copper layers referenced by canonical ordinal.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct LayerSet {
+    pub layers: Vec<CopperLayer>,
+}
+
 /// A geometric region on the board, used by keepout and future constraints.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Region {
@@ -23,12 +70,6 @@ pub enum Region {
     Rect { x1: f64, y1: f64, x2: f64, y2: f64 },
     /// Circle in millimetres, centre `(cx, cy)` with radius `r`.
     Circle { cx: f64, cy: f64, r: f64 },
-}
-
-/// A set of copper layers referenced by index.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct LayerSet {
-    pub layers: Vec<usize>,
 }
 
 /// Reference to a component targeted by a placement directive.
@@ -70,7 +111,7 @@ pub enum LayoutConstraint {
     Keepout { region: Region, layers: LayerSet },
     /// Dedicate a copper layer as a plane / pour (net-level only).  The
     /// net is excluded from routing and emitted as a board-outline zone.
-    Plane { layer: usize },
+    Plane { layer: CopperLayer },
 }
 
 /// One component's physical placement.
@@ -90,7 +131,7 @@ pub struct Placement {
 #[derive(Clone, Debug)]
 pub struct Track {
     pub net: LayoutNetIdx,
-    pub layer: usize,
+    pub layer: CopperLayer,
     pub width: Qty<Meter>,
     pub path: Vec<(f64, f64)>,
 }
@@ -103,14 +144,14 @@ pub struct Via {
     pub drill: Qty<Meter>,
     pub diameter: Qty<Meter>,
     /// (start_layer, end_layer) inclusive.
-    pub layers: (usize, usize),
+    pub layers: (CopperLayer, CopperLayer),
 }
 
 /// One copper pour / zone on a single layer, typically for a plane net.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Zone {
     pub net: LayoutNetIdx,
-    pub layer: usize,
+    pub layer: CopperLayer,
     pub outline: Vec<(f64, f64)>,
 }
 

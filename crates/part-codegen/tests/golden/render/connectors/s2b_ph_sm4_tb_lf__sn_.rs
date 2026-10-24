@@ -15,9 +15,9 @@ pub struct S2bPhSm4TbLfSn {
 
 impl S2bPhSm4TbLfSn {
     pub const PIN_1: copperleaf::PinRef = copperleaf::PinRef("1");
-    pub const SHIELD_1: copperleaf::PinRef = copperleaf::PinRef("SHIELD_1");
+    pub const SHIELD_1: copperleaf::PinRef = copperleaf::PinRef("S1");
     pub const PIN_2: copperleaf::PinRef = copperleaf::PinRef("2");
-    pub const SHIELD_2: copperleaf::PinRef = copperleaf::PinRef("SHIELD_2");
+    pub const SHIELD_2: copperleaf::PinRef = copperleaf::PinRef("S2");
 
     pub fn new() -> Self {
         use copperleaf::{Pin, PowerSpec, Role, units::UnitExt};

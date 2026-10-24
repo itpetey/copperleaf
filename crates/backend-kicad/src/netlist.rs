@@ -122,18 +122,13 @@ fn node_sexpr(board: &CompiledBoard, conn: &copperleaf::Connection) -> Sexpr {
     let comp = board.components.get(conn.component);
     let refdes = comp.map(|c| c.refdes.as_str()).unwrap_or("");
     let mut children = vec![Sexpr::atom("node"), kv("ref", refdes)];
-    let pin = comp.and_then(|c| {
-        c.pins
-            .iter()
-            .enumerate()
-            .find(|(_, p)| p.name() == conn.pin)
-    });
-    if let Some((i, pin)) = pin {
-        children.push(kv("pin", crate::fp_geom::pin_number(pin, i)));
+    let pin = comp.and_then(|c| c.pins.get(conn.pin_index));
+    if let Some(pin) = pin {
+        children.push(kv("pin", crate::fp_geom::pin_number(pin, conn.pin_index)));
         children.push(kv("pinfunction", pin.name()));
         children.push(kv("pintype", role_to_pin_type(pin.role())));
     } else {
-        children.push(kv("pin", &conn.pin));
+        children.push(kv("pin", &conn.pin.0));
     }
     Sexpr::list(children)
 }
@@ -194,17 +189,20 @@ mod tests {
             connections: vec![
                 Connection {
                     component: 0,
-                    pin: "VIN".into(),
+                    pin: copperleaf::PinId("VIN".into()),
+                    pin_index: 0,
                     net: NetIdx(0),
                 },
                 Connection {
                     component: 1,
-                    pin: "VDD".into(),
+                    pin: copperleaf::PinId("VDD".into()),
+                    pin_index: 0,
                     net: NetIdx(1),
                 },
                 Connection {
                     component: 1,
-                    pin: "GPIO".into(),
+                    pin: copperleaf::PinId("GPIO".into()),
+                    pin_index: 1,
                     net: NetIdx(1),
                 },
             ],
