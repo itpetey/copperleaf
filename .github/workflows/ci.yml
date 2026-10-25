@@ -18,6 +18,8 @@ jobs:
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: clippy, rustfmt
+      - name: Install binary installer (cargo binstall)
+        run: cargo install cargo-binstall
       - name: Install verification tools
         run: cargo binstall cargo-deny cargo-shear
       - name: Install OpenSpec
