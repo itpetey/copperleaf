@@ -6,7 +6,7 @@ Provide CLI commands for creating and updating part TOML manifests from KiCad sy
 ## Requirements
 
 ### Requirement: CLI exposes new and update commands
-The `copperleaf-cli` binary SHALL provide `new` and `update` commands, each accepting exactly one source selector: `--symbol <FILE>`, `--footprint <FILE>`, `--dir <DIR>`, or `--datasheet <FILE>`. The binary SHALL use `clap` with `default-features = false`. `update` SHALL use `--crate <VENDOR>` and `--lib-id <ID>` to locate `parts/<vendor>/<toml_stem>.toml`, standardising with `new --crate`. Datasheet-derived output SHALL pass the same untrusted-manifest validation as every other source and SHALL NOT be compiled or executed automatically.
+The `copperleaf-cli` binary SHALL provide `new` and `update` commands, each accepting exactly one source selector: `--symbol <FILE>`, `--footprint <FILE>`, `--dir <DIR>`, or `--datasheet <FILE>`. The binary SHALL use `clap` with `default-features = false`.
 
 #### Scenario: new --symbol creates a part from a KiCad symbol
 - **WHEN** `copperleaf new --symbol ic.kicad_sym --lib-id RP2354A --out rp2354a.toml` is run
@@ -20,17 +20,6 @@ The `copperleaf-cli` binary SHALL provide `new` and `update` commands, each acce
 - **WHEN** `copperleaf new --dir ./part_files/ --lib-id RP2354A --crate raspberrypi` is run
 - **AND** `./part_files/` contains `rp2354a.kicad_sym` and `rp2354a.kicad_mod`
 - **THEN** a TOML file is created at `parts/raspberrypi/rp2354a.toml` containing both symbol-derived names/kinds and footprint-derived geometry
-
-#### Scenario: new --datasheet produces a validated draft
-- **WHEN** `copperleaf new --datasheet ic.pdf --out rp2354a.toml` is run with a usable datasheet
-- **THEN** the CLI writes a manifest only after untrusted-manifest validation succeeds
-- **AND** reports that the manifest is a draft requiring review
-- **AND** does not build the generated Rust
-
-#### Scenario: new --datasheet hard-fails
-- **WHEN** datasheet processing returns content that fails manifest validation
-- **THEN** the CLI prints an error diagnostic and exits with code 1
-- **AND** no output file is written
 
 #### Scenario: update --symbol merges symbol data into existing TOML
 - **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --symbol ic.kicad_sym` is run
@@ -46,6 +35,20 @@ The `copperleaf-cli` binary SHALL provide `new` and `update` commands, each acce
 - **WHEN** `copperleaf update --crate raspberrypi --lib-id RP2354A --dir ./part_files/` is run
 - **AND** the directory contains a `.kicad_sym` and a `.kicad_mod` file
 - **THEN** both symbol and footprint data are merged into the existing TOML
+
+### Requirement: Datasheet-derived manifests are validated drafts
+Datasheet-derived output SHALL pass the same untrusted-manifest validation as every other source and SHALL NOT be compiled or executed automatically.
+
+#### Scenario: new --datasheet produces a validated draft
+- **WHEN** `copperleaf new --datasheet ic.pdf --out rp2354a.toml` is run with a usable datasheet
+- **THEN** the CLI writes a manifest only after untrusted-manifest validation succeeds
+- **AND** reports that the manifest is a draft requiring review
+- **AND** does not build the generated Rust
+
+#### Scenario: new --datasheet hard-fails
+- **WHEN** datasheet processing returns content that fails manifest validation
+- **THEN** the CLI prints an error diagnostic and exits with code 1
+- **AND** no output file is written
 
 #### Scenario: update --datasheet hard-fails
 - **WHEN** datasheet processing returns an invalid manifest update
