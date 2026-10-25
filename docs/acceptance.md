@@ -82,13 +82,16 @@ script fails on any change.
 
 `.github/workflows/ci.yml` runs the same acceptance in a `kicad-acceptance`
 job. The job builds the fixture on the runner, then runs the script inside
-the pinned KiCad container with `KICAD_ACCEPTANCE_SKIP_EMIT=1`:
+the pinned KiCad container with `KICAD_ACCEPTANCE_SKIP_EMIT=1`. The image
+runs as uid 1000, which cannot write to the runner-owned checkout, so the
+emitted project is copied into the container's scratch space first:
 
 ```sh
-docker run --rm -v "$PWD:/work" -w /work \
+docker run --rm -v "$PWD:/work:ro" -w /work \
   -e KICAD_ACCEPTANCE_SKIP_EMIT=1 \
+  -e KICAD_ACCEPTANCE_WORKDIR=/tmp/kicad-acceptance \
   kicad/kicad@sha256:c8f05703e865a1caa7266851cf4986dd01d5fb1148e4f63382b6a73466ba7e71 \
-  bash -lc "./scripts/kicad-acceptance.sh"
+  bash -lc 'cp -R target/kicad-acceptance /tmp/kicad-acceptance && ./scripts/kicad-acceptance.sh'
 ```
 
 ## Known limitations
